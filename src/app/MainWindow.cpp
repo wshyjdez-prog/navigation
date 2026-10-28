@@ -2,7 +2,7 @@
 #include "app/ImportLanding.h"
 #include "ui/common/Components.h"
 #include "ui/common/Theme.h"
-
+#include "ui/map/MapDemoWidget.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
@@ -88,6 +88,7 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent) : QMainWindow(parent), the
     shell_->addWidget(workspace,1);
 
     registerPage("import","数据导入","添加本地路网、兴趣点或轨迹数据。",new ImportLanding(theme));
+    registerPage("map","地图导航","固定场景地图与导航路线演示。",new MapDemoWidget());
     registerPage("components","组件预览","检查公共控件与交互状态。此页为独立演示，不导入业务数据。",makeGallery());
     registerPage("settings","设置与帮助","让工作台适合你。偏好仅在本次会话中保留。",makeSettings());
     connect(&theme_, &Theme::changed, this, &MainWindow::refreshNavigation);

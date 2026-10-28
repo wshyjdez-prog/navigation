@@ -10,6 +10,8 @@ find_package(Qt6 6.4.2 EXACT REQUIRED COMPONENTS Widgets)
 add_library(p1_ui STATIC
     src/ui/common/Theme.cpp
     src/ui/common/Components.cpp
+    src/ui/map/MapDemoWidget.cpp
+    src/ui/map/MapDemoWidget.h
     src/app/ImportLanding.cpp
     src/app/MainWindow.cpp)
 target_include_directories(p1_ui PUBLIC src)
