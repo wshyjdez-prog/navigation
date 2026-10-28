@@ -623,6 +623,7 @@ private slots:
         QTest::newRow("failed") << int(NavigationErrorCode::PlanningFailed) << true << true;
         QTest::newRow("cancelled") << int(NavigationErrorCode::PlanningCancelled) << false << false;
     }
+    // 同一条覆盖说明的执行体（数据见 planningFailuresAbortToIdle_data）。
     void planningFailuresAbortToIdle() {
         QFETCH(int, code);
         QFETCH(bool, expectError);
