@@ -52,6 +52,8 @@ class LocationReplayTests : public QObject {
     Q_OBJECT
 private slots:
     void csvFixtureLoads() {
+        // 覆盖 Stage 4：FixedTrackLoader 读取 CSV 固定轨迹 —— 坐标系 WGS84、数据版本、
+        // 可选字段（海拔/方向/垂直精度）可缺省，全部帧标记 source=mock。
         const auto result = FixedTrackLoader::loadFile(kFixtureDir + QStringLiteral("/campus_loop.csv"));
         QVERIFY2(result.ok(), qPrintable(result.error));
         const FixedTrack& track = *result.track;
@@ -68,6 +70,7 @@ private slots:
     }
 
     void jsonMatchesCsv() {
+        // 覆盖 Stage 4：同一轨迹的 CSV 与 JSON 两种格式逐帧等价（sameSample 全字段比对）。
         const auto csv = FixedTrackLoader::loadFile(kFixtureDir + QStringLiteral("/campus_loop.csv"));
         const auto json = FixedTrackLoader::loadFile(kFixtureDir + QStringLiteral("/campus_loop.json"));
         QVERIFY2(csv.ok(), qPrintable(csv.error));
@@ -79,6 +82,9 @@ private slots:
     }
 
     void csvErrorsAreExplicit_data() {
+        // 覆盖 Stage 4：坏输入的错误必须写成"来源:行号: 原因"，不抛异常、不跳过坏行；
+        // 下列 11 行数据覆盖缺版本/缺列/未知坐标系/未知列名/纬度越界/非数字/列数不符/
+        // 时间非递增/坐标系混用/方向越界/空轨迹。
         QTest::addColumn<QString>("text");
         QTest::addColumn<QString>("expected");
         const QString h = QString::fromLatin1(kCsvHeader);
@@ -96,6 +102,7 @@ private slots:
         QTest::newRow("no-frames") << v + h << QStringLiteral("没有任何轨迹帧");
     }
     void csvErrorsAreExplicit() {
+        // 覆盖 Stage 4：逐条断言上表坏输入的错误信息含预期关键字。
         QFETCH(QString, text);
         QFETCH(QString, expected);
         const auto result = FixedTrackLoader::parseCsv(text, QStringLiteral("t.csv"));
@@ -104,6 +111,7 @@ private slots:
     }
 
     void jsonAndFileErrorsAreExplicit() {
+        // 覆盖 Stage 4：JSON 破损、缺字段、字段类型越界、文件不存在、扩展名不支持均显式报错。
         auto r = FixedTrackLoader::parseJson("{ broken", QStringLiteral("t.json"));
         QVERIFY(!r.ok() && r.error.contains(QStringLiteral("JSON 解析失败")));
         r = FixedTrackLoader::parseJson(R"({"format":"p1-fixed-track","formatVersion":1,"dataVersion":"x","frames":[]})",
@@ -119,6 +127,7 @@ private slots:
     }
 
     void startWithoutTrackIsUnavailable() {
+        // 覆盖 Stage 1：未装载轨迹时 start() → Unavailable + ServiceUnavailable，且不发出任何位置样本。
         MockLocationSource source;
         Recorder rec;
         rec.attach(source);
@@ -131,6 +140,8 @@ private slots:
     }
 
     void replayIsDeterministicAndSeqMonotonic() {
+        // 覆盖 Stage 1 + Stage 5：确定性回放（两次运行逐帧相同）、seq 从 0 单调递增、
+        // 时间戳取自轨迹而非墙钟、sessionId 与 mock 标记一致、seekTo 越界不改变游标。
         std::vector<PositionSample> runs[2];
         for (auto& run : runs) {
             MockLocationSource source;
@@ -160,6 +171,8 @@ private slots:
     }
 
     void timerPauseResumeAndSpeed() {
+        // 覆盖 Stage 4：setSpeed(0.1–32) 与步长换算、pause 后不再自动推进但允许 stepOnce、
+        // resume 恢复推进，越界倍速与越界步长被拒。
         MockLocationSource source;
         Recorder rec;
         rec.attach(source);
@@ -190,6 +203,8 @@ private slots:
     }
 
     void noCallbacksAfterStop() {
+        // 覆盖 Stage 1 + Stage 5：stop() 后不得再回调 —— stepOnce/seekTo/resume/simulateError 全部失效，
+        // 重复 stop() 为空操作，等待后回调总数不变。
         MockLocationSource source;
         Recorder rec;
         rec.attach(source);
@@ -211,6 +226,7 @@ private slots:
     }
 
     void stopInsideSlotSuppressesRemainingSignals() {
+        // 覆盖 Stage 1：在槽函数内调用 stop() 时，同一发帧内后续信号（含精度错误）不再发出。
         MockLocationSource source;
         Recorder rec;
         rec.attach(source);
@@ -225,6 +241,8 @@ private slots:
     }
 
     void replayEndsWithFinishedThenStopped() {
+        // 覆盖 Stage 4：回放结束先发 replayFinished 再自动转 Stopped；运行中不可替换轨迹；
+        // 重新 start() 开启新会话（sessionId 递增、seq 与帧号归零）。
         MockLocationSource source;
         Recorder rec;
         rec.attach(source);
@@ -245,6 +263,8 @@ private slots:
     }
 
     void simulatedErrorsMapToStatus() {
+        // 覆盖 Stage 1：四类 LocationErrorCode（位置丢失/精度过低/权限被拒/服务不可用）与状态映射正确，
+        // 精度过低时样本照常发出；授权恢复后 start() 可重试。
         MockLocationSource source;
         Recorder rec;
         rec.attach(source);
