@@ -1,0 +1,20 @@
+{
+  "format": "p1-fixed-track",
+  "formatVersion": 1,
+  "dataVersion": "fixture-campus-loop-v1",
+  "crs": "WGS84",
+  "frames": [
+    {"timestampMs": 1767225600000, "latDeg": 39.908700, "lonDeg": 116.397500, "altM": 44.0, "speedMps": 0.0, "bearingDeg": null, "hAccuracyM": 8.0, "vAccuracyM": 12.0},
+    {"timestampMs": 1767225601000, "latDeg": 39.908745, "lonDeg": 116.397500, "altM": 44.0, "speedMps": 5.0, "bearingDeg": 0.0, "hAccuracyM": 6.0, "vAccuracyM": 10.0},
+    {"timestampMs": 1767225602000, "latDeg": 39.908790, "lonDeg": 116.397500, "altM": 44.1, "speedMps": 5.0, "bearingDeg": 0.0, "hAccuracyM": 5.0, "vAccuracyM": 9.0},
+    {"timestampMs": 1767225603000, "latDeg": 39.908835, "lonDeg": 116.397500, "speedMps": 5.0, "bearingDeg": 0.0, "hAccuracyM": 5.0},
+    {"timestampMs": 1767225604000, "latDeg": 39.908880, "lonDeg": 116.397500, "altM": 44.2, "speedMps": 5.0, "bearingDeg": 0.0, "hAccuracyM": 5.0, "vAccuracyM": 9.0},
+    {"timestampMs": 1767225605000, "latDeg": 39.908925, "lonDeg": 116.397500, "altM": 44.2, "speedMps": 5.0, "bearingDeg": 0.0, "hAccuracyM": 5.0, "vAccuracyM": 9.0},
+    {"timestampMs": 1767225606000, "latDeg": 39.908925, "lonDeg": 116.397559, "altM": 44.2, "speedMps": 5.0, "bearingDeg": 90.0, "hAccuracyM": 5.0, "vAccuracyM": 9.0},
+    {"timestampMs": 1767225607000, "latDeg": 39.908925, "lonDeg": 116.397617, "altM": 44.3, "speedMps": 5.0, "bearingDeg": 90.0, "hAccuracyM": 5.0, "vAccuracyM": 9.0},
+    {"timestampMs": 1767225608000, "latDeg": 39.908925, "lonDeg": 116.397676, "speedMps": 5.0, "bearingDeg": 90.0, "hAccuracyM": 6.0},
+    {"timestampMs": 1767225609000, "latDeg": 39.908925, "lonDeg": 116.397734, "altM": 44.3, "speedMps": 5.0, "bearingDeg": 90.0, "hAccuracyM": 25.0, "vAccuracyM": 30.0},
+    {"timestampMs": 1767225610000, "latDeg": 39.908925, "lonDeg": 116.397793, "altM": 44.3, "speedMps": 5.0, "bearingDeg": 90.0, "hAccuracyM": 6.0, "vAccuracyM": 9.0},
+    {"timestampMs": 1767225611000, "latDeg": 39.908925, "lonDeg": 116.397852, "altM": 44.3, "speedMps": 0.0, "bearingDeg": 90.0, "hAccuracyM": 5.0, "vAccuracyM": 9.0}
+  ]
+}

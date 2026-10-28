@@ -30,3 +30,7 @@ if(BUILD_TESTING)
     add_test(NAME ui-contracts COMMAND p1-ui-tests)
     set_tests_properties(ui-contracts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
+
+# 4 号：导航模块（位置源契约 + 固定轨迹读取 + 可回放模拟位置源）。
+# 必须位于 include(CTest) 之后，子目录内的 add_test 才会注册到 ctest。
+add_subdirectory(src/navigation)
