@@ -1,0 +1,39 @@
+{
+  "_comment": "4 号第一次作业：本地 stub 参考路线，供导航状态契约测试与 5 号渲染演示使用。全部 source=mock，非真实路网数据，不作真实定位/PAL 适配/G6 联调证据。",
+  "_replaceNote": "待替换：第 2 次作业接入 3 号 RoutePlanner 后，本文件仅保留为回归基准；真实路线由 RoutePlanner 输出 RoutePlanRef，routeId/dataVersion/totalDistanceM/geometryRef 一律以 3 号输出为准。geometryRef 为不透明字符串，路网几何格式由 2/3 号定义，本 stub 不定义。",
+  "format": "p1-stub-route",
+  "formatVersion": 1,
+  "source": "mock",
+  "crs": "WGS84",
+  "routeId": "stub-route-straight-north-001",
+  "dataVersion": "fixture-navigation-case-v1",
+  "totalDistanceM": 190.3572,
+  "totalDurationSec": 19.0,
+  "geometryRef": "stub://waypoints/straight-north-001",
+  "waypoints": [
+    { "latDeg": 60.000000, "lonDeg": 116.000000 },
+    { "latDeg": 60.000090, "lonDeg": 116.000000 },
+    { "latDeg": 60.000180, "lonDeg": 116.000000 },
+    { "latDeg": 60.000270, "lonDeg": 116.000000 },
+    { "latDeg": 60.000360, "lonDeg": 116.000000 },
+    { "latDeg": 60.000450, "lonDeg": 116.000000 },
+    { "latDeg": 60.000540, "lonDeg": 116.000000 },
+    { "latDeg": 60.000630, "lonDeg": 116.000000 },
+    { "latDeg": 60.000720, "lonDeg": 116.000000 },
+    { "latDeg": 60.000810, "lonDeg": 116.000000 },
+    { "latDeg": 60.000900, "lonDeg": 116.000000 },
+    { "latDeg": 60.000990, "lonDeg": 116.000000 },
+    { "latDeg": 60.001080, "lonDeg": 116.000000 },
+    { "latDeg": 60.001170, "lonDeg": 116.000000 },
+    { "latDeg": 60.001260, "lonDeg": 116.000000 },
+    { "latDeg": 60.001350, "lonDeg": 116.000000 },
+    { "latDeg": 60.001440, "lonDeg": 116.000000 },
+    { "latDeg": 60.001530, "lonDeg": 116.000000 },
+    { "latDeg": 60.001620, "lonDeg": 116.000000 },
+    { "latDeg": 60.001710, "lonDeg": 116.000000 }
+  ],
+  "instructions": [
+    { "index": 0, "kind": "Depart", "text": "出发，沿虚拟道路向北", "distanceToManeuverM": 0.0 },
+    { "index": 1, "kind": "ArriveDestination", "text": "到达目的地", "distanceToManeuverM": 190.3572 }
+  ]
+}

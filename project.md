@@ -61,7 +61,7 @@ PDF 总任务中的“适配四大平台”未列出平台清单；本组明确�
 
 所有 UI 设计、实现与评审统一使用根目录 [design.md](design.md) v1.0（2026-10-26）：按用户指定的 Clay Dashboard 视觉风格、Mapbox Car Navigation 地图交互和 EV Stations Health Map 整体布局方向，定义明暗配色、字体、间距、圆角/阴影、公共组件、地图工作台与第一次作业导入流程。网页文字与色板已核对，参考主图未完整载入，具体视觉参数为本项目定义。1 号维护公共主题与应用外壳；2 号负责导入流程实现；5 号负责地图与仪表盘落地。后续 UI 变更先读此文件，调整基准时同步更新。当前已编写应用外壳与公共主题源码，业务导入/地图仍待接入；外部接口与渲染后端仍待确认。
 
-工程结构（应用、公共 UI、测试与根 CMake 已创建；`src/algorithms/` 已有 3 号 P0 私有模型、校验和独立测试；`include/contracts/`、`src/navigation/`、`tests/fixtures/location/` 已有 4 号位置源契约、回放、模块 CMake 和固定轨迹。各自原分支验证见第 7 节，本次集成版本待 Linux 复验；其他模块目录仍为规划位置）：
+工程结构（应用、公共 UI、测试与根 CMake 已创建；`src/algorithms/` 已有 3 号 P0 私有模型、校验和独立测试；`include/contracts/` 已有 4 号位置源契约与导航状态契约；`src/navigation/` 已有位置源回放、导航契约测试与模块 CMake；`tests/fixtures/location/` 已有固定轨迹与五类模拟样例及逐帧期望值；`docs/navigation-contracts.md` 记录契约字段表与转换表。位置源部分已随 1 号 PR #3 进入 main，导航状态契约部分由 4 号本次以增量形式提交、待评审合并；各自的 Linux 虚拟机验证见第 7 节，合并后的完整版本仍建议统一复验；其他模块目录仍为规划位置）：
 
 ```text
 CMakeLists.txt               # 1：顶层工程与目标装配
@@ -86,7 +86,7 @@ docs/                       # 各模块说明及 G6 联调报告
 | DataRepository / StorageAdapter | 2 → 1/3/5 | 数据集 ID/版本、导入进度、图/轨迹/瓦片读取；用户本地 CRUD；包清单/下载/更新；禁止其他模块直接操作其数据库内部表 |
 | RoutePlanner / MapMatcher | 3 → 4/算法页 | 异步请求 ID、输入/结果、取消/失败；路径几何/路段/距离/时间、匹配点/道路/质量信息 |
 | LocationAdapter / LocationSource | 4 → 导航核心 | GeoClue2 和模拟源可替换，位置/时间/速度/方向/精度，启停/错误/权限状态。已落地契约：`include/contracts/LocationTypes.h`、`LocationSource.h`（2026-10-28，4 号分支已记录 Linux 构建通过，本次集成版本待复验）；Mock 实现 `src/navigation/MockLocationSource.*`，真实源替换点 `src/pal/linux/location/` |
-| NavigationController / NavigationSnapshot | 4 → 1/5 | 导航命令、状态、路线、位置、剩余距离/时间、引导指令及序号；经 G6 确认事件映射 |
+| NavigationController / NavigationSnapshot | 4 → 1/5 | 导航命令、状态、路线、位置、剩余距离/时间、引导指令及序号；经 G6 确认事件映射。已落地契约：`include/contracts/NavigationTypes.h`、`NavigationController.h`（2026-10-28，Linux 构建与 ctest 已通过；**状态机实现属第 3 次作业，本次只定契约与转换表**）。Paused 为 Navigating/OffRoute 的子标志而非独立状态；偏航策略已确认为"偏离 > 15 米且持续 ≥ 3 秒，重算最小间隔 10 秒、在途不重复请求"。说明见 `docs/navigation-contracts.md` |
 | LinuxRenderer / MapScene | 5 → UI；2/3/4 提供输入 | drawTile→drawImage、drawRoute→drawLine、present→flush；图像/路线/标记、选点/视角事件、异步提交与渲染完成；后端映射及函数签名待实现验证 |
 | LinuxVoiceAdapter | 1 ↔ 核心层/4 | speak() 本地中文 TTS、listen() 本地 ASR；语音回调通过 FFI 传回核心层；明确 ABI、回调线程、缓冲区归属、注销与销毁顺序 |
 
@@ -270,6 +270,40 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - 下一步：用户在 Ubuntu 共享源码上重跑本轮补测，建议 Debug/Release 独立构建和 CTest，并使用原 Qt 构建目录复验。既往通过记录不表示新增用例已通过；P1 图/几何/样例仍需另行授权。精确长度、邻接、投影、A*、HMM、Qt 服务、页面与性能监控均未实施。
 - 接口/方案：模块私有表示不作为公共 contracts；X02–X05 及与 1/2/4/5 号的正式接入约定仍待确认，A＋B 等试验范围未选择。本次不触发关键算法试验，未改 `decision_log.md` 或其他成员模块。
 - 关联日志：初轮对话 5，`20261028-member3-p0-models-05`；收尾对话 6，`20261028-member3-p0-closeout-06`。实施记录中的未提交/推送/合并为当时状态；最终提交 `fdd486e` 已于 2026-10-28 18:36（Asia/Shanghai）通过 PR #2 合入 main。
+
+### 2026-10-28：导航状态事件契约、模拟样例与契约测试
+
+- 日期 / 模块 / 负责人 / 状态：2026-10-28 / 导航状态与事件契约（NavigationController / NavigationSnapshot）、五类模拟样例、契约测试 / 4 / **契约已完成**（Ubuntu 24.04.4 + Qt 6.4.2 + GCC 13.3.0 构建零警告，ctest 5/5 通过）；**状态机实现、偏航判定算法、重算去重实现未完成**（属第 3 次作业）。
+- 已实现能力与正式入口：
+  - `include/contracts/NavigationTypes.h`：NavigationStatus 五态（Idle/Planning/Navigating/OffRoute/Arrived）、NavigationEventKind 16 种 + NavigationEvent、NavigationErrorCode 四类、GuidanceKind 16 种 + GuidanceInstruction、RoutePlanRef、RoutePlanRequest/Result、RerouteRequest、MapMatchRequest/Result、NavigationError、**NavigationSnapshot（13 字段，5 号渲染唯一消费入口）**，各结构带字段表（单位/可选性）、`toString()` 与元类型注册 `registerNavigationMetaTypes()`。
+  - `include/contracts/NavigationController.h`：抽象接口（snapshot/status/paused/navigationId/currentRequestId + 10 个命令 start/pause/resume/stop/locationUpdated/requestReroute/routeResultReady/routeFailed/arrived/offRoute + 8 个信号）；3 号 `RoutePlanner` / `MapMatcher` 的调用形状；文件头含线程归属、所有权/生命周期、stop() 后无回调、陈旧 requestId 丢弃四条硬性规则，以及完整状态转换表与已确认的偏航/重算策略。
+  - `tests/fixtures/location/`：`normal_straight.csv`(10 帧)、`off_route_recover.csv`(14 帧)、`arrive_destination.csv`(20 帧)、`degraded_signal.csv`(10 帧)、`jump_backward.csv`(10 帧)、`navigation_case.json`(本地 stub 参考路线)、`expected/*.md`(五份逐帧期望值与手算方法)、`README.md`(构造常量、格式约束、三步手算复核法、容差说明)。
+  - `src/navigation/tests/NavigationContractTests.cpp`（19 例，ctest 名 `navigation-contracts`）与 `src/navigation/tests/LocationFixtureTests.cpp`（9 例，ctest 名 `navigation-location-fixtures`）。
+  - 文档：`docs/navigation-contracts.md`（字段表、转换表、错误码、Mock 替换点、使用示例、验证状态）。
+- 接口、数据约定、外部版本和 PAL 边界：
+  - 沿用统一约定：距离米、时长秒、速度米/秒、角度度（正北 0 顺时针）、时间戳 Unix 毫秒 int64；经纬度带坐标系标记；全部带 requestId/navigationId/dataVersion/source。
+  - **Paused 是 Navigating/OffRoute 的子标志，不是独立状态**（`snapshot.paused` 与 `statusChanged(status, paused)` 第二参数），理由见 `docs/navigation-contracts.md` 第 2 节。
+  - `navigationId` 每次 start() 递增；`requestId` 每次 start()/requestReroute() 递增；只有 `requestId == currentRequestId()` 的结果被采纳，其余丢弃并发 Rejected 事件 —— 落实"旧异步结果不得覆盖当前导航"。
+  - 偏航/重算策略（已确认）：横向偏离 > 15 米且持续 ≥ 3 秒才判定偏航；重算最小间隔 10 秒；在途 requestId 未回流前不发起新请求；间隔按**定位样本时间戳**计算以保证回放确定性。
+  - 路网几何格式属 2/3 号，本契约只透传 `RoutePlanRef::geometryRef` 不透明字符串。**偏离量由 3 号 MapMatcher 提供，本契约只定阈值与持续时间。**
+  - `LocationSource`（Mock 与真实 GeoClue2 同接口）的 `positionUpdated` 直接接 `NavigationController::locationUpdated()`；切换真实源时导航侧零改动。GeoClue2 替换点仍为 `src/pal/linux/location/`（第 3 次）。
+- 跨组选择及确认依据：本次不新增跨组接入。X06（G6）未确认，**本次未接入、未联调**；X04/X05（3 号 A*/HMM）只定义调用形状并配本地 stub，未替 3 号选算法；X01/X07 属 2 号，未涉及。关键算法策略由组员 4 于 2026-10-28 从三个候选中选定候选 2（原文"选择2。进行下一步"）。
+- decision_log.md 记录 ID：`DEC-20261028-4-offroute-reroute-01`（偏航判定与重算去重策略；状态"已确认"，因当前无真实路网与噪声样本、未做 2–3 种试验对比，按 AGENTS.md 7.3 未标"已完成"）。
+- Linux 环境、验证步骤/结果/证据：
+  - 环境：VirtualBox 7.2.22 上的 Ubuntu 24.04.4 LTS amd64，Qt 6.4.2、GCC/G++ 13.3.0、CMake 3.28.3、Ninja 1.11.1，2 核虚拟 CPU。
+  - 独立编译单元检查（两份契约头，`-std=c++17 -Wall -Wextra -Wpedantic -fPIC`）：退出码 0，**warning 0**。
+  - `cmake -S . -B build -G Ninja` → 退出码 0；`cmake --build build -j2` → 退出码 0，**warning 计数 0**；`ctest --test-dir build --output-on-failure` → 退出码 0，**5/5 通过**：ui-contracts、navigation-location、navigation-location-demo、**navigation-contracts（19/19）**、**navigation-location-fixtures（9/9）**。
+  - AUTOMOC 证据：`build/src/navigation/p1_navigation_autogen/.../moc_NavigationController.cpp` 已生成并编入 `libp1_navigation.a`（含 Q_OBJECT 的契约头已在 `src/navigation/CMakeLists.txt` 显式列出）。
+  - 样例实测（一次性检查程序，写在 `/tmp`，不入库）：normal_straight 末帧进度 90.1692 m / 剩余 100.1880 m；off_route_recover 峰值偏离 20.0376 m 且连续 3 帧超 15 m；arrive_destination 末帧进度 190.3572 m / 剩余 0.0000 m；degraded_signal 最大帧间空档 30 s、3 帧零位移、3 帧 35 m 精度；jump_backward 最小帧间位移 −20.0376 m；`navigation_case.json` 被误当轨迹加载时明确报错（不静默解析）。
+  - 回放实测：degraded_signal 触发 3 次 `AccuracyTooLow`，末态 Stopped；jump_backward seq 单调、末态 Stopped。
+  - 证据位置：`docs/navigation-contracts.md` 第 12 节；测试源码 `src/navigation/tests/`；样例与期望值 `tests/fixtures/location/`。
+- 未实现/未验证内容、下一步与涉及组员：
+  - 未实现：状态机实现、偏航判定与重算去重代码、真实 GeoClue2 源、定位权限、G6 联调（X06）。到达半径、长时间无定位阈值、精度过低阈值仍未确定（属第 3 次）。
+  - 未验证：跨线程排队连接的运行期实测（当前无后台线程场景）；`registerNavigationMetaTypes()` 运行期未调用；真实 3 号规划/匹配未接入；阈值 15 m/3 s/10 s 未经真实噪声数据标定。
+  - 涉及组员与下一步：第 2 次作业由 **3 号**用真实 RoutePlanner/MapMatcher 替换本地 stub（控制器侧无需改动），**5 号**消费 `NavigationSnapshot` 做地图与引导展示，均可并行；第 3 次作业由 **4 号**照转换表实现状态机并接真实定位。
+  - 关联提交：导航契约部分见上游分支 `codex/member-4/location-source` 的本次提交（文档内不固化自身提交哈希）；位置源部分见 `main` 上的 `412d29d` / `727647f` / `9919b7f`。
+- 关联日志 / 已有提交：`20261028-member4-navigation-contracts-01`（ai_log **对话 8**；原拟编号 6，因 3 号占用对话 5 / 对话 6；1 号集成时曾以其合并记录占对话 8，该记录已在 main 上删除、编号 8 空出，故本记录占用对话 8）。位置源三提交（`412d29d` / `727647f` / `9919b7f`）已由 1 号于2026-10-28 通过 PR #3 合入 `main`，本分支不再重复提交；导航契约部分本次以增量形式提交到上游 `codex/member-4/location-source` 并开 PR 请 1 号评审合并（Windows 侧 `github.com` https 不通，走 SSH）。
+- 与 3 号模块的关系（2026-10-28 核对 `feature/member3-algorithms` 的 `fdd486e` 后记录）：3 号 P0 为模块私有米制模型（`p1::algorithms::model`，`LocalCartesian/ProjectedCartesian`，单位米，明确"不作为公共 contracts"、未接入根 CMake），与 4 号契约无代码冲突；双方坐标单位不同（4 号度 / 3 号米），分工见 `docs/navigation-contracts.md` 第 6.1 节：**4 号不转换，由 3 号适配层负责**。
 
 ### 后续完成记录模板
 

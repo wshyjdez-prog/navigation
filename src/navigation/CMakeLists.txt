@@ -7,7 +7,9 @@ add_library(p1_navigation STATIC
     MockLocationSource.cpp
     FixedTrackLoader.cpp
     # 含 Q_OBJECT 的公共契约头不在本目录，须显式列出才会被 AUTOMOC 处理并链接进本库。
-    "${CMAKE_SOURCE_DIR}/include/contracts/LocationSource.h")
+    "${CMAKE_SOURCE_DIR}/include/contracts/LocationSource.h"
+    # 导航控制器契约（含 Q_OBJECT），同样须显式列出；NavigationTypes.h 无 Q_OBJECT，无需列出。
+    "${CMAKE_SOURCE_DIR}/include/contracts/NavigationController.h")
 # 子目录中相对路径 src 会解析为 src/navigation/src，故使用绝对路径。
 target_include_directories(p1_navigation PUBLIC
     "${CMAKE_SOURCE_DIR}/src"
@@ -39,4 +41,24 @@ if(BUILD_TESTING)
         "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
     add_test(NAME navigation-location COMMAND p1-navigation-tests)
     add_test(NAME navigation-location-demo COMMAND p1-location-demo)
+
+    # 契约测试：导航状态事件契约（转换表、非法事件、陈旧 requestId、快照字段）。
+    qt_add_executable(p1-navigation-contract-tests tests/NavigationContractTests.cpp)
+    target_link_libraries(p1-navigation-contract-tests PRIVATE p1_navigation Qt6::Test)
+    target_compile_options(p1-navigation-contract-tests PRIVATE
+        "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
+        "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    add_test(NAME navigation-contracts COMMAND p1-navigation-contract-tests)
+    set_tests_properties(navigation-contracts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    # 五类模拟样例的加载与回放一致性（期望值见 tests/fixtures/location/expected/）。
+    qt_add_executable(p1-location-fixture-tests tests/LocationFixtureTests.cpp)
+    target_link_libraries(p1-location-fixture-tests PRIVATE p1_navigation Qt6::Test)
+    target_compile_definitions(p1-location-fixture-tests PRIVATE
+        P1_LOCATION_FIXTURE_DIR="${P1_LOCATION_FIXTURE_DIR}")
+    target_compile_options(p1-location-fixture-tests PRIVATE
+        "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
+        "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    add_test(NAME navigation-location-fixtures COMMAND p1-location-fixture-tests)
+    set_tests_properties(navigation-location-fixtures PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()
