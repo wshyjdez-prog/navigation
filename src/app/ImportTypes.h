@@ -2,10 +2,11 @@
 
 #include <QMetaType>
 #include <QString>
+#include <QStringList>
 
 namespace p1::app {
 
-// Statistics collected while an .osmx dataset is parsed. Values describe the
+// Statistics collected while an OSM dataset is parsed. Values describe the
 // data that was actually read and validated, never estimates.
 struct ImportStats {
     quint64 nodes = 0;
@@ -26,6 +27,12 @@ struct ImportResult {
     QString fileName;
     qint64 fileSize = 0;
     quint32 formatVersion = 0;
+    QString sourceFormat;
+    QString datasetId;
+    QString cachePath;
+    QString sourceSha256;
+    QString importedAt;
+    QStringList warnings;
     QString sourceName;
     bool hasBounds = false;
     double minLat = 0.0;

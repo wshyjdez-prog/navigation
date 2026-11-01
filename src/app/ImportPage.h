@@ -3,12 +3,15 @@
 #include "app/ImportTypes.h"
 
 #include <QWidget>
+#include <QVector>
 
 class QLabel;
 class QProgressBar;
 class QPlainTextEdit;
 class QPushButton;
 class QResizeEvent;
+class QListWidget;
+class QTabWidget;
 
 namespace p1::ui {
 class Theme;
@@ -18,14 +21,14 @@ namespace p1::app {
 
 class ImportTask;
 
-// Data import page for the binary .osmx container: file selection, background
+// Data import page for standard OSM formats: file selection, background
 // parsing with real progress, a running log and a success/failure summary.
 // The page owns the worker thread and keeps working while the user navigates
 // to another page, because the page itself stays alive in the window stack.
 class ImportPage final : public QWidget {
     Q_OBJECT
 public:
-    explicit ImportPage(ui::Theme& theme, QWidget* parent = nullptr);
+    explicit ImportPage(ui::Theme& theme, QWidget* parent = nullptr, const QString& cacheDirectory = {});
     ~ImportPage() override;
 
     // Public so tests and the window shell can preselect a file. An unreadable
@@ -55,10 +58,17 @@ private:
     void setStatusBadge(const QString& text, const char* tone);
     void appendLog(const QString& message);
     void setBusy(bool busy);
+    void refreshCatalog();
+    void showSummary(const ImportResult& result);
 
     ui::Theme& theme_;
     QString selectedPath_;
     bool importing_ = false;
+    QString cacheDirectory_;
+    int catalogGeneration_ = 0;
+    QVector<ImportResult> datasets_;
+    QListWidget* datasetList_ = nullptr;
+    QTabWidget* detailsTabs_ = nullptr;
 
     QLabel* fileName_ = nullptr;
     QLabel* fileInfo_ = nullptr;

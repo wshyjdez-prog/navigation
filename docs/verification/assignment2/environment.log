@@ -1,0 +1,39 @@
+Linux p1-linux 7.0.0-38-generic #38~24.04.4-Ubuntu SMP PREEMPT_DYNAMIC Mon Sep 14 16:37:11 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.4 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+/dev/sda2 rw,relatime
+1
+               total        used        free      shared  buff/cache   available
+Mem:            7937        1324        4666          24        2211        6613
+Swap:              0           0           0
+6.4.2
+13.3.0
+cmake version 3.28.3
+
+CMake suite maintained and supported by Kitware (kitware.com/cmake).
+1.11.1
+cmake	3.28.3-1build7
+g++-13	13.3.0-6ubuntu2~24.04.1
+gcc-13	13.3.0-6ubuntu2~24.04.1
+qt6-base-dev:amd64	6.4.2+dfsg-21.1build5
+Navit executable: Navit package: srwxrwxr-x 1 navigation navigation 0 Nov  1 09:19 /run/user/1000/wayland-0
+CMAKE_CXX_COMPILER:STRING=/usr/bin/g++-13
+CMAKE_CXX_COMPILER_AR:FILEPATH=/usr/bin/gcc-ar-13
+CMAKE_CXX_COMPILER_RANLIB:FILEPATH=/usr/bin/gcc-ranlib-13
+//ADVANCED property for variable: CMAKE_CXX_COMPILER
+CMAKE_CXX_COMPILER-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: CMAKE_CXX_COMPILER_AR
+CMAKE_CXX_COMPILER_AR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: CMAKE_CXX_COMPILER_RANLIB
+CMAKE_CXX_COMPILER_RANLIB-ADVANCED:INTERNAL=1

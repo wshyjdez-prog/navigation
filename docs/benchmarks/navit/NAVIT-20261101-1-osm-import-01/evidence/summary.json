@@ -1,0 +1,16 @@
+{
+  "p1": {
+    "n": 3,
+    "medianSeconds": 41.28,
+    "p95Seconds": 215.78,
+    "maxPeakMiB": 100.99609375,
+    "medianInputMiBps": 1.2968358143355494
+  },
+  "navit": {
+    "n": 3,
+    "medianSeconds": 47.35,
+    "p95Seconds": 49.63,
+    "maxPeakMiB": 179.12890625,
+    "medianInputMiBps": 1.1305888577776448
+  }
+}

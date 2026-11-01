@@ -1,0 +1,21 @@
+********* Start testing of ImportTests *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : ImportTests::initTestCase()
+PASS   : ImportTests::formats(.osm)
+PASS   : ImportTests::formats(.pbf)
+PASS   : ImportTests::formats(.osm.pbf)
+PASS   : ImportTests::formats(.osm.gz)
+PASS   : ImportTests::formats(.osm.bz2)
+PASS   : ImportTests::invalidInputs(empty)
+PASS   : ImportTests::invalidInputs(truncated)
+PASS   : ImportTests::invalidInputs(duplicate-id)
+PASS   : ImportTests::invalidInputs(latitude)
+PASS   : ImportTests::invalidInputs(no-location)
+PASS   : ImportTests::invalidInputs(deleted)
+PASS   : ImportTests::invalidInputs(broken-pbf)
+PASS   : ImportTests::invalidInputs(unsupported)
+PASS   : ImportTests::cancellationAndRollback()
+PASS   : ImportTests::incompleteExtractIsReported()
+PASS   : ImportTests::cleanupTestCase()
+Totals: 17 passed, 0 failed, 0 skipped, 0 blacklisted, 61ms
+********* Finished testing of ImportTests *********

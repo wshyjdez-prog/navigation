@@ -1,8 +1,7 @@
 #include "app/MainWindow.h"
-#include "app/ImportLanding.h"
+#include "app/ImportFactory.h"
 #include "ui/common/Components.h"
 #include "ui/common/Theme.h"
-#include "ui/map/MapDemoWidget.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
@@ -16,10 +15,11 @@
 #include <QScreen>
 #include <QSpinBox>
 #include <QStackedWidget>
+#include <QThread>
 
 namespace p1::app {
 using namespace ui;
-MainWindow::MainWindow(Theme& theme, QWidget* parent) : QMainWindow(parent), theme_(theme) {
+MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCacheDirectory) : QMainWindow(parent), theme_(theme) {
     setWindowTitle("P1 导航 · Linux");
     setObjectName("p1MainWindow");
     setMinimumSize(1024,720);
@@ -47,7 +47,8 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent) : QMainWindow(parent), the
     addNavigation("offline","离线数据","folder",false);
     addNavigation("history","收藏历史","clock",false);
     sidebarLayout->addStretch();
-    sidebarLayout->addWidget(label("第一次作业", "caption"));
+    toolsLabel_ = label("公共工具", "caption");
+    sidebarLayout->addWidget(toolsLabel_);
     addNavigation("components","组件预览","grid",true);
     // Move the remaining navigation buttons to the bottom without making another registry.
     sidebarLayout->addWidget(buttons_["components"]);
@@ -68,7 +69,7 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent) : QMainWindow(parent), the
     description_ = label({},"secondary");
     headings->addWidget(title_); headings->addWidget(description_);
     header->addLayout(headings,1);
-    auto* phase = badge("第 1 次作业");
+    auto* phase = badge("第 2 次作业");
     header->addWidget(phase,0,Qt::AlignTop);
     themeButton_ = button("深色主题");
     themeButton_->setObjectName("themeButton");
@@ -83,12 +84,13 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent) : QMainWindow(parent), the
     auto* status = new QHBoxLayout;
     status->addWidget(label("●  本地会话", "caption"));
     status->addStretch();
-    status->addWidget(label("解析服务待接入  /  定位、语音尚未启用", "caption"));
+    auto* serviceStatus = label("算法、渲染待接入  /  定位、语音尚未启用", "caption");
+    serviceStatus->setWordWrap(false);
+    status->addWidget(serviceStatus);
     work->addLayout(status);
     shell_->addWidget(workspace,1);
 
-    registerPage("import","数据导入","添加本地路网、兴趣点或轨迹数据。",new ImportLanding(theme));
-    registerPage("map","地图导航","固定场景地图与导航路线演示。",new MapDemoWidget());
+    registerPage("import","数据导入","导入 OpenStreetMap 路网数据，并保存到本机。",ImportFactory::createImportPage(theme,nullptr,importCacheDirectory));
     registerPage("components","组件预览","检查公共控件与交互状态。此页为独立演示，不导入业务数据。",makeGallery());
     registerPage("settings","设置与帮助","让工作台适合你。偏好仅在本次会话中保留。",makeSettings());
     connect(&theme_, &Theme::changed, this, &MainWindow::refreshNavigation);
@@ -118,14 +120,23 @@ QPushButton* MainWindow::addNavigation(const QString& id, const QString& text, c
 }
 
 bool MainWindow::registerPage(const QString& id, const QString& title, const QString& description, QWidget* page) {
-    if (!page || !buttons_.contains(id)) return false;
+    if (QThread::currentThread() != thread() || !page || !buttons_.contains(id)) return false;
+    // Reject reparenting cycles and sharing a page between two navigation entries.
+    // A failed registration must not remove the old page or take caller ownership.
+    if (page->thread() != thread() || page == pages_ || page->isAncestorOf(pages_)) return false;
+    for (auto it = registry_.cbegin(); it != registry_.cend(); ++it) {
+        if (it.key() != id && (it->widget == page || it->widget->isAncestorOf(page))) return false;
+    }
     if (registry_.contains(id)) {
         auto* previous = registry_[id].widget;
-        if (previous == page) return true;
-        pages_->removeWidget(previous);
-        previous->deleteLater();
+        if (previous != page) {
+            // A child of the page being replaced would otherwise die with its parent.
+            if (previous->isAncestorOf(page)) return false;
+            pages_->removeWidget(previous);
+            previous->deleteLater();
+        }
     }
-    pages_->addWidget(page);
+    if (pages_->indexOf(page) < 0) pages_->addWidget(page);
     registry_.insert(id,Page{title,description,page});
     buttons_[id]->setEnabled(true);
     buttons_[id]->setToolTip(title);
@@ -149,6 +160,7 @@ void MainWindow::refreshNavigation() {
         b->setText(compact_ ? QString() : b->property("fullText").toString());
     }
     logo_->setText(compact_ ? "P1" : "P1 导航");
+    toolsLabel_->setVisible(!compact_);
     sidebarFoot_->setVisible(!compact_);
     themeButton_->setChecked(theme_.isDark());
     themeButton_->setText(theme_.isDark() ? "浅色主题" : "深色主题");
@@ -285,7 +297,7 @@ void MainWindow::showHelp() {
     auto* layout = new QVBoxLayout(dialog);
     layout->setContentsMargins(24,24,24,24); layout->setSpacing(24);
     layout->addWidget(label("P1 导航 · 0.1.0", "sectionTitle"));
-    layout->addWidget(label("第一次作业应用框架：页面导航、明暗主题和公共组件。\n\n文件解析与保存由 2 号模块接入；算法、地图、定位与语音将在后续作业实现。", "secondary"));
+    layout->addWidget(label("支持 PBF、OSM XML 与 gzip/bzip2 压缩的 OSM 数据导入，数据保存在本机。\n\n算法调用、地图导航、定位与语音尚待接入。", "secondary"));
     auto* close = button("知道了",true);
     connect(close,&QPushButton::clicked,dialog,&QDialog::accept);
     layout->addWidget(close); dialog->open(); close->setFocus();

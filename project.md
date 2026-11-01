@@ -1,6 +1,6 @@
 # P1 Linux 导航应用：总体规划与实现状态
 
-最后更新：2026-10-28（Asia/Shanghai）。组员：1、2、3、4、5。
+最后更新：2026-11-01（Asia/Shanghai）。组员：1、2、3、4、5。
 
 ## 1. 组名、任务依据与当前事实
 
@@ -12,7 +12,7 @@
 
 PDF 总任务中的“适配四大平台”未列出平台清单；本组明确交付范围为 Linux 可运行应用和四项 PAL 适配，公共接口须支持跨平台复用。是否还要求产出其他平台实现需向教师核实，不把“四项适配”直接等同“四个平台”，也不擅自增加其他平台交付。
 
-已完成：团队规划、五人分工、跨组接口登记、协作规则、UI 设计基准与方案抉择模板。1 号已建立第一次作业 Qt Widgets/CMake 应用框架源码：窗口、页面导航、明暗主题、公共组件演示、文件选择占位与模块页面注册；构建与桌面验收结果见下方进度和 [框架说明](docs/assignment-1-framework.md)。真实解析/保存、算法、导航及四项 PAL 业务仍未接入。原 Ubuntu 虚拟机曾出现根文件系统 emergency_ro；用户已选择保留现状并从基础快照独立克隆验证，不能沿用旧环境成功记录证明本次程序可运行。
+已完成：团队规划、五人分工、跨组接口登记、协作规则、UI 设计基准与方案抉择模板。1 号已建立第一次作业 Qt Widgets/CMake 应用框架源码：窗口、页面导航、明暗主题、公共组件演示、文件选择占位与模块页面注册；构建与桌面验收结果见下方进度和 [框架说明](docs/assignment-1-framework.md)。标准 OSM 原始数据解析/缓存已接入；算法、导航及完整四项 PAL 业务仍待集成。原 Ubuntu 虚拟机曾出现根文件系统 emergency_ro；用户已选择保留现状并从基础快照独立克隆验证，不能沿用旧环境成功记录证明本次程序可运行。
 
 ## 2. 编程环境与工程启动
 
@@ -132,6 +132,12 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 
 每个人验证自己的模块；全员补齐端到端、权限拒绝、服务不可用、计算失败、离线包缺失/更新失败、回调释放和非阻塞场景。第 4 次 G6 报告须有真实联调证据，尚未发生时状态写“待联调”。性能记录同一 Linux 环境的启动耗时、帧率、内存和计算耗时；新 PDF 未给具体数值阈值，应先确认并建基线，旧版“启动 <2 秒”不再作为当前硬性指标。
 
+### Navit 持续性能对标
+
+自 2026-10-31 起，团队将 **Navit** 作为性能对标项目，后续五位成员新增、完善或优化的功能模块均须比较等价任务并记录。按 [AGENTS.md 第 8 节](AGENTS.md#8-以-navit-为持续性能对标项目) 和 [对标规范、报告模板及索引](docs/navit-benchmark.md) 执行：1 号维护共同 Navit 版本/配置基线，各模块负责人在同一统一 Linux 虚拟机、同源数据与可比场景下实测，保存本组/Navit 数值、单位、差异、质量限制、原始数据及复现步骤。具体报告归档到 `docs/benchmarks/navit/`，模块完成记录引用报告 ID；算法抉择同时关联 `decision_log.md`。
+
+目前只确认了对标要求，**Navit 具体版本、配置、数据和运行基线尚未建立，没有实测比较或性能结论**。缺少条件时记录受阻/未测、责任人与补测步骤；无对应能力时核查并说明不适用及仍可比的子任务。可比项未测不能把模块整体验收标为已完成，功能实现与对标状态分别记录；已有历史验收不追写虚构指标，后续修改或阶段验收时补齐。一次忽略算法多方案试验不豁免本要求，比较落后也如实留存，不自动设定“必须快于 Navit”的门槛。
+
 新 PDF 不再要求鸿蒙分布式协同、账号同步或 HAP；用户数据明确本地存储。答辩 PPT 可另行准备，但不能把旧任务的页数要求当作新 PDF 已明确的交付项。周次未给起始日期，不换算日历截止日。
 
 ## 提示词框架与任务启动
@@ -144,11 +150,13 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | --- | --- | --- | --- |
 | Linux 任务规划与分工 | 团队公共 | 已完成（文档） | project.md、README、AGENTS.md、任务摘录及 decision_log.md 已更新 |
 | 提示词框架 | 团队公共 | 已完成（文档） | prompts/ 的通用开场、五人职责与七类流程；业务状态不变 |
+| Navit 性能对标基线与模块比较 | 全员，1 汇总 | 未开始（实测） | 对标规则/模板已建立；Navit 版本/配置、同源数据和运行基线待建立，各模块负责人按 docs/navit-benchmark.md 补齐比较报告 |
 | Linux 基础开发环境 | 1 | 进行中 | 历史基础验证通过；原机 emergency_ro 未修复，用户授权克隆的版本/应用自动验证及常规原生桌面补测通过；其他成员复现仍待完成 |
 | UI 设计规范 | 1，2/5 协作 | 已完成（文档） | design.md v1.0；主题/公共组件已有实现与 offscreen 截图；完整桌面、地图/导入业务验收待完成 |
 | Qt 工程/框架/CMake | 1 | 进行中 | 真实源码与更新 Linux 包已产出；offscreen/Wayland 测试各 8/0，常规桌面与文件选择已补测；高 DPI/200% 字号和完整人工键盘验收仍待进行 |
+| 第二次作业应用集成 | 1，3/5 提供业务模块 | 进行中 | 已将 3 号基础模型加入根构建/CTest，修正未接入地图入口及页面注册所有权；本轮 Ubuntu 根 CTest 6/6、offscreen/Wayland UI 各 11/0。真实算法页/渲染页未交付，Navit 对标受阻（未测）；见 docs/assignment-2-integration.md 与 NAVIT-20261101-1-integration-shell-01 |
 | 窗口/导航/主题/公共组件基线 | 1 | 已完成（基础子项） | 真实 Wayland 桌面启动、屏幕适配、主题/组件与文件选择回传通过；源码、双平台测试、实际桌面截图与安装入口见框架说明；不包含真实导入和完整缩放验收 |
-| 数据导入/StorageAdapter/离线包 | 2 | 未开始 | 确认 X01/X07 与存储接口 |
+| 数据导入/StorageAdapter/离线包 | 2（本次 1 号授权装配） | 进行中 | X01 已选 B：标准 OSM；libosmium＋SQLite 导入子项已验收，Navit 预处理成本已记录（有语义/负载限制）；完整存储及 X07 离线包待办 |
 | C++ A*/HMM/性能页 | 3 | 进行中 | 独立算法模块已验收：Ubuntu 原始日志确认 5/5 CTest、0 失败、3.51 秒，真实 FMM/HMM 约 0.47 秒，三条新 CSV 已核查；A* demo 正确。根回归已执行为 4/5，ui-contracts 两断言失败，交一号核查。真实投影/路网、四五号接线、算法页/监控与完整应用联调未完成。见 src/algorithms/FMM_INTEGRATION.md、DEC-20261101-3-open-source-01 |
 | LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；4 号记录原分支 Ubuntu 构建零警告、ctest 3/3 通过，根 CMake 已引入模块。本次与 3 号集成后的版本待 Linux 复验；导航状态机、GeoClue2、权限与 X06 联调未完成 |
 | LinuxRenderer/地图/仪表盘 | 5 | 未开始 | 选择渲染后端与绘制接口，满足第 2 次作业 |
@@ -305,6 +313,27 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - 关联日志 / 已有提交：`20261028-member4-navigation-contracts-01`（ai_log **对话 8**；原拟编号 6，因 3 号占用对话 5 / 对话 6；1 号集成时曾以其合并记录占对话 8，该记录已在 main 上删除、编号 8 空出，故本记录占用对话 8）。位置源三提交（`412d29d` / `727647f` / `9919b7f`）已由 1 号于2026-10-28 通过 PR #3 合入 `main`，本分支不再重复提交；导航契约部分本次以增量形式提交到上游 `codex/member-4/location-source` 并开 PR 请 1 号评审合并（Windows 侧 `github.com` https 不通，走 SSH）。
 - 与 3 号模块的关系（2026-10-28 核对 `feature/member3-algorithms` 的 `fdd486e` 后记录）：3 号 P0 为模块私有米制模型（`p1::algorithms::model`，`LocalCartesian/ProjectedCartesian`，单位米，明确"不作为公共 contracts"、未接入根 CMake），与 4 号契约无代码冲突；双方坐标单位不同（4 号度 / 3 号米），分工见 `docs/navigation-contracts.md` 第 6.1 节：**4 号不转换，由 3 号适配层负责**。
 
+### 2026-10-31：确立 Navit 持续性能对标规则
+
+- 范围与负责人：团队公共规则维护；发起组员编号待确认。影响 1–5 号后续全部功能模块，1 号维护共同基线，各模块负责人提供比较证据。
+- 产出：AGENTS.md 第 8 节规定对应能力核查、固定版本/配置、同一 Linux 虚拟机与同源数据、正确性/质量先验、性能差异与原始证据、受阻/不适用记录和验收衔接；新增 `docs/navit-benchmark.md` 的指标建议、报告模板及索引，同步提示词流程与方案抉择模板。
+- 当前事实与限制：本次是文档工作，未安装/构建/运行 Navit，未执行性能比较，没有新增业务实现或改变跨组接口、算法方案。实测工作仍未开始，历史完成记录不改写为已有 Navit 证据。
+- 验证：核查相关规则、模板及项目引用的一致性，执行文档链接与 Git 差异/空白检查；不以文档检查代替 Linux 性能实测。
+- 下一步：1 号建立并记录共同 Navit 运行基线，各负责人为后续功能登记等价任务、指标、测试数据与报告；缺少条件按规则保留补测事项。
+- 关联日志：ai_log 对话 9（`20261031-navit-benchmark-rules-01`）；无本次算法选型，Navit 对标确认原文见 `docs/navit-benchmark.md` 第 1 节。
+
+### 2026-11-01：1 号第二次作业首轮应用集成准备
+
+- 负责人：1；状态：进行中。代码基线 `ca12fe6` / `main`，任务开始已有的规则、日志与项目文档修改全部保留；本轮未提交或推送。
+- 已实现：根 CMake 装配 3 号现有基础模型目标/测试；移除主窗口对 MapDemoWidget 的默认注册，使尚未接入的地图入口保持禁用；强化 `MainWindow::registerPage()` 的 GUI 线程、单页单路由、祖先/子控件拒绝、替换销毁与同页元信息更新规则；补齐三个生命周期/集成测试，沿用原视觉令牌并修正紧凑侧栏标签和状态栏换行。入口为 CMakeLists.txt、src/app/MainWindow.h/.cpp、src/app/main.cpp、tests/UiTests.cpp。
+- 接口与影响：继续使用已有 QWidget 页面注册 API；3/5 号提供独立目标与工厂，由 1 号在应用装配，窗口不访问其内部数据；2 号导入页面仍待真实契约与装配，未直接启用仓库中未进入根目标的 ImportPage/OsmxParser。语音只整理第三次作业的后端、FFI、生命周期和权限交接清单，未选择 X09/G10 或 X06/G6 协议，未新增公共语音 ABI。
+- 跨组/算法选择：未新增外部接入，也未新增或替换关键算法，不触发本轮候选试验或新的 decision_log 记录；X04/X05 算法来源、5 号渲染后端与 X06/X09 决定由对应负责人确认。
+- 实测：用户确认虚拟机已启动；SSH 核对 P1-Ubuntu-24.04 当前根目录为 rw,relatime，团队 Ubuntu 24.04.4 / Qt 6.4.2 / GCC-G++ 13.3.0 / CMake 3.28.3 / Ninja 1.11.1，Debug / 1 vCPU / 8192 MiB / -j1。基线 UI 复现 6 通过、2 失败；最终根 CTest 6/6、offscreen 与真实 Wayland UI 各 11 通过/0 失败（含初始化/收尾），源码编译 warning 0；BUILD_TESTING=OFF 完整构建通过、注册 0 项测试；安装后 offscreen/Wayland 启动与 ldd 无缺失通过。最终源码 57 文件 SHA256 与来宾逐项核对一致。
+- 证据与产物：[集成/交接说明](docs/assignment-2-integration.md)、[原始日志、脚本与 Wayland 窗口抓图](docs/verification/assignment2/README.md)；宿主忽略目录 `out/p1-navigation-assignment2-linux-amd64.tar.gz`，来宾安装入口 `/home/navigation/p1-assignment2-20261101-member1-01/install/bin/p1-navigation`。包只含已验证外壳，不含尚未接入的业务/离线包，依赖目标 Ubuntu 的 Qt 运行库。
+- 限制：Mesa/EGL 运行提示仍在，3D 关闭，不声明硬件加速或 OpenGL ES 验收；此次可读写不代表历史文件系统故障根因已修复。真实 A*/HMM、LinuxRenderer、业务非阻塞/取消/过期结果、性能监控及完整团队演示尚未接入。1 号首轮接入准备通过正确性检查，第二次作业整体验收保持进行中。
+- Navit：`NAVIT-20261101-1-integration-shell-01`，受阻（未测）；当前 VM 未安装 Navit，版本/配置及同源业务场景未建立，无耗时/内存/吞吐量差值。报告保存缺口及补测步骤，未把 CTest 时长当成性能数据。
+- 下一步：3 号提供真实服务、算法页/监控与模块 CMake；5 号提供真实 LinuxRenderer、地图页/工厂、线程/上下文与绘制证据；2 号提供数据。1 号据公共契约完成装配并建立 Navit 共同基线，各负责人补测等价任务。关联日志：对话 10（`20261101-member1-assignment2-integration-01`）。
+
 ### 2026-11-01：3 号 Boost.Graph A* 开源集成阶段 A
 
 - 负责人：3；状态：进行中（源码已提供，待用户在 Ubuntu 验证）。用户指定分支 `feature/member3-open-source-integration`，起始提交 `ca12fe6`，起始工作区干净；没有切换分支、合并、提交或推送。
@@ -313,7 +342,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - 后台行为：QtConcurrent 工作任务按值持有快照/投影器/取消标记；完成后在所属线程过滤取消/旧 requestId，再发既有信号。未装配主窗口或修改根 CMake，未改变 2/4/5 号内部模块，也不声称真实跨组联调。
 - 实际检查：Windows Clang 8.0.1 + 本机 Boost 1.82 头文件，核心/核心测试/示例 C++17 语法检查通过；Debug `-O0 -g` 与 Release `-O2 -DNDEBUG` 目标文件编译 6 次通过，无诊断。未执行链接、用例、CTest、Qt 6.4.2 适配器编译或 Linux 运行，不提供未经测量的性能数字。
 - 构建：模块新增可选 A* 和 Qt 适配开关，默认 OFF 保留 P0 标准库构建；Boost 采用系统头文件（最低 1.74，Ubuntu 24.04 默认 1.83），未复制或修改上游仓库。Qt 目标使用 6.4.2 Core/Concurrent，测试用 Test。原根 CMake 和公共契约不变。
-- 来源/选择：用户选择成熟开源实现，本次按 W03 单方案路径记录，跳过多方案对比；A* 来自 Boost（BSL-1.0），后续 FMM（Apache-2.0）仅完成来源/上游依赖初查，未锁定使用提交、安装、接入或运行。关联 `DEC-20261101-3-open-source-01`，日志对话 9 `20261101-member3-boost-astar-09`。
+- 来源/选择：用户选择成熟开源实现，本次按 W03 单方案路径记录，跳过多方案对比；A* 来自 Boost（BSL-1.0），后续 FMM（Apache-2.0）仅完成来源/上游依赖初查，未锁定使用提交、安装、接入或运行。关联 `DEC-20261101-3-open-source-01`，日志对话 12 `20261101-member3-boost-astar-09`。
 - 下一步：用户在 `/media/sf_navigation` 共享源码上执行说明中的 Debug/Release 独立构建、模型/A*/适配器 CTest 和原工程回归，构建目录使用 `~/projects/navigation-build/` 子目录；反馈结果后修复或结案。A* 真实验证前不开展 FMM、算法页面或全面 Qt 改造。
 
 ### 2026-11-01：3 号 A* 独立审核修复及测试精简
@@ -323,7 +352,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - F2：仅在 A* 层明确并校验每条边长度/代价 ≤1e9 m、全图两类总量分别 ≤1e12 m，超出返回明确 NumericError；P0 校验规则不变。范围内普通 double 累加，不再因候选支路溢出异常终止搜索，补上界、超限及有限目标路线测试。
 - 测试精简：P0 全部用例保留，仅与 A* 共用 `tests/TestSupport.h`；A* 三个单独名称合入已有全节点对对照，原断言保留；Qt 首次不可达合入三行重算场景。静态统计 P0 71→71，A* 11→8，Qt 业务槽 7→7、数据展开场景 7→9；合计 89→88，不是实际通过数。CTest 4→3，demo 保留并显式运行，没有删除独有覆盖。
 - 实际检查：Windows Clang 8.0.1 + Boost 1.82，P0 校验/测试、A* 核心/测试及 demo 五份源文件 Debug/Release 目标文件编译共 10 次通过，无诊断；未执行链接、用例、Qt 6.4.2 编译、CTest 或 Ubuntu 运行。根 CMake、公共契约和其他组员模块保持不变。
-- 交接：用户按 [接入说明](src/algorithms/ASTAR_INTEGRATION.md) 的命令重新构建并运行三个 CTest 项及 demo，反馈真实日志后再判断是否关闭 V1；不接入 FMM、不开发其他成员模块。关联日志对话 10 `20261101-member3-astar-review-fix-10`，沿用 `DEC-20261101-3-open-source-01`。
+- 交接：用户按 [接入说明](src/algorithms/ASTAR_INTEGRATION.md) 的命令重新构建并运行三个 CTest 项及 demo，反馈真实日志后再判断是否关闭 V1；不接入 FMM、不开发其他成员模块。关联日志对话 13 `20261101-member3-astar-review-fix-10`，沿用 `DEC-20261101-3-open-source-01`。
 
 ### 2026-11-01：3 号 A* Debug 反馈、Release 待验及 FMM 源码准备
 
@@ -332,7 +361,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - Release/回归：已整理 [接入说明](src/algorithms/ASTAR_INTEGRATION.md) 中的 Release 构建、3 项 CTest、demo 输出核对和根工程 Release 回归命令；产物/日志在 `~/projects/navigation-build/member3-release-20261101/`，真实成功或失败待用户返回，未重复开发或要求重跑 Debug。
 - FMM 准备：官方 API 核实固定 commit `19ef34e1f57ff2f2484231aa0d01dfffea986ec1`，已下载官方 ZIP 至项目外缓存；SHA256 `435F381FDE877CB6E5BCFE5F1A2A1D84FF245FA16C2C55465857FCD1C0236A5D`。共享 `out/member3-fmm-transfer/` 放同哈希忽略副本供离线传输，完整库未进入 src。核实官方 edges/trips Shapefile、CSV 轨迹、FMM/UBODT 配置及参考输出实际存在。
 - 依赖边界：顶层 Apache-2.0，附带 fiboheap 有 LGPL-3.0 文本等独立许可。上游 Linux 要求 GDAL、Boost Serialization、OpenMP，并无条件构建旧 Python/SWIG 绑定；只需 C++，下一阶段最小调整外部 CMake 跳过绑定、改 C++17 和本地输出，不引入过期 Python 或 PPA。目标来宾新依赖尚未安装/验证，FMM/HMM 尚未运行，不以 ST-Matching 或上游参考 mr.txt 冒充成功。
-- 下一步（当时计划）：先收 A* Release 与根回归真实日志，再继续 FMM 独立编译→官方 HMM 样例→小型 MapMatcher 适配。详见仓库外 [阶段报告](../navigation-仓库审查资料/STAGE_REPORT_2026-11-01.md)；关联日志对话 11 `20261101-member3-release-fmm-prep-11`。后续授权与实际反馈见下条。
+- 下一步（当时计划）：先收 A* Release 与根回归真实日志，再继续 FMM 独立编译→官方 HMM 样例→小型 MapMatcher 适配。详见仓库外 [阶段报告](../navigation-仓库审查资料/STAGE_REPORT_2026-11-01.md)；关联日志对话 14 `20261101-member3-release-fmm-prep-11`。后续授权与实际反馈见下条。
 
 ### 2026-11-01：3 号 A* Release 通过反馈与 FMM 独立源码准备命令
 
@@ -341,7 +370,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - 固定 ZIP SHA256 重算与审核一致，没有重新下载/换版本。外部脚本 `../navigation-仓库审查资料/prepare_fmm_cpp.sh` 复制到忽略的 `out/member3-fmm-transfer/` 供手动运行；将检查并仅请求缺少的 Ubuntu 官方包、验证 OpenMP、复制/解压到来宾本地，在外部 FMM CMake 中改 C++17、禁用 Python 绑定、设置本地程序输出，保留原文与补丁。同名源码目录存在时停止，不覆盖已有工作。
 - Windows 实际检查：Bash -n 通过；Python 修改逻辑对固定 ZIP 的真实 CMake 临时副本执行检查通过，三处替换、原文备份和 diff 生成正确。未在 Ubuntu 安装依赖、准备源目录、编译 FMM、生成 UBODT 或运行 HMM，不声称这些已成功。
 - A* 核心、测试、CMake、公共接口和其他成员实现未改；无 Git 切换/重置/提交/推送。AI 阶段与审核报告统一保存在仓库外，已修正失效报告链接。
-- 交接：用户先运行 [FMM 环境和源码准备命令](../navigation-仓库审查资料/FMM_CPP_PREPARE_2026-11-01.md)，返回 prepare 日志后继续优先构建 ubodt_gen/fmm；当前不接 Qt MapMatcher、不新增大量测试。关联日志对话 12 `20261101-member3-fmm-source-prepare-12`。
+- 交接：用户先运行 [FMM 环境和源码准备命令](../navigation-仓库审查资料/FMM_CPP_PREPARE_2026-11-01.md)，返回 prepare 日志后继续优先构建 ubodt_gen/fmm；当前不接 Qt MapMatcher、不新增大量测试。关联日志对话 15 `20261101-member3-fmm-source-prepare-12`。
 
 ### 2026-11-01：3 号 FMM 独立成功反馈与 MapMatcher 适配待验
 
@@ -349,8 +378,8 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - 新增 `src/algorithms/fmm/FmmClient.*`、`qt/FmmMapMatcher.*`、`tests/FmmTests.cpp`、明确标注为调度夹具的 `tests/FmmProcessFixture.cpp`、`FMM_INTEGRATION.md`；调整三号模块 CMake/README。只调用外部 fmm，不复制/重写 HMM，不改 A* 核心、公共签名、根 CMake 或其他成员实现。
 - 数据流：WGS84 请求→有限窗口→worker 投影→新 CSV→真实 fmm/HMM→解析 opath/pgeom/cpath/mgeom/error→逆投影→所属线程按 requestId 回流。具体类支持取消/会话重置；少点和失败为空匹配，内部状态区分。没有既定路线几何时，两项路线距离保持空，不把道路误差用作偏航量。FMM 有符号道路 ID 与 P0 分离，显式表映射；UBODT/路网版本须一致，生成来源由供数方保证。
 - 当前验证：四份新增 cpp 在 Windows Clang 8.0.1 / Qt 5.14.2 头文件下 C++17 前端检查通过；没有执行 moc、链接、测试或新适配器 Ubuntu 验收。本机 moc 启动受系统 DLL 重定位错误阻止，Qt 6.4.2 不在本机。新增普通适配 CTest 与需外部路径的真实 HMM CTest，完整配置预计总计五项；实际通过数待用户日志。
-- 下一步：用户按 [FMM 接入说明](src/algorithms/FMM_INTEGRATION.md) 在 Ubuntu 本地生成新样例 UBODT、编译、运行全部 CTest/示例及根回归。二号交真实米制投影/有向路网/ID/版本来源，四号确认会话重置与状态消费，五号确认几何坐标交接；未完成真实导航联调、页面或性能监控。日志对话 13 `20261101-member3-fmm-map-matcher-13`，沿用已确认单方案决定；未提交/推送/合并。
-- 同日独立审核收尾（日志对话 14）：按仓库外 `member3_fmm_qt_adapter_review.md` 修复 F1/F2。仅对完整无候选结构 `id=0`、空 opath/error/pgeom/cpath、`mgeom=LINESTRING()` 返回 NoMatch，成功仍须 id=1；空 cpath 的其他数据先严格校验。上一定位序号改 optional，首次及 reset 后允许 seq=0，后续递增与正数/递增 requestId 不变。现有解析/窗口测试补真实空返回、坏结构拒绝、初次/重置后 0→1 及重复/倒退拒绝。Windows 三份相关 cpp 前端检查、Ubuntu 命令 Bash -n 与嵌入 Python 语法检查通过；静态确认 CMake 五项声明，实际 Qt6 注册/编译/运行仍待验。命令加 --no-tests=error 并核对五项 JSON 清单；不改 A*、公共契约、CMake 或上游 FMM，不增加测试框架。内部修复记录在仓库外。
+- 下一步：用户按 [FMM 接入说明](src/algorithms/FMM_INTEGRATION.md) 在 Ubuntu 本地生成新样例 UBODT、编译、运行全部 CTest/示例及根回归。二号交真实米制投影/有向路网/ID/版本来源，四号确认会话重置与状态消费，五号确认几何坐标交接；未完成真实导航联调、页面或性能监控。日志对话 16 `20261101-member3-fmm-map-matcher-13`，沿用已确认单方案决定；未提交/推送/合并。
+- 同日独立审核收尾（日志对话 17）：按仓库外 `member3_fmm_qt_adapter_review.md` 修复 F1/F2。仅对完整无候选结构 `id=0`、空 opath/error/pgeom/cpath、`mgeom=LINESTRING()` 返回 NoMatch，成功仍须 id=1；空 cpath 的其他数据先严格校验。上一定位序号改 optional，首次及 reset 后允许 seq=0，后续递增与正数/递增 requestId 不变。现有解析/窗口测试补真实空返回、坏结构拒绝、初次/重置后 0→1 及重复/倒退拒绝。Windows 三份相关 cpp 前端检查、Ubuntu 命令 Bash -n 与嵌入 Python 语法检查通过；静态确认 CMake 五项声明，实际 Qt6 注册/编译/运行仍待验。命令加 --no-tests=error 并核对五项 JSON 清单；不改 A*、公共契约、CMake 或上游 FMM，不增加测试框架。内部修复记录在仓库外。
 
 ### 2026-11-01：3 号算法独立模块 Ubuntu 验收及根回归实际结果
 
@@ -360,7 +389,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - 本次 A* demo：nodes=900 42 5、edges=10 11、cost_m=6、distance_m=6、单次 elapsed_ms=0.03672；保留前次 Debug/Release 成功事实，不用单次时间计算性能达标结论。
 - `root-regression-LastTest.log` 已完整记录五项结束：navigation-location、navigation-location-demo、navigation-contracts、navigation-location-fixtures Passed，ui-contracts Failed。失败为 UiTests.cpp:63 的 map 页面拒绝预期，以及 :91 的页面栈实际 4/预期 3；交一号核查，不推断原因或修改 UI。根构建日志未随本次共享证据提供，不能记为根工程全通过。
 - 原始证据共 15 个非空文件，已逐文件 SHA256 校验并保全到仓库外 `../navigation-仓库审查资料/member3-acceptance-evidence-20261101-145035/`，附 SHA256SUMS.txt；out 为 Git 忽略目录，内部验收报告也在仓库外。未重跑测试，未提交/推送/合并。
-- 交接：二号提供真实米制有向路网、双向投影、ID 映射和 UBODT 版本/生成来源；四号接公共 MapMatcher/RoutePlanner 并处理 seq/requestId、停止/换源 resetWindow、空匹配与取消，路线偏离量仍为空待真实路线几何；五号按真实坐标转换消费几何并保留 const 共享句柄。一号核查根 UI 回归并负责主工程装配。可安排样例接口联调，尚未完成跨成员接线或完整真实导航联调。正式接口说明见 src/algorithms/FMM_INTEGRATION.md；日志对话 15 `20261101-member3-algorithms-acceptance-15`。
+- 交接：二号提供真实米制有向路网、双向投影、ID 映射和 UBODT 版本/生成来源；四号接公共 MapMatcher/RoutePlanner 并处理 seq/requestId、停止/换源 resetWindow、空匹配与取消，路线偏离量仍为空待真实路线几何；五号按真实坐标转换消费几何并保留 const 共享句柄。一号核查根 UI 回归并负责主工程装配。可安排样例接口联调，尚未完成跨成员接线或完整真实导航联调。正式接口说明见 src/algorithms/FMM_INTEGRATION.md；日志对话 18 `20261101-member3-algorithms-acceptance-15`。
 
 ### 后续完成记录模板
 
@@ -371,6 +400,15 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 跨组选择及确认依据：
 decision_log.md 记录 ID（如涉及）：
 Linux 环境、验证步骤/结果/证据：
+Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用依据：
 未实现/未验证内容、下一步与涉及组员：
 关联日志 / 已有提交：
 ```
+
+### 2026-11-01：标准 OSM 导入替换（进行中）
+
+负责人：1 号授权装配，影响 2 号导入与 3/5 号数据消费。X01 选 B，本次忽略方案对比并明确采用 libosmium 2.20.0＋SQLite；见 DEC-20261101-1-import-backend-01。真实导入页面替换占位注册，支持 .osm/.pbf/.osm.pbf/.osm.gz/.osm.bz2；后台解析、取消、事务临时缓存、重启目录读取及公共只读 API 已编码。入口 src/data/import/、src/app/ImportPage.*、include/contracts/ImportedDataset.h；约定及复现见 docs/osm-import.md。
+
+恢复前阶段记录：统一 Ubuntu 完整构建成功，运行测试待恢复 VM 后执行（当前黑屏、SSH 无响应）；湖北 PBF、UI 实际显示与 Navit 对标均未验证，不能标已完成。原始 OSM 缓存不生成可路由图，不宣称完整 StorageAdapter、G7 离线包或算法/渲染已集成。旧实现源码暂留，待验证后清理。下一步由 1/2 号恢复环境后执行 CTest、真实数据导入、安装与对标；报告 NAVIT-20261101-1-osm-import-01，AI 日志 11。未提交/推送。
+
+本轮恢复后结果：标准 OSM 导入子项已完成。Debug/Release CTest 各7/7，导入专项17/17、真实Wayland UI12/12；湖北节点9077243、道路593776、关系5262，缓存完整性ok，3类缺失关系引用警告保留。旧 OsmxParser/ImportLanding 四文件已清理，正式路径不再引用；61文件源码指纹一致。新版安装于 /home/navigation/p1-import-libosmium-20261101/install，现有P1快捷方式已更新并启动，重启恢复列表。Navit报告已完成本轮各自预处理测量，P1中位41.28秒/P95 215.78秒，Navit47.35/49.63秒；因snap-store负载干扰和输出语义不同不计算优劣。历史受阻已解除，完整StorageAdapter/G7离线包、路由图/地图消费仍未实现，模块整体保持进行中。证据见同名报告目录，日志11合并本任务结果，未提交/推送。

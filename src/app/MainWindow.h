@@ -13,8 +13,10 @@ namespace p1::app {
 class MainWindow final : public QMainWindow {
     Q_OBJECT
 public:
-    explicit MainWindow(ui::Theme& theme, QWidget* parent = nullptr);
-    // Transfers ownership to this window. A replacement retains navigation position.
+    explicit MainWindow(ui::Theme& theme, QWidget* parent = nullptr, const QString& importCacheDirectory = {});
+    // GUI thread only. On success, transfers ownership to this window; on failure,
+    // ownership stays unchanged. One widget may belong to only one route.
+    // Replacement keeps the current route; re-registering the same widget updates metadata.
     // Intended for independently built module QWidget factories, not database access.
     bool registerPage(const QString& id, const QString& title,
                       const QString& description, QWidget* page);
@@ -38,6 +40,7 @@ private:
     QLabel* title_;
     QLabel* description_;
     QLabel* logo_;
+    QLabel* toolsLabel_;
     QLabel* sidebarFoot_;
     QPushButton* themeButton_;
     QMap<QString, Page> registry_;

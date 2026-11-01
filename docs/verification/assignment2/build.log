@@ -1,0 +1,9 @@
+[1/10] Automatic MOC for target p1_ui
+[2/10] Building CXX object CMakeFiles/p1_ui.dir/p1_ui_autogen/mocs_compilation.cpp.o
+[3/10] Building CXX object CMakeFiles/p1_ui.dir/src/app/MainWindow.cpp.o
+[4/10] Linking CXX static library libp1_ui.a
+[5/10] Building CXX object CMakeFiles/p1-navigation.dir/src/app/main.cpp.o
+[6/10] Linking CXX executable p1-navigation
+[7/10] Automatic MOC for target p1-ui-tests
+[8/9] Building CXX object CMakeFiles/p1-ui-tests.dir/tests/UiTests.cpp.o
+[9/9] Linking CXX executable p1-ui-tests

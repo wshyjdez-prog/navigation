@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
     QCoreApplication::setApplicationVersion("0.1.0");
     QCoreApplication::setOrganizationName("P1Linux");
     QCommandLineParser args;
-    args.setApplicationDescription("P1 Linux navigation · assignment 1 application shell");
+    args.setApplicationDescription("P1 Linux navigation · assignment 2 integration shell");
     args.addHelpOption(); args.addVersionOption();
     args.addOption({"smoke","Show the window and exit after processing initial events."});
     args.addOption({"capture-dir","Capture application views for UI review, then exit.","directory"});
