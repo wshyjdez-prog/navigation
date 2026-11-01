@@ -14,8 +14,8 @@
 | 8 | 4 | WorkBuddy 桌面应用（Agent 模式） | 未提供/未记录 | 桌面对话、本地代码编辑、经 VirtualBox guestcontrol 在 Linux 虚拟机内执行构建与 ctest | 导航状态事件契约（NavigationTypes/NavigationController）、五类模拟样例、契约测试与文档；与 3 号米制模型的度 / 米坐标边界；提交与分支集成 |
 | 9 | 待确认 | Codex 桌面应用 | 具体模型及应用版本未提供/未记录 | 桌面对话与本地文档操作 | Navit 持续性能对标规则、报告模板与索引、项目及开发流程同步 |
 | 10 | 1 | Codex 桌面应用 | 具体模型及应用版本未提供/未记录 | 桌面对话、本地代码编辑、SSH 连接 Ubuntu 构建测试与窗口抓图 | 第二次作业首轮应用集成、页面注册修复、根模型目标装配、交接与受阻对标记录 |
-
 | 11 | 1 | Codex 桌面应用 | 具体模型及应用版本未提供/未记录 | 桌面对话、本地代码编辑、Ubuntu 构建 | 标准 OSM 导入替换、公共读取接口与运行受阻记录 |
+| 12 | 4 | WorkBuddy 桌面应用（Agent 模式） | 未提供/未记录 | 桌面对话、本地代码编辑、经 VirtualBox guestcontrol 在 Linux 虚拟机内执行构建与 ctest | main 集成版本（9cc04b1）统一虚拟机 Linux 复验、project.md 进度同步与依赖清单沉淀 |
 
 ## 1. AI使用详情
 
