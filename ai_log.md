@@ -16,6 +16,7 @@
 | 10 | 1 | Codex 桌面应用 | 具体模型及应用版本未提供/未记录 | 桌面对话、本地代码编辑、SSH 连接 Ubuntu 构建测试与窗口抓图 | 第二次作业首轮应用集成、页面注册修复、根模型目标装配、交接与受阻对标记录 |
 | 11 | 1 | Codex 桌面应用 | 具体模型及应用版本未提供/未记录 | 桌面对话、本地代码编辑、Ubuntu 构建 | 标准 OSM 导入替换、公共读取接口与运行受阻记录 |
 | 12 | 4 | WorkBuddy 桌面应用（Agent 模式） | 未提供/未记录 | 桌面对话、本地代码编辑、经 VirtualBox guestcontrol 在 Linux 虚拟机内执行构建与 ctest | main 集成版本（9cc04b1）统一虚拟机 Linux 复验、project.md 进度同步与依赖清单沉淀 |
+| 13 | 4 | WorkBuddy 桌面应用（Agent 模式） | 未提供/未记录 | 桌面对话、本地代码编辑、经 VirtualBox guestcontrol 在 Linux 虚拟机内执行构建与 ctest | 第二次作业规划对接层：AsyncPlannerBridge 线程化对接、StubRoutePlanner 确定性桩、7 例集成测试与演示程序 |
 
 ## 1. AI使用详情
 
@@ -727,3 +728,36 @@ AI回答：
 是否采用，以及原因：已按实测结果更新 project.md 第 5 节 4 号进度行（销掉"待 Linux 复验"待办、附依赖清单）；采用原因：该复验为项目文档点名待办，结果在虚拟机 `~/navigation-verify` 副本（@ `9cc04b1`）上可复核。
 
 对本组的实际价值：确认 2 号导入模块合入后全仓库在 Ubuntu 24.04 可完整构建、7 项 CTest 全过，4 号此前"ctest 3/3"旧口径已按当前目标数修正；沉淀了复验机系统依赖清单（SQLite3/EXPAT/ZLIB/BZip2/libosmium 2.20.0/protozero），可供 1 号环境文档与 2 号模块 README 引用。注意边界：构建与测试通过只证明各模块可共存编译且各自契约测试绿，不代表 3 号算法与 4 号契约的语义集成完成——导航状态机、GeoClue2 真实源、权限与 X06 联调仍属后续作业；Navit 对标按 docs/navit-benchmark.md 属 4 号后续义务，本次未运行 Navit、未产生性能数据。
+
+### 对话 13：第二次作业规划对接层（对接真实计算和导航事件）
+
+对话编号：13（4 号；记录 ID：`20261101-member4-planner-bridge-01`）
+
+日期：2026-11-01（Asia/Shanghai）。
+
+场景：第二次作业 4 号模块（project.md 分工"对接真实计算和导航事件"）。3 号真实 A*/HMM 未交付，按确认先搭对接层框架：契约先行的异步对接桥 + 确定性规划桩，3 号交付后即插即换。
+
+工具：WorkBuddy 桌面应用（Agent 模式）；VirtualBox guestcontrol 驱动虚拟机内 git/CMake/Ninja/CTest。
+
+提示词：
+
+```text
+现在开始第二次作业
+```
+
+方案确认原文（AI 按第 3/7 节展示选项后用户答复）：
+
+```text
+跨组接口：B：契约先行（推荐）
+异步模型：QThread+Worker（推荐）
+```
+
+AI回答：
+
+> 已核对契约：第一次作业 NavigationController.h 已定义 RoutePlanner/MapMatcher 抽象接口（注释明示第 2 次替换点），本轮不新增契约头，直接实现对接层。交付：AsyncPlannerBridge（内部 QThread，请求 functor 队列投递、结果 Qt::QueuedConnection 回流控制器线程）、StubRoutePlanner（确定性桩：延迟/失败/取消语义可注入，haversine 距离可手算复现）、RecordingController（验证桩，非第 3 次状态机）、p1-planner-demo 演示与 7 例集成测试。实测（统一虚拟机，Ubuntu 24.04.4/Qt 6.4.2/G++ 13.3.0）：configure 0 / build 0 / 警告 0，全量 ctest 9/9（含新增 navigation-integration、navigation-planner-demo）。演示输出：300ms 模拟计算期间主线程心跳 4 次（UI 循环不阻塞）、stop() 取消在途后零回调、陈旧 requestId 被拒。
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已按确认的两个方案落地（跨组接口方案 B、异步模型 QThread+Worker）；采用原因：契约先行与全队第一次作业风格一致，3 号只需实现既定接口；QThread+Worker 为契约注释预设模式，取消/生命周期语义清晰。
+
+对本组的实际价值：第二次作业"对接真实计算"的接缝就位——3 号真实 RoutePlanner 按契约实现后零改动替换，控制器/UI 不受影响；"不阻塞 UI"有了自动化证明（心跳测试 + 回流线程断言），不再只是口头承诺；stop() 取消、陈旧结果拒绝等契约硬性规则首次以可执行测试落地。限制与边界：RecordingController 仅验证桩，状态机仍属第 3 次；偏航触发/重算去重随第 3 次补测；Navit 对标按规范记受阻未测（NAVIT-20261101-4-planner-bridge-01），真实算法接入后补测规划 P50/P95 与取消响应。决策记录：DEC-20261101-4-planner-bridge-interface-01（已确认）、DEC-20261101-4-async-model-01（本次忽略）。

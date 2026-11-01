@@ -19,6 +19,8 @@
 | 记录 ID | 模块/组员 | 状态 | 入选试验组合 | 最终方案或忽略去向 | 项目/日志关联 |
 | --- | --- | --- | --- | --- | --- |
 | `DEC-20261028-4-offroute-reroute-01` | 偏航判定与重算去重 / 4 | 已确认（单方案，未按 7.1 做 2–3 种试验对比，见该记录第 2 节） | 候选 2（偏离 > 15 m 持续 ≥ 3 s；重算最小间隔 10 s；在途不重复请求） | 候选 2，已写入 `NavigationController.h` 第 ⑥ 节与样例 | project.md 2026-10-28 记录；ai_log 对话 8 |
+| `DEC-20261101-4-planner-bridge-interface-01` | 规划计算对接接口 / 4（AGENTS 第 3 节跨组接口选择） | 已确认（方案 B） | 不适用（接口选择，非算法试验） | 方案 B：沿用 `include/contracts/NavigationController.h` 既有 `RoutePlanner`/`MapMatcher` 抽象接口为对接缝，4 号交付 `AsyncPlannerBridge` + `StubRoutePlanner`；3 号真实 A*/HMM 实现该接口即插即换 | project.md 第二次作业 4 号行；ai_log 对话 13 |
+| `DEC-20261101-4-async-model-01` | 规划对接异步执行模型 / 4 | 本次忽略（单方案，未做 2–3 种试验对比） | QThread+Worker / QtConcurrent / 忽略 三选项展示 | QThread+Worker（`AsyncPlannerBridge` 内部 QThread，functor 队列投递 + QueuedConnection 回流）；契约注释 ① 预设该模式 | project.md 第二次作业 4 号行；ai_log 对话 13；Navit：NAVIT-20261101-4-planner-bridge-01 |
 | 暂无（其他） | — | 尚未开展 | — | — | — |
 
 ## 单次抉择模板（复制后填写，模板不是实际记录）
@@ -212,3 +214,37 @@
 - Navit 关联：NAVIT-20261101-1-osm-import-01，已比较各自预处理成本，输出语义及后台负载限制明确，不计算性能排名。AI 日志关联：11。
 
 - 恢复后验收：Debug/Release CTest 各 7/7，导入专项17/17、真实 Wayland UI12/12；湖北实际导入及 SQLite integrity_check=ok，重启恢复列表。清理后 Release 再验7/7，源码61文件宿主/来宾校验一致；新版已安装并更新快捷方式。功能子项完成，本次忽略仅指免多方案试验。实测、原始报告及限制见上述 Navit 报告；X07/完整存储 PAL、路由图与渲染转换仍未完成。
+
+### DEC-20261101-4-planner-bridge-interface-01：规划计算对接接口（跨组接口选择）
+
+- 日期：2026-11-01；组员 4。基线 `main`/`cb056d0`，分支 `codex/member-4/assignment2-integration`。
+- 性质：AGENTS.md 第 3 节跨组接口选择（4 号 ↔ 3 号算法服务），非关键算法试验，不适用候选组合表。
+- 背景：第二次作业 4 号任务为"对接真实计算和导航事件"；3 号真实 A*/HMM 尚未实现（X04/X05 待其确认）。
+- 可用方案：A：等 3 号真实接口定型后再对接；B：契约先行——沿用第一次作业 `NavigationController.h`
+  既定的 `RoutePlanner`/`MapMatcher` 抽象接口（异步 requestId、QueuedConnection 回流、取消语义均已写明，
+  注释明示"第 2 次作业替换为 3 号真实实现，控制器侧无需改动"）作为对接缝，4 号本轮交付对接桥与桩；
+  C：纯 Mock 不留接口。推荐 B。
+- 用户确认原文：“B：契约先行（推荐）”。
+- 落地：`src/navigation/AsyncPlannerBridge.{h,cpp}`（线程化对接桥，控制器线程 ⇄ 工作线程）、
+  `src/navigation/StubRoutePlanner.{h,cpp}`（确定性桩：延迟/失败/取消语义可注入）、
+  `src/navigation/RecordingController.h`（验证桩，非第 3 次状态机）、7 例集成测试与 `p1-planner-demo`。
+  3 号交付后只需提供 `RoutePlanner` 实现，控制器/桥/测试零改动替换。
+- 状态：**已确认**。注意：方案 B 不替 3 号选择算法本身（X04/X05 仍属 3 号），也不影响第 3 节其他接口。
+- Navit 关联：NAVIT-20261101-4-planner-bridge-01（受阻未测）。AI 日志关联：对话 13。
+
+### DEC-20261101-4-async-model-01：规划对接异步执行模型（本次忽略）
+
+- 日期：2026-11-01；组员 4。同基线同分支。按第 7.1 节展示三个候选：
+
+| 候选 | 执行方式 | 取舍 |
+| --- | --- | --- |
+| QThread+Worker | 桥内 QThread，请求 functor 队列投递、结果 QueuedConnection 回流 | 契约注释 ① 预设该模式；取消/生命周期语义清晰，测试可控（推荐） |
+| QtConcurrent::run | 线程池执行，QFutureWatcher 回流 | 代码最少，但取消与迟到结果管理依赖框架，requestId 语义分散 |
+| 单线程定时器分片 | 无后台线程，协作式分片 | 不满足真实算法的重计算场景，仅适合演示 |
+
+- 正常流程需选 2–3 种试验对比；用户直接选定单方案，确认原文：“QThread+Worker（推荐）”。
+  按第 7.1 记为 **本次忽略**：仅跳过本次多方案试验与二次选择，未生成其余候选代码，不补造对比值；
+  下一个关键算法决策自动恢复规则。忽略不豁免 Navit 对标（见受阻报告）与正确性验证
+  （7 例集成测试已实测，VM ctest 9/9、警告 0）。
+- 正式路径：`AsyncPlannerBridge.{h,cpp}`（单方案去向）。清理范围：无（未产生未选方案代码）。
+- 状态：本次忽略。AI 日志关联：对话 13。
