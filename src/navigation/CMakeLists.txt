@@ -1,4 +1,5 @@
-# 4 号：导航模块。本阶段内容：位置源契约 + 固定轨迹读取 + 可回放的模拟位置源。
+# 4 号：导航模块。本阶段内容：位置源契约 + 固定轨迹读取 + 可回放的模拟位置源
+#       + 规划对接层（AsyncPlannerBridge 线程化对接 + StubRoutePlanner 确定性桩，第 2 次作业）。
 # 由顶层 CMakeLists.txt 在 include(CTest) 之后 add_subdirectory(src/navigation) 引入，
 # 依赖顶层的 C++17 与 CMAKE_AUTOMOC 设置。
 find_package(Qt6 6.4.2 EXACT REQUIRED COMPONENTS Core)
@@ -6,10 +7,14 @@ find_package(Qt6 6.4.2 EXACT REQUIRED COMPONENTS Core)
 add_library(p1_navigation STATIC
     MockLocationSource.cpp
     FixedTrackLoader.cpp
+    AsyncPlannerBridge.cpp
+    StubRoutePlanner.cpp
     # 含 Q_OBJECT 的公共契约头不在本目录，须显式列出才会被 AUTOMOC 处理并链接进本库。
     "${CMAKE_SOURCE_DIR}/include/contracts/LocationSource.h"
     # 导航控制器契约（含 Q_OBJECT），同样须显式列出；NavigationTypes.h 无 Q_OBJECT，无需列出。
-    "${CMAKE_SOURCE_DIR}/include/contracts/NavigationController.h")
+    "${CMAKE_SOURCE_DIR}/include/contracts/NavigationController.h"
+    # 对接层验证用最小控制器桩（Q_OBJECT，非第 3 次状态机，仅供演示与集成测试）。
+    RecordingController.h)
 # 子目录中相对路径 src 会解析为 src/navigation/src，故使用绝对路径。
 target_include_directories(p1_navigation PUBLIC
     "${CMAKE_SOURCE_DIR}/src"
@@ -39,8 +44,27 @@ if(BUILD_TESTING)
     target_compile_options(p1-navigation-tests PRIVATE
         "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
         "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
-    add_test(NAME navigation-location COMMAND p1-navigation-tests)
-    add_test(NAME navigation-location-demo COMMAND p1-location-demo)
+add_test(NAME navigation-location COMMAND p1-navigation-tests)
+add_test(NAME navigation-location-demo COMMAND p1-location-demo)
+
+# 规划对接层演示：start → 后台线程规划（可注入延迟）→ 队列回流 → 事件采纳；
+# 含 stop() 取消在途后无回调的验证。退出码 0 即成功。
+qt_add_executable(p1-planner-demo demo/PlannerBridgeDemo.cpp)
+target_link_libraries(p1-planner-demo PRIVATE p1_navigation)
+target_compile_options(p1-planner-demo PRIVATE
+    "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
+    "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+add_test(NAME navigation-planner-demo COMMAND p1-planner-demo)
+
+# 规划对接层测试：端到端链路、回流线程归属、不阻塞（心跳）、stop 取消、
+# 陈旧结果拒绝（故障注入 honorCancel=false）、析构静默、stub 输出确定性。
+qt_add_executable(p1-navigation-integration-tests tests/PlannerBridgeTests.cpp)
+target_link_libraries(p1-navigation-integration-tests PRIVATE p1_navigation Qt6::Test)
+target_compile_options(p1-navigation-integration-tests PRIVATE
+    "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
+    "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+add_test(NAME navigation-integration COMMAND p1-navigation-integration-tests)
+set_tests_properties(navigation-integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
     # 契约测试：导航状态事件契约（转换表、非法事件、陈旧 requestId、快照字段）。
     qt_add_executable(p1-navigation-contract-tests tests/NavigationContractTests.cpp)
