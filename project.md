@@ -158,7 +158,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | 窗口/导航/主题/公共组件基线 | 1 | 已完成（基础子项） | 真实 Wayland 桌面启动、屏幕适配、主题/组件与文件选择回传通过；源码、双平台测试、实际桌面截图与安装入口见框架说明；不包含真实导入和完整缩放验收 |
 | 数据导入/StorageAdapter/离线包 | 2（本次 1 号授权装配） | 进行中 | X01 已选 B：标准 OSM；libosmium＋SQLite 导入子项已验收，Navit 预处理成本已记录（有语义/负载限制）；完整存储及 X07 离线包待办 |
 | C++ A*/HMM/性能页 | 3 | 进行中 | P0 原版独立审核通过；用户确认 Linux 独立构建、模型 CTest、原 Qt 工程回归通过；T1–T4 边界补测已提供，待 Ubuntu 复验。A*/HMM/性能页未实现；算法来源与 X04/X05 待确认 |
-| LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；4 号记录原分支 Ubuntu 构建零警告、ctest 3/3 通过，根 CMake 已引入模块。本次与 3 号集成后的版本待 Linux 复验；导航状态机、GeoClue2、权限与 X06 联调未完成 |
+| LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；4 号记录原分支 Ubuntu 构建零警告、ctest 3/3 通过（当时仅位置源两项），根 CMake 已引入模块。**2026-11-01 已在 main（`9cc04b1`）统一虚拟机 Linux 复验通过**：configure / build 零警告，全量 ctest **7/7**（ui-contracts、data-import、member3-models、navigation-location、navigation-location-demo、navigation-contracts、navigation-location-fixtures）；复验机新增系统依赖：libsqlite3-dev、libexpat1-dev、zlib1g-dev、libbz2-dev、libosmium2-dev（2.20.0，与导入基线要求一致）、libprotozero-dev。导航状态机、GeoClue2、权限与 X06 联调未完成 |
 | LinuxRenderer/地图/仪表盘 | 5 | 未开始 | 选择渲染后端与绘制接口，满足第 2 次作业 |
 | LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 未开始 | 本地 TTS/ASR、FFI、中文与麦克风权限 |
 | Linux 发布与最终材料 | 全员，1 汇总 | 未开始 | 逐次收集运行证据、G6 报告和 3–5 分钟视频 |
