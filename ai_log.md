@@ -699,3 +699,29 @@ AI回答：
 是否采用，以及原因：已接入正式构建和页面注册并通过功能验收，用户采用原因待用户填写。方案确认见 DEC-20261101-1-import-backend-01，未提交或推送。
 
 对本组的实际价值：支持标准 OSM 家族的流式读取、事务缓存、取消/错误回滚及只读公共契约，保留后续 G1 适配边界；VM恢复后Debug/Release CTest各7/7，导入专项17/17，真实Wayland UI12/12；湖北实际导入并通过完整性检查，新版安装、快捷方式更新、重启读取与明暗/紧凑截图通过。Navit报告 NAVIT-20261101-1-osm-import-01 已测各自预处理成本，后台负载波动和输出语义不同，不能作稳定性能排名；原始证据及下一步见报告。旧解析器/占位页四文件已清理、复验通过，完整StorageAdapter/G7/路由图未完成。
+
+### 对话 12：main 集成版本（9cc04b1）统一虚拟机 Linux 复验
+
+对话编号：12（4 号；记录 ID：`20261101-member4-reverify-01`）
+
+日期：2026-11-01（Asia/Shanghai）。
+
+场景：4 号在统一虚拟机（Ubuntu 24.04.4 LTS）上对 main 最新集成版本做 Linux 复验，回应 project.md 中"本次与 3 号集成后的版本待 Linux 复验"待办。
+
+工具：Codex 桌面应用；VirtualBox guestcontrol 驱动虚拟机内 git/CMake/Ninja/CTest。
+
+提示词：
+
+```text
+现在项目已经更新了，你拉取仔细理解阅读（随后授权：在虚拟机里做 Linux 复验）
+```
+
+AI回答：
+
+> 已拉取 main @ `9cc04b1` 并通读：本轮主要新增为 2 号 OSM 导入模块（src/data/import，含 ImportedDataset 契约）与 Navit 持续性能对标规则（AGENTS.md 第 8 节、docs/navit-benchmark.md），4 号契约头、src/navigation、tests/fixtures 零改动。虚拟机副本同步到 `9cc04b1` 后 configure 失败，系缺导入模块系统依赖；安装 libsqlite3-dev、libexpat1-dev、zlib1g-dev、libbz2-dev、libosmium2-dev（2.20.0，与导入基线硬校验版本一致）、libprotozero-dev 后：configure 通过、构建 56/56 零警告、全量 ctest **7/7 通过**（ui-contracts、data-import、member3-models、navigation-location、navigation-location-demo、navigation-contracts、navigation-location-fixtures）。
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已按实测结果更新 project.md 第 5 节 4 号进度行（销掉"待 Linux 复验"待办、附依赖清单）；采用原因：该复验为项目文档点名待办，结果在虚拟机 `~/navigation-verify` 副本（@ `9cc04b1`）上可复核。
+
+对本组的实际价值：确认 2 号导入模块合入后全仓库在 Ubuntu 24.04 可完整构建、7 项 CTest 全过，4 号此前"ctest 3/3"旧口径已按当前目标数修正；沉淀了复验机系统依赖清单（SQLite3/EXPAT/ZLIB/BZip2/libosmium 2.20.0/protozero），可供 1 号环境文档与 2 号模块 README 引用。注意边界：构建与测试通过只证明各模块可共存编译且各自契约测试绿，不代表 3 号算法与 4 号契约的语义集成完成——导航状态机、GeoClue2 真实源、权限与 X06 联调仍属后续作业；Navit 对标按 docs/navit-benchmark.md 属 4 号后续义务，本次未运行 Navit、未产生性能数据。
