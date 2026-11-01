@@ -158,7 +158,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | 窗口/导航/主题/公共组件基线 | 1 | 已完成（基础子项） | 真实 Wayland 桌面启动、屏幕适配、主题/组件与文件选择回传通过；源码、双平台测试、实际桌面截图与安装入口见框架说明；不包含真实导入和完整缩放验收 |
 | 数据导入/StorageAdapter/离线包 | 2（本次 1 号授权装配） | 进行中 | X01 已选 B：标准 OSM；libosmium＋SQLite 导入子项已验收，Navit 预处理成本已记录（有语义/负载限制）；完整存储及 X07 离线包待办 |
 | C++ A*/HMM/性能页 | 3 | 进行中 | P0 原版独立审核通过；用户确认 Linux 独立构建、模型 CTest、原 Qt 工程回归通过；T1–T4 边界补测已提供，待 Ubuntu 复验。A*/HMM/性能页未实现；算法来源与 X04/X05 待确认 |
-| LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；4 号记录原分支 Ubuntu 构建零警告、ctest 3/3 通过（当时仅位置源两项），根 CMake 已引入模块。**2026-11-01 已在 main（`9cc04b1`）统一虚拟机 Linux 复验通过**：configure / build 零警告，全量 ctest **7/7**（ui-contracts、data-import、member3-models、navigation-location、navigation-location-demo、navigation-contracts、navigation-location-fixtures）；复验机新增系统依赖：libsqlite3-dev、libexpat1-dev、zlib1g-dev、libbz2-dev、libosmium2-dev（2.20.0，与导入基线要求一致）、libprotozero-dev。导航状态机、GeoClue2、权限与 X06 联调未完成 |
+| LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；main（`9cc04b1`）Linux 复验通过（ctest 7/7）。**第二次作业对接层已交付（2026-11-01）**：`AsyncPlannerBridge`（QThread+Worker 线程化对接，落实契约"计算不阻塞 UI"）、`StubRoutePlanner`（确定性桩，延迟/失败/取消可注入）、`RecordingController`（验证桩）、`p1-planner-demo` 与 7 例集成测试；虚拟机实测 configure/build 零警告、全量 ctest **9/9**（新增 navigation-integration、navigation-planner-demo）。接口选择见 DEC-20261101-4-planner-bridge-interface-01（契约先行，3 号真实 A*/HMM 实现既定 `RoutePlanner` 接口即插即换）、DEC-20261101-4-async-model-01（本次忽略）。Navit 对标受阻未测（NAVIT-20261101-4-planner-bridge-01）。导航状态机、偏航/重算去重、GeoClue2、权限与 X06 联调未完成（第 3 次作业） |
 | LinuxRenderer/地图/仪表盘 | 5 | 未开始 | 选择渲染后端与绘制接口，满足第 2 次作业 |
 | LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 未开始 | 本地 TTS/ASR、FFI、中文与麦克风权限 |
 | Linux 发布与最终材料 | 全员，1 汇总 | 未开始 | 逐次收集运行证据、G6 报告和 3–5 分钟视频 |
@@ -333,6 +333,16 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 - 限制：Mesa/EGL 运行提示仍在，3D 关闭，不声明硬件加速或 OpenGL ES 验收；此次可读写不代表历史文件系统故障根因已修复。真实 A*/HMM、LinuxRenderer、业务非阻塞/取消/过期结果、性能监控及完整团队演示尚未接入。1 号首轮接入准备通过正确性检查，第二次作业整体验收保持进行中。
 - Navit：`NAVIT-20261101-1-integration-shell-01`，受阻（未测）；当前 VM 未安装 Navit，版本/配置及同源业务场景未建立，无耗时/内存/吞吐量差值。报告保存缺口及补测步骤，未把 CTest 时长当成性能数据。
 - 下一步：3 号提供真实服务、算法页/监控与模块 CMake；5 号提供真实 LinuxRenderer、地图页/工厂、线程/上下文与绘制证据；2 号提供数据。1 号据公共契约完成装配并建立 Navit 共同基线，各负责人补测等价任务。关联日志：对话 10（`20261101-member1-assignment2-integration-01`）。
+
+### 2026-11-01：4 号第二次作业规划对接层
+
+- 负责人：4；状态：进行中（对接层子项完成，状态机属第 3 次）。代码基线 `main`/`cb056d0`，分支 `codex/member-4/assignment2-integration`。
+- 已实现：`src/navigation/AsyncPlannerBridge.{h,cpp}`——规划请求线程化对接桥：控制器线程（GUI）发出 `routePlanRequested`/`routePlanCancelled`，经队列连接投递至内部 QThread 上的 `RoutePlanner`，结果 `routeReady`/`routeFailed` 经 `Qt::QueuedConnection` 回流控制器线程（落实契约文件头 ①线程规则）；析构先退线程再回收，析构后零回调。`StubRoutePlanner.{h,cpp}`——确定性规划桩：延迟/失败/取消语义（`setHonorCancel(false)` 模拟取消不及时）可注入，haversine 距离确定性可复算；`RecordingController.h`——对接验证桩（非第 3 次状态机）；`p1-planner-demo` 演示程序；`tests/PlannerBridgeTests.cpp` 7 例集成测试。
+- 接口与影响：未新增契约头——对接缝即第一次契约的 `contracts::RoutePlanner` 抽象接口，3 号真实 A*/HMM 实现该接口后桥/控制器/测试零改动替换（DEC-20261101-4-planner-bridge-interface-01，方案 B 契约先行）。异步模型 QThread+Worker（DEC-20261101-4-async-model-01，本次忽略）。CMake 变更仅 `src/navigation/`：库源 + `p1-planner-demo` + `p1-navigation-integration-tests`（ctest `navigation-integration`、`navigation-planner-demo`），顶层 CMake 未动。
+- 实测：统一虚拟机 p1-linux-member4（Ubuntu 24.04.4、Qt 6.4.2、G++ 13.3.0、CMake 3.28.3、Ninja、Debug、-j2）：configure 0 / build 0 / **警告 0**；全量 ctest **9/9**（新增 navigation-integration 7 例全过、navigation-planner-demo 通过）。演示输出：300ms 模拟计算期间主线程心跳 4 次（UI 循环不阻塞）、`stub-route-1` 100.08 m、stop() 后事件数不变。
+- 证据与产物：`docs/benchmarks/navit/NAVIT-20261101-4-planner-bridge-01.md`（对标受阻未测及补测步骤）；ai_log 对话 13（`20261101-member4-planner-bridge-01`）。
+- 限制：RecordingController 为验证桩，完整状态机属第 3 次；偏航触发/重算去重的端到端场景未建；Navit 对标受阻（VM 未安装 Navit、stub 非真实算法），真实算法接入后补测规划 P50/P95 与取消响应。
+- 下一步：3 号确认 X04/X05 并交付 `RoutePlanner` 实现后联调替换；第 3 次作业按契约第 ⑤ 节实现状态机（ReferenceController 脚手架为底稿）。
 
 ### 后续完成记录模板
 
