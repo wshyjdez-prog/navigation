@@ -1,6 +1,6 @@
 # FMM/HMM 与 Qt MapMatcher 接入
 
-状态（2026-11-01）：**Ubuntu 24.04 独立算法模块 CTest 5/5 通过，失败 0，总耗时 3.51 秒**；真实 FMM/HMM 经新 Qt MapMatcher 适配器运行并生成三条匹配 CSV。已读取共享证据核实，不再仅依据口头反馈。根工程回归已执行，**4/5 通过、ui-contracts 失败**；完整导航应用联调未完成。此前 A* Debug/Release 各 3/3 的历史验收保留。
+状态（2026-11-01）：**Ubuntu 24.04 独立算法模块 CTest 5/5 通过，失败 0，总耗时 3.51 秒**；真实 FMM/HMM 经新 Qt MapMatcher 适配器运行并生成三条匹配 CSV。已读取共享证据核实，不再仅依据口头反馈。合并前根回归 **4/5、ui-contracts 失败**保留为历史；合入 main `9cc04b1` 后，用户最新确认独立算法 **5/5**、根工程 **7/7**、失败 **0**，libbz2-dev、libosmium2-dev 已补齐；完整导航应用联调未完成。此前 A* Debug/Release 各 3/3 的历史验收保留。
 
 ## 来源与调用方式
 
@@ -97,7 +97,7 @@ Windows 实际检查：Clang 8.0.1 + 本机 Qt 5.14.2 头文件，四份新增 c
 | A* demo | evidence-20261101-145035/astar-demo.log | nodes=900 42 5，edges=10 11，cost_m=6，distance_m=6；本次单次 elapsed_ms=0.03672，历史 0.035558 保留为前次测量 |
 | UBODT 与样例数据 | ubodt-gen.log、ubodt.txt、dataset-sha256.txt | 本次从固定官方样例 30 边/17 节点路网生成，delta=3 样例单位；UBODT 实物 SHA256 与记录一致，路网四个旁文件/轨迹的五项记录与原固定 ZIP 字节校验一致 |
 | 匹配 CSV | evidence-20261101-145035/fmm-results/track-1.csv 至 track-3.csv | 每文件一条 id=1 新输出；六列齐全，逐观测道路/误差/投影点数量一致，坐标有限、误差非负，pgeom/mgeom 末端一致 |
-| 根工程回归 | root-regression-LastTest.log | 五项测试中四项 Passed、ui-contracts Failed。已记录 End testing；当前共享证据没有根工程 configure/build/完整 ctest 汇总日志，不能宣称根构建链和回归全部通过 |
+| 合并前根工程回归（历史） | root-regression-LastTest.log | 五项测试中四项 Passed、ui-contracts Failed。已记录 End testing；当前共享证据没有根工程 configure/build/完整 ctest 汇总日志，不能宣称根构建链和回归全部通过 |
 
 | 官方轨迹 | 点数 | cpath | 最后观测道路 | 本次 runFmm 调用耗时 ms |
 | --- | --- | --- | --- | --- |
@@ -107,7 +107,7 @@ Windows 实际检查：Clang 8.0.1 + 本机 Qt 5.14.2 头文件，四份新增 c
 
 member3-fmm-official 的 CTest 墙钟为 0.47 秒，内部 QtTest 为 461 ms；表中是各次批量调用（含进程启动和加载），不同统计范围不能混用，均不是稳定性能基准。CSV 的 error 和几何使用合成样例单位，不能当作米制定位质量。
 
-根失败位于 UiTests::disabledRoutesDoNotChangePage（tests/UiTests.cpp:63，map 页面可进入却预期拒绝）与 pageReplacementTransfersOwnership（:91，页面栈实际 4、预期 3）。由一号核查实际页面行为与测试约定，本轮只交接日志，不修改 UI 或断言，不推断根因。其余 navigation-location、navigation-location-demo、navigation-contracts、navigation-location-fixtures 均通过；这不表示 FMM 已接入导航主窗口。
+合并前的根失败位于 UiTests::disabledRoutesDoNotChangePage（tests/UiTests.cpp:63，map 页面可进入却预期拒绝）与 pageReplacementTransfersOwnership（:91，页面栈实际 4、预期 3）。由一号核查实际页面行为与测试约定，本轮只交接日志，不修改 UI 或断言，不推断根因。其余 navigation-location、navigation-location-demo、navigation-contracts、navigation-location-fixtures 均通过；这不表示 FMM 已接入导航主窗口。合入 main 后的新回归结果见下方用户反馈。
 
 ## Ubuntu 手动构建和运行
 
@@ -178,7 +178,9 @@ BASH
 
 CTest 中真实样例将输出三条道路序列、点数和本次调用耗时；不要求复现之前 A* 单次计时。若找不到 libFMMLIB.so，先反馈原始日志及 `ldd <上述 fmm 绝对路径>`，不要改系统库或更换 FMM。Debug 复验可换独立 build 目录并把 Release 改 Debug，不复用不同工具链的缓存。
 
-根工程已执行但 ui-contracts 失败。下列命令供一号修复后复验留档，本次不重跑；当前根工程没有 add_subdirectory 算法模块，根回归不替代新适配器测试：
+合并 main 前的根回归为 4/5，ui-contracts 失败，当时根 CMake 尚未引入算法子目录。该结果保留为历史验收记录。
+
+合并 `origin/main`（`9cc04b1`）后，当前根 CMake 已通过 `add_subdirectory(src/algorithms)` 纳入算法模块。`P1_ALGORITHMS_BUILD_ASTAR`、`P1_ALGORITHMS_BUILD_QT_ADAPTER`、`P1_ALGORITHMS_BUILD_FMM_ADAPTER` 仍默认 OFF，算法部分默认只构建 P0 模型及启用 BUILD_TESTING 时的模型测试；RoutePlanner/MapMatcher 的主程序装配尚未完成。用户已确认合并后的 Ubuntu 独立算法 CTest 5/5、根工程 CTest 7/7、失败 0，依赖 libbz2-dev、libosmium2-dev 已补齐。本次未提供新的原始日志、运行耗时或构建模式，故不附加这些结论；之前 evidence-20261101-145035 的根 4/5 日志仍是合并前证据。下列命令保留供后续复现，本轮不重跑；根回归不能替代独立算法适配器测试：
 
 ```bash
 bash <<'BASH'
@@ -202,4 +204,4 @@ BASH
 - 四号：确认 requestId/locationSeq 生命周期、将停止/定位断层接到 resetWindow、等待/失败的内部状态消费；公共结果缺少道路/版本/来源/取消入口，当前走具体类内部接口，不擅改契约。既定路线距离及偏航判断仍缺真实路线几何供给，不能用道路误差代替。
 - 五号：内部几何为网络坐标，须按数据集投影转换后消费，并保留共享只读句柄；正式渲染数据交接尚未进行。
 - 一号：通过模块目标 `p1_algorithms_fmm` 装配具体 matcher；根工程注册和 UI 接线本轮未修改。
-- 下一步：独立模块及官方合成样例验收已通过，可安排与四五号的样例接口联调；实际接线尚未发生。根 UI 回归失败须一号核查；真实路网投影/UBODT 来源和路线偏离量未就绪前，不宣称已完成完整真实导航联调。未开发页面、FMM 引擎重写、压力框架或其他成员模块。
+- 下一步：独立模块及官方合成样例验收已通过，可安排与四五号的样例接口联调；实际接线尚未发生。合并后的根回归已由用户确认 7/7；真实路网投影/UBODT 来源和路线偏离量未就绪前，不宣称已完成完整真实导航联调。未开发页面、FMM 引擎重写、压力框架或其他成员模块。
