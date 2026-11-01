@@ -19,6 +19,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `DEC-20261028-4-offroute-reroute-01` | 偏航判定与重算去重 / 4 | 已确认（单方案，未按 7.1 做 2–3 种试验对比，见该记录第 2 节） | 候选 2（偏离 > 15 m 持续 ≥ 3 s；重算最小间隔 10 s；在途不重复请求） | 候选 2，已写入 `NavigationController.h` 第 ⑥ 节与样例 | project.md 2026-10-28 记录；ai_log 对话 8 |
 | 暂无（其他） | — | 尚未开展 | — | — | — |
+| `DEC-20261101-3-open-source-01` | A*/HMM 开源集成 / 3 | 本次忽略（用户指定单方案；独立模块 Ubuntu 5/5 已通过） | Boost.Graph A*；固定 FMM/HMM 外部程序及 Qt 适配 | 保留已验收实现；根回归 4/5、UI 项失败，完整导航待联调 | project.md 2026-11-01；ai_log 对话 9–15 |
 
 ## 单次抉择模板（复制后填写，模板不是实际记录）
 
@@ -188,3 +189,29 @@
 - 完成状态：策略已确认并落地，标 **已确认**；因未做 2–3 种试验对比，
   按 7.3 不标"已完成"（"已完成"要求确认、清理、复验三项齐备且包含试验流程）。
   待第 3 次作业实现状态机并用真实/更完整的匹配结果复核后，再新建关联记录结案。
+
+### DEC-20261101-3-open-source-01：Boost.Graph A* 与后续 FMM
+
+- 日期/负责人：2026-11-01（Asia/Shanghai），3 号。状态：本次忽略多方案对比；最新已核查独立算法模块 Ubuntu 5/5 通过，根回归 UI 项失败，完整导航待联调。以下保留各阶段历史。
+- 基线：`feature/member3-open-source-integration` / `ca12fe6`，工作区起始干净。重新读取了现有 P0、最新公共 NavigationTypes/NavigationController、导航 CMake 和测试，没有沿用旧分支“公共契约不存在”的结论。
+- 用户选择及原因：课程项目优先复用成熟开源算法，指定 Boost.Graph A* 和 FMM HMM。用户原文：“本次无需重新进行大范围算法选型。”同一任务此前已明确：“如果仓库 W03 流程要求多方案选型，将本次请求视为选择其中的单方案工作路径，按规范记录选择及跳过多方案比较的原因，但不得跳过必要的正确性和集成验证。”该选择只跳过本次方案对比，不豁免验证或公共接口确认。
+- 当前授权：用户最新指令“完成 A 阶段后先汇报结果，不要未经验证直接进入 FMM 或全面改造 Qt 界面。”因此只编写 A* 核心、固定样例、测试与公共 RoutePlanner 适配；FMM 为后续来源，不表示已集成或锁定版本。
+- 算法与数据：真实调用 Boost `astar_search`，系统头文件依赖，不复制上游；`directedS` 保留单行/平行边，ID 映射紧凑索引，前驱边恢复。使用 h=0，因为 P0 没有代价的几何下界保证；代价最优与道路声明长度分别返回。
+- 所有权与执行：P0 快照只读，任务按值持有；QtConcurrent 后台计算，所属线程回调，取消静默、仅最新有效 requestId 回流。WGS84→米制投影由显式注入适配器提供，测试标签映射不充当通用投影；只支持已有节点端点，未实现道路内端点或转向限制。
+- 来源/版本：Boost BSL-1.0，Windows 实测头文件 1.82；CMake 最低 1.74，Ubuntu 24.04 默认包 1.83，来宾实际版本待用户记录。FMM master 的许可证为 Apache-2.0，上游 CMake 要求 GDAL/Boost Serialization/OpenMP，且包含 C++11、全局选项和 Python 构建设置；本次只审阅，使用提交及 C++17/Linux 实际兼容性待后续独立构建。
+- 新增文件：`src/algorithms/core/BoostAStar.h/.cpp`、`qt/BoostRoutePlanner.h/.cpp`、`samples/FixedRoadNetwork.h`、`demo/AStarDemo.cpp`、`tests/AStarTests.cpp`、`tests/RoutePlannerTests.cpp`、`ASTAR_INTEGRATION.md`。修改模块 CMake/README、第三位组员 project/ai_log 及本记录。未改根 CMake、公共契约或其他成员功能文件。
+- 方法：固定合成米制图，手工预期 900→42→5、边 10→11，代价/长度均 6；另以测试专用 Floyd–Warshall 比对全部节点对。Qt 测试用受控阻塞触发取消/连续提交/析构，并以事件循环心跳检测 GUI 线程可响应，不用人为等待时间冒充算法性能。
+- 实际结果：Windows Clang 8.0.1 / Boost 1.82 / C++17，核心/核心测试/示例语法检查及 Debug/Release 目标文件编译 6 次通过，无诊断；未执行链接、用例、CTest、Qt 6.4.2 编译或 Ubuntu 验收。耗时统计、峰值内存、吞吐量、GUI 运行和跨组回归均未测；没有多方案试验数据。
+- 清理：无其他候选实现，无需删除未选代码；P0 原模型和测试保留。上游源码未改，无第三方补丁。
+- 下一步：用户使用共享源码 `/media/sf_navigation`，在 `~/projects/navigation-build/` 下执行 [接入说明](src/algorithms/ASTAR_INTEGRATION.md) 的 Debug/Release 构建/CTest 与原 Qt 工程回归，返回实际输出后继续。与 2 号确认真实图和投影，与 4 号按原信号/取消形状接线，与 5 号确认几何引用解析；这些不作为已完成联调。
+- 关联：日志对话 9 `20261101-member3-boost-astar-09`；无提交/推送/合并。未进入 FMM、页面或性能监控阶段。
+- 同日审核修正（日志对话 10）：针对 F1，新增具体类按 geometryRef 保存/读取/释放的共享路线数据；重算失败/取消保留旧路线，新成功交接后由接收方显式释放旧引用，不改公共契约。针对 F2，用户要求课程作业采用简单合理输入域：A* 单边长度/代价分别 ≤1e9 m、全图各自总量 ≤1e12 m，入口明确校验并以 NumericError 拒绝超范围；P0 通用有限值规则保持。移除 CheckedPlus 候选溢出全局抛错，允许域内普通 double 累加安全。
+- 测试与验证修正：不删除独有覆盖；P0 重复报告辅助提取为简单共享头，A* 孤立/单行/同节点合入全节点对测试并保留原断言，Qt 首次失败合入旧路线失败/取消数据行，demo 改为单独执行。业务静态计数 89→88，CTest 4→3；修复后 Windows 五份非 Qt 源文件 Debug/Release 目标文件编译 10 次通过，无诊断，运行结果仍未验证。V1 须由用户在 Ubuntu 构建、链接并运行核心/Qt/CTest/demo 后关闭；不把此次代码修复作为阶段验收通过。
+- 同日用户运行反馈（日志对话 11）：Ubuntu 24.04 Debug 编译/链接成功、Boost 1.83.0、CTest 3/3，demo 节点 900→42→5、边 10→11、代价/长度均 6、单次约 0.080893 ms。记录为用户真实反馈，不推断内部用例计数、未提供的工具版本或 Release 结果。Release 与本轮根回归等待用户执行新命令。
+- 后续 FMM 来源固定为 `19ef34e1f57ff2f2484231aa0d01dfffea986ec1`（官方 API 核实），Windows 官方 ZIP 下载及 SHA256/真实示例核查已完成；顶层 Apache-2.0，另保留包内各依赖许可。上游 Python 绑定使用旧 distutils、CMake 写死 C++11 和源目录输出，计划外部副本最小调整，只保留 C++ 所需构建路径；尚未执行补丁、依赖安装、FMM 编译、HMM 匹配或 MapMatcher 适配。继续严格按 A* Release→FMM 独立编译→官方 fmm/UBODT HMM 运行→接口适配，不以 ST-Matching 替代。来源、归档和边界见 `src/algorithms/STAGE_REPORT_2026-11-01.md`。
+- 后续反馈/授权（日志对话 12）：用户确认 A* Debug/Release 各 CTest 3/3、demo 正常，Release 节点/边/代价正确、单次 0.035558 ms；根回归尚未验证。用户正式授权 FMM 独立阶段，先交环境、依赖与源码准备命令。使用原 ZIP，不重新下载；脚本仅在 Ubuntu 本地 FMM 副本改三处 CMake，保存原文与 patch，拒绝覆盖已存在源码目录。Windows Bash 语法和对原 CMake 的三处修改检查通过，不代表 Ubuntu 安装或构建成功。当前仍未生成本次 UBODT 或 HMM 匹配输出，未接 Qt。AI 报告统一在仓库外 `../navigation-仓库审查资料/`，旧记录中的仓库内报告路径是历史引用，现执行说明为该目录 `FMM_CPP_PREPARE_2026-11-01.md`。
+- 后续正式适配授权/实现（日志对话 13）：用户已确认固定版本 FMM 外部 C++/UBODT/HMM 官方三轨迹在 Ubuntu 成功，正式授权三号范围内连接公共 MapMatcher。本轮沿用已选 FMM HMM，不重新进行算法选型。核查固定源码 API、CMake、命令行和 CSV writer 后选第一阶段 CLI 调用：避免将上游全局选项、GDAL/OpenMP/Serialization/H3 及头文件安装布局引入已通过的 A* 构建；代价为每窗口进程启动和路网/UBODT 重载，实时性待实测。以后是否改直接链接由真实瓶颈决定。
+- 实现边界：配置不可变副本、WGS84 双向转换注入、有界窗口、worker 子进程、取消/过期过滤、新输出解析与只读结果；FMM 路网/UBODT 同版本声明及外部生成校验记录，官方数据仅合成样例。有符号 FMM ID 不直接当 P0 ID，公共路线距离不以道路误差替代。未改公共签名、其他成员实现、根 CMake 或 A* 功能。
+- 本轮验证/保留：Windows Qt5 头文件下新增四份 cpp 前端检查通过，不代表 Qt6/Ubuntu 构建运行；保留原有三项测试，新增适配夹具 CTest 与条件真实 HMM CTest，无其他算法候选要清理。Ubuntu 新适配器和根回归待用户运行；交接和命令见 `src/algorithms/FMM_INTEGRATION.md`。未提交/推送，未宣称正式联调完成。
+- 后续原始证据核实（日志对话 15）：用户补充 `out/member3-test-evidence/`，已直接读取配置/构建/CTest/QtTest/新 CSV。五项独立 CTest 全部 Passed，0 失败、3.51 秒；真实 HMM 0.47 秒，三条匹配路径和几何/观测字段核查一致。原样保全 15 个文件到仓库外并附 SHA256，UBODT 实物及固定样例数据校验一致。没有重跑测试或更换算法。
+- 阶段边界：根 LastTest 显示 4/5，ui-contracts 的 map 页面拒绝预期、页面栈数量两断言失败，交一号核查；不是算法模块验收失败，也不是完整应用通过。真实性能只有本次单次调用计时，样例单位不是米；真实投影、路网映射、路线偏离量、四五号接线及 UI/监控待完成。保留上游署名/许可、已选实现和所有原测试，无候选清理工作。此单方案决定不改记为已完成多方案比较。
