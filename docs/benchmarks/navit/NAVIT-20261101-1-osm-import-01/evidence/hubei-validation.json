@@ -1,0 +1,39 @@
+{
+  "integrity": "ok",
+  "counts": {
+    "nodes": 9077243,
+    "ways": 593776,
+    "relations": 5262,
+    "way_nodes": 10051981,
+    "relation_members": 237160
+  },
+  "summary": {
+    "bytes": "56133820",
+    "datasetId": "c7349a9b-cb03-4532-8b90-73489d4979b1",
+    "elapsedMs": "31547",
+    "format": "pbf",
+    "generator": "osmium/1.16.0",
+    "hasBounds": true,
+    "importedAt": "2026-11-01T07:11:16.378Z",
+    "maxLat": 33.4597419,
+    "maxLon": 118.2765123,
+    "minLat": 27.6427673,
+    "minLon": 106.8775025,
+    "name": "hubei-261031.osm.pbf",
+    "nodeReferences": "10051981",
+    "nodes": "9077243",
+    "reader": "libosmium 2.20.0",
+    "relationMembers": "237160",
+    "relations": "5262",
+    "sha256": "b099af20e3e02e13a68ec958ae2a5f05ec28f21664dede7eb33f76b20eca0ffe",
+    "sourcePath": "/home/navigation/Applications/Navit/maps/hubei-261031.osm.pbf",
+    "tags": "1789851",
+    "warnings": [
+      "关系节点：1293 个引用缺少对象；原始引用已保留，导航可用性尚未验证。",
+      "关系道路：141198 个引用缺少对象；原始引用已保留，导航可用性尚未验证。",
+      "关系成员：1719 个引用缺少对象；原始引用已保留，导航可用性尚未验证。"
+    ],
+    "ways": "593776"
+  },
+  "cacheBytes": 545054720
+}

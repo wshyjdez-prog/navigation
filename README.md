@@ -2,11 +2,11 @@
 
 **组名：Linux 端导航应用开发组（Linux PAL 适配）。**
 
-5 人使用 C++、Qt Widgets / OpenGL ES 和 CMake 开发 Linux 导航应用，集成 A*/HMM，完成渲染、语音、存储、定位四项 PAL 适配，并与 G6 联调。当前已建立第一次作业 Qt Widgets 应用框架源码，Linux 构建与桌面验收状态见 [框架说明](docs/assignment-1-framework.md)；真实数据解析与其他业务模块尚未接入。
+5 人使用 C++、Qt Widgets / OpenGL ES 和 CMake 开发 Linux 导航应用，集成 A*/HMM，完成渲染、语音、存储、定位四项 PAL 适配，并与 G6 联调。当前已建立第一次作业 Qt Widgets 应用框架源码，Linux 构建与桌面验收状态见 [框架说明](docs/assignment-1-framework.md)；标准 OSM 导入已接入；其他业务模块尚待集成。
 
 ## 第一次作业：应用框架
 
-根目录 `CMakeLists.txt` 是 Qt Creator 工程入口。窗口、页面导航、明暗主题、文件选择占位页、公共组件演示和模块页面替换已实现；详细构建步骤、关键函数与 2/3/4/5 号交接入口见 [基础框架说明](docs/assignment-1-framework.md)。导入解析与保存由 2 号接入，当前“开始导入”保持禁用。
+根目录 `CMakeLists.txt` 是 Qt Creator 工程入口。窗口、页面导航、明暗主题、文件选择占位页、公共组件演示和模块页面替换已实现；详细构建步骤、关键函数与 2/3/4/5 号交接入口见 [基础框架说明](docs/assignment-1-framework.md)。标准 OSM 导入已由 1 号授权装配，支持 PBF、OSM XML、gzip/bzip2 压缩，后台解析并保存 SQLite 缓存，详见 [导入说明](docs/osm-import.md)。
 
 在团队 Ubuntu 虚拟机的工程目录中执行：
 
@@ -17,6 +17,10 @@ cmake --build build -j1
 ctest --test-dir build --output-on-failure
 ./build/p1-navigation
 ```
+
+## 第二次作业：应用集成
+
+1 号已将已有算法基础模型加入根工程测试，并修正未接入页面的入口状态及页面替换所有权；真实 A*/HMM 和 LinuxRenderer 尚待 3/5 号交付后接入。模块工厂、CMake 交接、语音边界准备与剩余验收见 [第二次作业集成说明](docs/assignment-2-integration.md)，Ubuntu 实测见 [验证记录](docs/verification/assignment2/README.md)。Navit 对标当前受阻（未测），详见说明中的报告。
 
 ## 统一开发环境
 
@@ -34,7 +38,7 @@ ctest --test-dir build --output-on-failure
 
 ## 提示词框架
 
-UI 设计与实现统一遵循 [design.md](design.md)：包含 Clay 风格明暗配色、字体、留白、组件样式、地图工作台及第一次作业数据导入页面规范。涉及 UI 时先读此文档；当前公共主题与应用外壳已按规范编写，业务导入、地图和导航仍待接入。
+UI 设计与实现统一遵循 [design.md](design.md)：包含 Clay 风格明暗配色、字体、留白、组件样式、地图工作台及第一次作业数据导入页面规范。涉及 UI 时先读此文档；当前公共主题与应用外壳已按规范编写，业务导入已接入，地图和导航仍待接入。
 
 新对话可以使用 [prompts/README.md](prompts/README.md)：按“通用开场 + 本人职责 + 本次流程”组合，覆盖五人模块开发、算法方案对比、跨组联调、排错与验收。
 

@@ -1,0 +1,20 @@
+Internal ctest changing into directory: /home/navigation/p1-import-libosmium-20261101/release-final
+Test project /home/navigation/p1-import-libosmium-20261101/release-final
+    Start 1: ui-contracts
+1/7 Test #1: ui-contracts .....................   Passed    1.50 sec
+    Start 2: data-import
+2/7 Test #2: data-import ......................   Passed    0.14 sec
+    Start 3: member3-models
+3/7 Test #3: member3-models ...................   Passed    0.01 sec
+    Start 4: navigation-location
+4/7 Test #4: navigation-location ..............   Passed    0.42 sec
+    Start 5: navigation-location-demo
+5/7 Test #5: navigation-location-demo .........   Passed    1.11 sec
+    Start 6: navigation-contracts
+6/7 Test #6: navigation-contracts .............   Passed    0.01 sec
+    Start 7: navigation-location-fixtures
+7/7 Test #7: navigation-location-fixtures .....   Passed    0.02 sec
+
+100% tests passed, 0 tests failed out of 7
+
+Total Test time (real) =   3.22 sec

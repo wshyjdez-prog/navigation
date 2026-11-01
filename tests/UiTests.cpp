@@ -1,10 +1,11 @@
 #include "app/MainWindow.h"
-#include "app/ImportLanding.h"
+#include "app/ImportPage.h"
 #include "ui/common/Theme.h"
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
+#include <QLabel>
 #include <QLineEdit>
 #include <QPointer>
 #include <QProgressBar>
@@ -13,6 +14,8 @@
 #include <QSpinBox>
 #include <QStackedWidget>
 #include <QTemporaryFile>
+#include <QTemporaryDir>
+#include <QListWidget>
 #include <QtTest>
 
 class UiTests : public QObject {
@@ -21,11 +24,12 @@ private slots:
     void init() {
         theme_ = new p1::ui::Theme(this);
         theme_->apply(*qApp);
-        window_ = new p1::app::MainWindow(*theme_);
+        cache_ = new QTemporaryDir;
+        window_ = new p1::app::MainWindow(*theme_,nullptr,cache_->path());
         window_->show();
         QVERIFY(QTest::qWaitForWindowExposed(window_));
     }
-    void cleanup() { delete window_; delete theme_; }
+    void cleanup() { delete window_; delete theme_; delete cache_; }
 
     void initialClientFitsAvailableScreen() {
         const auto available = window_->screen()->availableGeometry().size();
@@ -61,19 +65,22 @@ private slots:
 
     void disabledRoutesDoNotChangePage() {
         QVERIFY(!window_->setCurrentPage("map"));
+        QVERIFY(!window_->setCurrentPage("algorithms"));
         QVERIFY(!window_->setCurrentPage("unknown"));
         QCOMPARE(window_->currentPageId(),QString("import"));
         QVERIFY(!window_->findChild<QPushButton*>("nav_map")->isEnabled());
+        QVERIFY(!window_->findChild<QPushButton*>("nav_algorithms")->isEnabled());
         QVERIFY(!window_->findChild<QPushButton*>("startImportButton")->isEnabled());
     }
 
     void selectedFileSurvivesThemeAndInvalidSelection() {
-        QTemporaryFile file;
+        QTemporaryFile file(QDir::tempPath()+"/p1-selected-XXXXXX.osm");
         QVERIFY(file.open()); file.write("unparsed fixture"); file.flush();
-        auto* landing = window_->findChild<p1::app::ImportLanding*>();
+        auto* landing = window_->findChild<p1::app::ImportPage*>();
         QVERIFY(landing);
         landing->selectFile(file.fileName());
         QCOMPARE(landing->selectedFile(),file.fileName());
+        QVERIFY(window_->findChild<QPushButton*>("startImportButton")->isEnabled());
         theme_->setDark(true);
         window_->setCurrentPage("settings"); window_->setCurrentPage("import");
         QCOMPARE(landing->selectedFile(),file.fileName());
@@ -99,6 +106,56 @@ private slots:
         QVERIFY(!window_->registerPage("import","","",nullptr));
     }
 
+    void modulePagesRetainStateAcrossNavigationAndReplacement() {
+        auto* algorithms = new QLineEdit;
+        algorithms->setText("待提交的起终点输入");
+        QVERIFY(window_->registerPage("algorithms","算法实验","测试工厂页面",algorithms));
+        QCOMPARE(window_->currentPageId(),QString("import"));
+        QVERIFY(window_->setCurrentPage("algorithms"));
+        QPointer<QWidget> oldMap = new QWidget;
+        QVERIFY(window_->registerPage("map","地图导航","测试工厂页面",oldMap));
+        QVERIFY(window_->setCurrentPage("map"));
+        theme_->setDark(true);
+        QVERIFY(window_->setCurrentPage("algorithms"));
+        QCOMPARE(algorithms->text(),QString("待提交的起终点输入"));
+        auto* newMap = new QWidget;
+        QVERIFY(window_->registerPage("map","新地图","替换后台页面",newMap));
+        QCOMPARE(window_->currentPageId(),QString("algorithms"));
+        QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+        QVERIFY(oldMap.isNull());
+        QVERIFY(window_->setCurrentPage("map"));
+        QCOMPARE(window_->findChild<QStackedWidget*>("pageStack")->currentWidget(),newMap);
+    }
+
+    void registrationRejectsSharedPagesAndOwnershipCycles() {
+        auto* stack = window_->findChild<QStackedWidget*>("pageStack");
+        auto* importPage = stack->currentWidget();
+        const int count = stack->count();
+        QVERIFY(!window_->registerPage("map","错误复用","",importPage));
+        QVERIFY(!window_->registerPage("import","错误容器","",stack));
+        QVERIFY(!window_->registerPage("import","错误窗口","",window_));
+        auto* child = new QWidget(importPage);
+        QVERIFY(!window_->registerPage("map","错误子页","",child));
+        QVERIFY(!window_->registerPage("import","错误子页","",child));
+        QCOMPARE(child->parentWidget(),importPage);
+        QCOMPARE(stack->count(),count);
+        QCOMPARE(stack->currentWidget(),importPage);
+        QVERIFY(!window_->findChild<QPushButton*>("nav_map")->isEnabled());
+    }
+
+    void samePageRegistrationRefreshesMetadataWithoutDeletingPage() {
+        auto* stack = window_->findChild<QStackedWidget*>("pageStack");
+        QPointer<QWidget> page = stack->currentWidget();
+        const int count = stack->count();
+        QVERIFY(window_->registerPage("import","更新后的标题","更新后的说明",page));
+        QCOMPARE(window_->findChild<QLabel*>("pageTitle")->text(),QString("更新后的标题"));
+        QCOMPARE(window_->findChild<QPushButton*>("nav_import")->toolTip(),QString("更新后的标题"));
+        QCOMPARE(stack->count(),count);
+        QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
+        QVERIFY(page);
+        QCOMPARE(stack->currentWidget(),page.data());
+    }
+
     void compactLayoutAndKeyboardDialog() {
         window_->resize(1024,720);
         QTRY_VERIFY(window_->isCompact());
@@ -119,7 +176,25 @@ private slots:
         QTRY_VERIFY(!window_->isCompact());
         QCOMPARE(window_->findChild<QPushButton*>("nav_import")->text(),QString("数据导入"));
     }
+    void importPersistsAndCatalogReloads() {
+        QTemporaryFile file(QDir::tempPath()+"/p1-ui-XXXXXX.osm");
+        QVERIFY(file.open());
+        file.write("<osm version=\"0.6\"><node id=\"1\" lat=\"30.5\" lon=\"114.3\"/></osm>"); file.flush();
+        auto* page=window_->findChild<p1::app::ImportPage*>(); QVERIFY(page);
+        QSignalSpy done(page,&p1::app::ImportPage::importFinished);
+        page->selectFile(file.fileName()); page->startImport();
+        QVERIFY(page->isImporting());
+        theme_->setDark(true); QVERIFY(window_->setCurrentPage("settings"));
+        QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
+        const auto result=qvariant_cast<p1::app::ImportResult>(done.at(0).at(0));
+        QVERIFY2(result.ok,qPrintable(result.error)); QVERIFY(QFile::exists(result.cachePath));
+        QVERIFY(!page->isImporting());
+        p1::app::ImportPage reopened(*theme_,nullptr,cache_->path());
+        auto* list=reopened.findChild<QListWidget*>("importedDatasets");
+        QTRY_VERIFY_WITH_TIMEOUT(list->count()==1 && list->item(0)->text().contains(QFileInfo(file.fileName()).fileName()),10000);
+    }
 private:
+    QTemporaryDir* cache_ = nullptr;
     p1::ui::Theme* theme_ = nullptr;
     p1::app::MainWindow* window_ = nullptr;
 };

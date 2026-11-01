@@ -1,0 +1,268 @@
+Start testing: Nov 01 09:26 CST
+----------------------------------------------------------
+1/6 Testing: ui-contracts
+1/6 Test: ui-contracts
+Command: "/home/navigation/p1-assignment2-20261101-member1-01/build/p1-ui-tests"
+Directory: /home/navigation/p1-assignment2-20261101-member1-01/build
+"ui-contracts" start time: Nov 01 09:26 CST
+Output:
+----------------------------------------------------------
+********* Start testing of UiTests *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : UiTests::initTestCase()
+PASS   : UiTests::initialClientFitsAvailableScreen()
+PASS   : UiTests::themeAndNavigationPreserveForm()
+PASS   : UiTests::disabledRoutesDoNotChangePage()
+PASS   : UiTests::selectedFileSurvivesThemeAndInvalidSelection()
+PASS   : UiTests::pageReplacementTransfersOwnership()
+PASS   : UiTests::modulePagesRetainStateAcrossNavigationAndReplacement()
+PASS   : UiTests::registrationRejectsSharedPagesAndOwnershipCycles()
+PASS   : UiTests::samePageRegistrationRefreshesMetadataWithoutDeletingPage()
+QWARN  : UiTests::compactLayoutAndKeyboardDialog() This plugin does not support propagateSizeHints()
+PASS   : UiTests::compactLayoutAndKeyboardDialog()
+PASS   : UiTests::cleanupTestCase()
+Totals: 11 passed, 0 failed, 0 skipped, 0 blacklisted, 584ms
+********* Finished testing of UiTests *********
+<end of output>
+Test time =   0.60 sec
+----------------------------------------------------------
+Test Passed.
+"ui-contracts" end time: Nov 01 09:26 CST
+"ui-contracts" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/6 Testing: member3-models
+2/6 Test: member3-models
+Command: "/home/navigation/p1-assignment2-20261101-member1-01/build/src/algorithms/p1_algorithms_model_tests"
+Directory: /home/navigation/p1-assignment2-20261101-member1-01/build/src/algorithms
+"member3-models" start time: Nov 01 09:26 CST
+Output:
+----------------------------------------------------------
+PASS valid sparse IDs, metadata and directed edge
+PASS isolated node, zero ID and no edges
+PASS parallel, reverse and self-loop edges
+PASS repeated geometry points retained
+PASS endpoint tolerance boundary retained
+PASS to endpoint tolerance boundary retained
+PASS nonblank opaque version whitespace retained
+PASS projected frame with explicit definition
+PASS valid trajectory, gaps and optional accuracy
+PASS equal timestamps, repeated position, zero accuracy
+PASS single point and pre-epoch timestamps
+PASS graph snapshot isolates aliases including rvalue publication
+PASS trajectory snapshot survives source lifetime and updates
+PASS empty graph
+PASS empty trajectory
+PASS missing metadata
+PASS blank metadata
+PASS blank metadata field dataset_id
+PASS blank metadata field version
+PASS blank metadata field source
+PASS blank metadata field frame.definition
+PASS unsupported coordinate system
+PASS unsupported unit
+PASS duplicate node ID
+PASS duplicate edge ID
+PASS missing from endpoint
+PASS missing to endpoint
+PASS both endpoints missing
+PASS negative length
+PASS negative cost
+PASS zero length
+PASS negative zero length
+PASS empty geometry
+PASS single geometry point
+PASS all repeated geometry
+PASS reversed geometry
+PASS outside from tolerance
+PASS outside to tolerance
+PASS diagonal from error outside tolerance
+PASS decreasing time
+PASS duplicate original index
+PASS decreasing original index
+PASS negative accuracy
+PASS nonfinite node 0
+PASS nonfinite geometry 0
+PASS nonfinite length 0
+PASS nonfinite cost 0
+PASS nonfinite position 0
+PASS nonfinite accuracy 0
+PASS nonfinite node y 0
+PASS nonfinite geometry x 0
+PASS nonfinite position x 0
+PASS nonfinite node 1
+PASS nonfinite geometry 1
+PASS nonfinite length 1
+PASS nonfinite cost 1
+PASS nonfinite position 1
+PASS nonfinite accuracy 1
+PASS nonfinite node y 1
+PASS nonfinite geometry x 1
+PASS nonfinite position x 1
+PASS nonfinite node 2
+PASS nonfinite geometry 2
+PASS nonfinite length 2
+PASS nonfinite cost 2
+PASS nonfinite position 2
+PASS nonfinite accuracy 2
+PASS nonfinite node y 2
+PASS nonfinite geometry x 2
+PASS nonfinite position x 2
+PASS invalid input retained without sorting or clamping
+71 passed, 0 failed
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"member3-models" end time: Nov 01 09:26 CST
+"member3-models" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/6 Testing: navigation-location
+3/6 Test: navigation-location
+Command: "/home/navigation/p1-assignment2-20261101-member1-01/build/src/navigation/p1-navigation-tests"
+Directory: /home/navigation/p1-assignment2-20261101-member1-01/build/src/navigation
+"navigation-location" start time: Nov 01 09:26 CST
+Output:
+----------------------------------------------------------
+********* Start testing of LocationReplayTests *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : LocationReplayTests::initTestCase()
+PASS   : LocationReplayTests::csvFixtureLoads()
+PASS   : LocationReplayTests::jsonMatchesCsv()
+PASS   : LocationReplayTests::csvErrorsAreExplicit(missing-version)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(missing-crs-column)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(unknown-crs)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(unknown-column)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(lat-range)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(bad-number)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(field-count)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(time-order)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(mixed-crs)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(bearing-range)
+PASS   : LocationReplayTests::csvErrorsAreExplicit(no-frames)
+PASS   : LocationReplayTests::jsonAndFileErrorsAreExplicit()
+PASS   : LocationReplayTests::startWithoutTrackIsUnavailable()
+PASS   : LocationReplayTests::replayIsDeterministicAndSeqMonotonic()
+PASS   : LocationReplayTests::timerPauseResumeAndSpeed()
+PASS   : LocationReplayTests::noCallbacksAfterStop()
+PASS   : LocationReplayTests::stopInsideSlotSuppressesRemainingSignals()
+PASS   : LocationReplayTests::replayEndsWithFinishedThenStopped()
+PASS   : LocationReplayTests::simulatedErrorsMapToStatus()
+PASS   : LocationReplayTests::cleanupTestCase()
+Totals: 23 passed, 0 failed, 0 skipped, 0 blacklisted, 405ms
+********* Finished testing of LocationReplayTests *********
+<end of output>
+Test time =   0.41 sec
+----------------------------------------------------------
+Test Passed.
+"navigation-location" end time: Nov 01 09:26 CST
+"navigation-location" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/6 Testing: navigation-location-demo
+4/6 Test: navigation-location-demo
+Command: "/home/navigation/p1-assignment2-20261101-member1-01/build/src/navigation/p1-location-demo"
+Directory: /home/navigation/p1-assignment2-20261101-member1-01/build/src/navigation
+"navigation-location-demo" start time: Nov 01 09:26 CST
+Output:
+----------------------------------------------------------
+[load] /home/navigation/p1-assignment2-20261101-member1-01/current/tests/fixtures/location/campus_loop.csv frames=12 crs=WGS84 dataVersion=fixture-campus-loop-v1
+[status] Starting
+[status] Active
+[sample] session=1 seq=0 frame=0 t=1767225600000 lat=39.908700 lon=116.397500 crs=WGS84 alt=44 v=0 bearing=- hacc=8 src=mock ver=fixture-campus-loop-v1
+[sample] session=1 seq=1 frame=1 t=1767225601000 lat=39.908745 lon=116.397500 crs=WGS84 alt=44 v=5 bearing=0 hacc=6 src=mock ver=fixture-campus-loop-v1
+[sample] session=1 seq=2 frame=2 t=1767225602000 lat=39.908790 lon=116.397500 crs=WGS84 alt=44.1 v=5 bearing=0 hacc=5 src=mock ver=fixture-campus-loop-v1
+[PASS] pause()
+[PASS] 暂停 300 ms 内没有新样本
+[PASS] seekTo(1)：下一帧回到轨迹第 1 帧
+[PASS] resume()
+[sample] session=1 seq=3 frame=1 t=1767225601000 lat=39.908745 lon=116.397500 crs=WGS84 alt=44 v=5 bearing=0 hacc=6 src=mock ver=fixture-campus-loop-v1
+[sample] session=1 seq=4 frame=2 t=1767225602000 lat=39.908790 lon=116.397500 crs=WGS84 alt=44.1 v=5 bearing=0 hacc=5 src=mock ver=fixture-campus-loop-v1
+[sample] session=1 seq=5 frame=3 t=1767225603000 lat=39.908835 lon=116.397500 crs=WGS84 alt=- v=5 bearing=0 hacc=5 src=mock ver=fixture-campus-loop-v1
+[PASS] setSpeed(4.0)，间隔 25 ms
+[sample] session=1 seq=6 frame=4 t=1767225604000 lat=39.908880 lon=116.397500 crs=WGS84 alt=44.2 v=5 bearing=0 hacc=5 src=mock ver=fixture-campus-loop-v1
+[sample] session=1 seq=7 frame=5 t=1767225605000 lat=39.908925 lon=116.397500 crs=WGS84 alt=44.2 v=5 bearing=0 hacc=5 src=mock ver=fixture-campus-loop-v1
+[sample] session=1 seq=8 frame=6 t=1767225606000 lat=39.908925 lon=116.397559 crs=WGS84 alt=44.2 v=5 bearing=90 hacc=5 src=mock ver=fixture-campus-loop-v1
+[status] Stopped
+[PASS] stop() 后 400 ms 内回调次数 = 0
+[PASS] stop() 后 stepOnce() 被拒绝且不发信号
+[PASS] seq 严格递增（含 seek 回退）
+[PASS] 帧序列为 0,1,2,[seek]1,2,3,4,5,6
+[PASS] 最终状态 Stopped
+[result] 全部通过
+<end of output>
+Test time =   1.10 sec
+----------------------------------------------------------
+Test Passed.
+"navigation-location-demo" end time: Nov 01 09:27 CST
+"navigation-location-demo" time elapsed: 00:00:01
+----------------------------------------------------------
+
+5/6 Testing: navigation-contracts
+5/6 Test: navigation-contracts
+Command: "/home/navigation/p1-assignment2-20261101-member1-01/build/src/navigation/p1-navigation-contract-tests"
+Directory: /home/navigation/p1-assignment2-20261101-member1-01/build/src/navigation
+"navigation-contracts" start time: Nov 01 09:27 CST
+Output:
+----------------------------------------------------------
+********* Start testing of NavigationContractTests *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : NavigationContractTests::initTestCase()
+PASS   : NavigationContractTests::enumerationsAndEventsAreConstructible()
+PASS   : NavigationContractTests::snapshotCarriesEveryContractField()
+PASS   : NavigationContractTests::startFromIdleGoesPlanning()
+PASS   : NavigationContractTests::planningAcceptsOnlyCurrentRequestId()
+PASS   : NavigationContractTests::planningFailuresAbortToIdle(no-route)
+PASS   : NavigationContractTests::planningFailuresAbortToIdle(failed)
+PASS   : NavigationContractTests::planningFailuresAbortToIdle(cancelled)
+PASS   : NavigationContractTests::pauseAndResumeOnlyWhileNavigating()
+PASS   : NavigationContractTests::locationUpdatesDoNotAdvanceWhilePaused()
+PASS   : NavigationContractTests::offRouteTriggersSingleReroute()
+PASS   : NavigationContractTests::rerouteResultReturnsToNavigating()
+PASS   : NavigationContractTests::rerouteFailureKeepsNavigating()
+PASS   : NavigationContractTests::staleResultsNeverOverrideCurrentNavigation()
+PASS   : NavigationContractTests::arrivedIsTerminalUntilStop()
+PASS   : NavigationContractTests::arrivedFromOffRouteEndsNavigation()
+PASS   : NavigationContractTests::illegalCommandsAreDroppedInIdle()
+PASS   : NavigationContractTests::stopSilencesAllCallbacks()
+PASS   : NavigationContractTests::cleanupTestCase()
+Totals: 19 passed, 0 failed, 0 skipped, 0 blacklisted, 0ms
+********* Finished testing of NavigationContractTests *********
+<end of output>
+Test time =   0.00 sec
+----------------------------------------------------------
+Test Passed.
+"navigation-contracts" end time: Nov 01 09:27 CST
+"navigation-contracts" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/6 Testing: navigation-location-fixtures
+6/6 Test: navigation-location-fixtures
+Command: "/home/navigation/p1-assignment2-20261101-member1-01/build/src/navigation/p1-location-fixture-tests"
+Directory: /home/navigation/p1-assignment2-20261101-member1-01/build/src/navigation
+"navigation-location-fixtures" start time: Nov 01 09:27 CST
+Output:
+----------------------------------------------------------
+********* Start testing of LocationFixtureTests *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : LocationFixtureTests::initTestCase()
+PASS   : LocationFixtureTests::allFiveScenariosLoadWithDeclaredShape()
+PASS   : LocationFixtureTests::straightScenarioMatchesHandCalculation()
+PASS   : LocationFixtureTests::offRouteScenarioSustainsDeviationForThreeSeconds()
+PASS   : LocationFixtureTests::arrivalScenarioEndsAtTotalDistance()
+PASS   : LocationFixtureTests::degradedScenarioHasGapZeroDisplacementAndLowAccuracy()
+PASS   : LocationFixtureTests::backwardJumpIsDetected()
+PASS   : LocationFixtureTests::replayMatchesExpectedSequence()
+PASS   : LocationFixtureTests::cleanupTestCase()
+Totals: 9 passed, 0 failed, 0 skipped, 0 blacklisted, 1ms
+********* Finished testing of LocationFixtureTests *********
+<end of output>
+Test time =   0.01 sec
+----------------------------------------------------------
+Test Passed.
+"navigation-location-fixtures" end time: Nov 01 09:27 CST
+"navigation-location-fixtures" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Nov 01 09:27 CST

@@ -1,0 +1,12 @@
+[1/12] Automatic MOC for target p1_ui
+[2/12] Building CXX object CMakeFiles/p1_ui.dir/p1_ui_autogen/mocs_compilation.cpp.o
+[3/12] Building CXX object CMakeFiles/p1_ui.dir/src/ui/common/Theme.cpp.o
+[4/12] Building CXX object CMakeFiles/p1_ui.dir/src/ui/common/Components.cpp.o
+[5/12] Building CXX object CMakeFiles/p1_ui.dir/src/ui/map/MapDemoWidget.cpp.o
+[6/12] Building CXX object CMakeFiles/p1_ui.dir/src/app/ImportLanding.cpp.o
+[7/12] Building CXX object CMakeFiles/p1_ui.dir/src/app/MainWindow.cpp.o
+[8/12] Linking CXX static library libp1_ui.a
+[9/12] Automatic MOC for target p1-ui-tests
+[10/12] Building CXX object CMakeFiles/p1-ui-tests.dir/p1-ui-tests_autogen/mocs_compilation.cpp.o
+[11/12] Building CXX object CMakeFiles/p1-ui-tests.dir/tests/UiTests.cpp.o
+[12/12] Linking CXX executable p1-ui-tests

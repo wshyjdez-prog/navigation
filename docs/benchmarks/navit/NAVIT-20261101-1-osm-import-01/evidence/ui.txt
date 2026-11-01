@@ -1,0 +1,17 @@
+********* Start testing of UiTests *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : UiTests::initTestCase()
+PASS   : UiTests::initialClientFitsAvailableScreen()
+PASS   : UiTests::themeAndNavigationPreserveForm()
+PASS   : UiTests::disabledRoutesDoNotChangePage()
+PASS   : UiTests::selectedFileSurvivesThemeAndInvalidSelection()
+PASS   : UiTests::pageReplacementTransfersOwnership()
+PASS   : UiTests::modulePagesRetainStateAcrossNavigationAndReplacement()
+PASS   : UiTests::registrationRejectsSharedPagesAndOwnershipCycles()
+PASS   : UiTests::samePageRegistrationRefreshesMetadataWithoutDeletingPage()
+QWARN  : UiTests::compactLayoutAndKeyboardDialog() This plugin does not support propagateSizeHints()
+PASS   : UiTests::compactLayoutAndKeyboardDialog()
+PASS   : UiTests::importPersistsAndCatalogReloads()
+PASS   : UiTests::cleanupTestCase()
+Totals: 12 passed, 0 failed, 0 skipped, 0 blacklisted, 746ms
+********* Finished testing of UiTests *********

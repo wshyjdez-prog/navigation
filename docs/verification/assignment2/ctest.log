@@ -1,0 +1,18 @@
+Internal ctest changing into directory: /home/navigation/p1-assignment2-20261101-member1-01/build
+Test project /home/navigation/p1-assignment2-20261101-member1-01/build
+    Start 1: ui-contracts
+1/6 Test #1: ui-contracts .....................   Passed    0.60 sec
+    Start 2: member3-models
+2/6 Test #2: member3-models ...................   Passed    0.00 sec
+    Start 3: navigation-location
+3/6 Test #3: navigation-location ..............   Passed    0.41 sec
+    Start 4: navigation-location-demo
+4/6 Test #4: navigation-location-demo .........   Passed    1.10 sec
+    Start 5: navigation-contracts
+5/6 Test #5: navigation-contracts .............   Passed    0.00 sec
+    Start 6: navigation-location-fixtures
+6/6 Test #6: navigation-location-fixtures .....   Passed    0.01 sec
+
+100% tests passed, 0 tests failed out of 6
+
+Total Test time (real) =   2.12 sec

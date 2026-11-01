@@ -1,7 +1,7 @@
 #include "app/ImportFactory.h"
 
 #include "app/ImportPage.h"
-#include "app/OsmxParser.h"
+#include "data/import/OsmImportParser.h"
 
 #include <QFileInfo>
 
@@ -10,26 +10,24 @@
 namespace p1::app {
 
 QStringList ImportFactory::supportedExtensions() {
-    // A new format only needs its parser here plus an entry in this list.
-    return {QStringLiteral("osmx")};
+    return {"osm","pbf","osm.pbf","osm.gz","osm.bz2"};
 }
 
 QString ImportFactory::fileDialogFilter() {
-    return QStringLiteral("OSMX 数据文件 (*.osmx);;所有文件 (*)");
+    return QStringLiteral("OpenStreetMap 数据 (*.osm *.pbf *.osm.pbf *.osm.gz *.osm.bz2);;所有文件 (*)");
 }
 
 bool ImportFactory::supports(const QString& path) {
-    const QString suffix = QFileInfo(path).suffix();
-    return !suffix.isEmpty() && supportedExtensions().contains(suffix, Qt::CaseInsensitive);
+    return !data::OsmImportParser::inputFormat(path).isEmpty();
 }
 
-std::unique_ptr<ImportParser> ImportFactory::createParser(const QString& path) {
+std::unique_ptr<ImportParser> ImportFactory::createParser(const QString& path, const QString& cacheDirectory) {
     if (!supports(path)) return nullptr;
-    return std::make_unique<OsmxParser>();
+    return std::make_unique<data::OsmImportParser>(cacheDirectory);
 }
 
-QWidget* ImportFactory::createImportPage(ui::Theme& theme, QWidget* parent) {
-    return new ImportPage(theme, parent);
+QWidget* ImportFactory::createImportPage(ui::Theme& theme, QWidget* parent, const QString& cacheDirectory) {
+    return new ImportPage(theme, parent, cacheDirectory);
 }
 
 } // namespace p1::app

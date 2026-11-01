@@ -1,0 +1,30 @@
+Internal ctest changing into directory: /home/navigation/p1-assignment2-20261101-member1-01/baseline-build
+Test project /home/navigation/p1-assignment2-20261101-member1-01/baseline-build
+    Start 1: ui-contracts
+1/1 Test #1: ui-contracts .....................***Failed    0.60 sec
+********* Start testing of UiTests *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : UiTests::initTestCase()
+PASS   : UiTests::initialClientFitsAvailableScreen()
+PASS   : UiTests::themeAndNavigationPreserveForm()
+FAIL!  : UiTests::disabledRoutesDoNotChangePage() '!window_->setCurrentPage("map")' returned FALSE. ()
+   Loc: [/home/navigation/p1-assignment2-20261101-member1-01/baseline/tests/UiTests.cpp(63)]
+PASS   : UiTests::selectedFileSurvivesThemeAndInvalidSelection()
+FAIL!  : UiTests::pageReplacementTransfersOwnership() Compared values are not the same
+   Actual   (stack->count()): 4
+   Expected (3)             : 3
+   Loc: [/home/navigation/p1-assignment2-20261101-member1-01/baseline/tests/UiTests.cpp(91)]
+QWARN  : UiTests::compactLayoutAndKeyboardDialog() This plugin does not support propagateSizeHints()
+PASS   : UiTests::compactLayoutAndKeyboardDialog()
+PASS   : UiTests::cleanupTestCase()
+Totals: 6 passed, 2 failed, 0 skipped, 0 blacklisted, 549ms
+********* Finished testing of UiTests *********
+
+
+0% tests passed, 1 tests failed out of 1
+
+Total Test time (real) =   0.62 sec
+
+The following tests FAILED:
+	  1 - ui-contracts (Failed)
+Errors while running CTest

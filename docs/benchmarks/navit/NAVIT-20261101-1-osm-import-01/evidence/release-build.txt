@@ -1,0 +1,86 @@
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/g++-13 - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE  
+-- Performing Test HAVE_STDATOMIC
+-- Performing Test HAVE_STDATOMIC - Success
+-- Found WrapAtomic: TRUE  
+-- Found OpenGL: /usr/lib/x86_64-linux-gnu/libOpenGL.so   
+-- Found WrapOpenGL: TRUE  
+-- Could NOT find XKB (missing: XKB_LIBRARY XKB_INCLUDE_DIR) (Required is at least version "0.5.0")
+-- Found WrapVulkanHeaders: /usr/include  
+-- Found SQLite3: /usr/include (found version "3.45.1") 
+-- Found EXPAT: /home/navigation/p1-deps/osmium-2.20/root/usr/lib/x86_64-linux-gnu/libexpat.a (found version "2.6.1") 
+-- Found ZLIB: /home/navigation/p1-deps/osmium-2.20/root/usr/lib/x86_64-linux-gnu/libz.a (found version "1.3")  
+-- Found BZip2: /home/navigation/p1-deps/osmium-2.20/root/usr/lib/x86_64-linux-gnu/libbz2.a (found version "1.0.8") 
+-- Looking for BZ2_bzCompressInit
+-- Looking for BZ2_bzCompressInit - found
+-- Configuring done (0.6s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/navigation/p1-import-libosmium-20261101/release-final
+[1/56] Automatic MOC for target p1_data_import
+[2/56] Building CXX object src/data/import/CMakeFiles/p1_data_import.dir/p1_data_import_autogen/mocs_compilation.cpp.o
+[3/56] Building CXX object src/data/import/CMakeFiles/p1_data_import.dir/OsmImportParser.cpp.o
+[4/56] Building CXX object src/data/import/CMakeFiles/p1_data_import.dir/ImportedDataset.cpp.o
+[5/56] Linking CXX static library src/data/import/libp1_data_import.a
+[6/56] Automatic MOC for target p1_ui
+[7/56] Building CXX object CMakeFiles/p1_ui.dir/p1_ui_autogen/mocs_compilation.cpp.o
+[8/56] Building CXX object CMakeFiles/p1_ui.dir/src/ui/common/Theme.cpp.o
+[9/56] Building CXX object CMakeFiles/p1_ui.dir/src/ui/common/Components.cpp.o
+[10/56] Building CXX object CMakeFiles/p1_ui.dir/src/ui/map/MapDemoWidget.cpp.o
+[11/56] Building CXX object CMakeFiles/p1_ui.dir/src/app/ImportFactory.cpp.o
+[12/56] Building CXX object CMakeFiles/p1_ui.dir/src/app/ImportPage.cpp.o
+[13/56] Building CXX object CMakeFiles/p1_ui.dir/src/app/ImportTask.cpp.o
+[14/56] Building CXX object CMakeFiles/p1_ui.dir/src/app/MainWindow.cpp.o
+[15/56] Linking CXX static library libp1_ui.a
+[16/56] Automatic MOC for target p1-navigation
+[17/56] Building CXX object CMakeFiles/p1-navigation.dir/p1-navigation_autogen/mocs_compilation.cpp.o
+[18/56] Building CXX object CMakeFiles/p1-navigation.dir/src/app/main.cpp.o
+[19/56] Linking CXX executable p1-navigation
+[20/56] Automatic MOC for target p1-ui-tests
+[21/56] Building CXX object CMakeFiles/p1-ui-tests.dir/p1-ui-tests_autogen/mocs_compilation.cpp.o
+[22/56] Building CXX object CMakeFiles/p1-ui-tests.dir/tests/UiTests.cpp.o
+[23/56] Linking CXX executable p1-ui-tests
+[24/56] Automatic MOC for target p1-import-cli
+[25/56] Building CXX object src/data/import/CMakeFiles/p1-import-cli.dir/p1-import-cli_autogen/mocs_compilation.cpp.o
+[26/56] Building CXX object src/data/import/CMakeFiles/p1-import-cli.dir/tools/ImportCli.cpp.o
+[27/56] Linking CXX executable src/data/import/p1-import-cli
+[28/56] Automatic MOC for target p1-import-tests
+[29/56] Building CXX object src/data/import/CMakeFiles/p1-import-tests.dir/p1-import-tests_autogen/mocs_compilation.cpp.o
+[30/56] Building CXX object src/data/import/CMakeFiles/p1-import-tests.dir/tests/ImportTests.cpp.o
+[31/56] Linking CXX executable src/data/import/p1-import-tests
+[32/56] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_model.dir/model/Validation.cpp.o
+[33/56] Linking CXX static library src/algorithms/libp1_algorithms_model.a
+[34/56] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_model_tests.dir/tests/ModelTests.cpp.o
+[35/56] Linking CXX executable src/algorithms/p1_algorithms_model_tests
+[36/56] Automatic MOC for target p1_navigation
+[37/56] Building CXX object src/navigation/CMakeFiles/p1_navigation.dir/p1_navigation_autogen/mocs_compilation.cpp.o
+[38/56] Building CXX object src/navigation/CMakeFiles/p1_navigation.dir/MockLocationSource.cpp.o
+[39/56] Building CXX object src/navigation/CMakeFiles/p1_navigation.dir/FixedTrackLoader.cpp.o
+[40/56] Linking CXX static library src/navigation/libp1_navigation.a
+[41/56] Automatic MOC for target p1-location-demo
+[42/56] Building CXX object src/navigation/CMakeFiles/p1-location-demo.dir/p1-location-demo_autogen/mocs_compilation.cpp.o
+[43/56] Building CXX object src/navigation/CMakeFiles/p1-location-demo.dir/demo/LocationReplayDemo.cpp.o
+[44/56] Linking CXX executable src/navigation/p1-location-demo
+[45/56] Automatic MOC for target p1-navigation-tests
+[46/56] Building CXX object src/navigation/CMakeFiles/p1-navigation-tests.dir/p1-navigation-tests_autogen/mocs_compilation.cpp.o
+[47/56] Building CXX object src/navigation/CMakeFiles/p1-navigation-tests.dir/tests/LocationReplayTests.cpp.o
+[48/56] Linking CXX executable src/navigation/p1-navigation-tests
+[49/56] Automatic MOC for target p1-navigation-contract-tests
+[50/56] Building CXX object src/navigation/CMakeFiles/p1-navigation-contract-tests.dir/p1-navigation-contract-tests_autogen/mocs_compilation.cpp.o
+[51/56] Building CXX object src/navigation/CMakeFiles/p1-navigation-contract-tests.dir/tests/NavigationContractTests.cpp.o
+[52/56] Linking CXX executable src/navigation/p1-navigation-contract-tests
+[53/56] Automatic MOC for target p1-location-fixture-tests
+[54/56] Building CXX object src/navigation/CMakeFiles/p1-location-fixture-tests.dir/p1-location-fixture-tests_autogen/mocs_compilation.cpp.o
+[55/56] Building CXX object src/navigation/CMakeFiles/p1-location-fixture-tests.dir/tests/LocationFixtureTests.cpp.o
+[56/56] Linking CXX executable src/navigation/p1-location-fixture-tests
+[1/6] Automatic MOC for target p1_ui
+[2/5] Building CXX object CMakeFiles/p1_ui.dir/src/app/ImportPage.cpp.o
+[3/5] Linking CXX static library libp1_ui.a
+[4/5] Linking CXX executable p1-navigation
+[5/5] Linking CXX executable p1-ui-tests

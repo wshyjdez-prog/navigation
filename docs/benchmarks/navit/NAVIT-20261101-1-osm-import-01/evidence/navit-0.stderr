@@ -1,0 +1,276 @@
+PROGRESS: Phase 1: reading input data 0:00 0 MB
+flush_nodes 1
+PROGRESS: Phase 2: counting references and resolving ways 0:08 7 MB
+1 slices
+slice 0 of 0
+PROGRESS: Phase 3: converting ways to pois 0:08 7 MB
+PROGRESS: Phase 4: splitting at intersections 0:08 7 MB
+PROGRESS4: Processed 0 nodes (0 out) 0 ways 0 relations 0 tiles 0:08 7 MB
+PROGRESS4: Processed 0 nodes (0 out) 952913 ways 0 relations 0 tiles 0:10 7 MB
+PROGRESS: Phase 5: generating coastlines 0:10 7 MB
+tile_collector_finish
+tile_collector_finish foreach done
+tile_collector_finish destroy done
+Level=14
+*****
+*
+*
+*
+Level=13
+*****
+*
+*
+*
+Level=12
+*****
+*
+*
+*
+Level=11
+*****
+*
+*
+*
+Level=10
+*****
+*
+*
+*
+Level=9
+*****
+*
+*
+*
+Level=8
+*****
+*
+*
+*
+Level=7
+*****
+*
+*
+*
+Level=6
+*****
+*
+*
+*
+Level=5
+*****
+*
+*
+*
+Level=4
+*****
+*
+*
+*
+Level=3
+*****
+*
+*
+*
+Level=2
+*****
+*
+*
+*
+Level=1
+*****
+*
+*
+*
+tile_collector_finish done
+PROGRESS: Phase 6: assigning towns to countries 0:10 7 MB
+PROGRESS6: Processed 0 nodes (0 out) 0 ways 0 relations 0 tiles 0:10 7 MB
+OSM Info:http://www.openstreetmap.org/relation/270056 Country Boundary for 'CN'
+Processed boundaries
+Finished town table rebuild
+PROGRESS6: Processed 25732 nodes (25732 out) 0 ways 930 relations 0 tiles 0:12 10 MB
+Finished processing towns
+PROGRESS: Phase 7: sorting countries 0:12 10 MB
+PROGRESS: Phase 8: generating turn restrictions 0:12 10 MB
+PROGRESS8: Processed 25732 nodes (25732 out) 0 ways 930 relations 0 tiles 0:12 10 MB
+process_turn_restrictions:setup (threads 1)
+worker 0 up
+OSM Warning:http://www.openstreetmap.org/relation/1750250 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/4872541 turn restriction: via member missing
+OSM Warning:http://www.openstreetmap.org/relation/11136118 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/11136120 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/11678300 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/11678414 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/11678418 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/11678506 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/11678507 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/11678508 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/11749053 turn restriction: multiple via member
+OSM Warning:http://www.openstreetmap.org/relation/11749054 turn restriction: multiple via member
+OSM Warning:http://www.openstreetmap.org/relation/11827563 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/11827793 turn restriction: via member missing
+OSM Warning:http://www.openstreetmap.org/relation/11884068 turn restriction: via member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634122 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634123 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634124 turn restriction: multiple from members
+OSM Warning:http://www.openstreetmap.org/relation/13634125 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634127 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634128 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634129 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634130 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634131 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13634132 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13768188 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13768304 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13773592 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13773594 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13773595 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/13773596 turn restriction: multiple from members
+OSM Warning:http://www.openstreetmap.org/relation/13780809 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/14114032 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/14114033 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/14114034 turn restriction: multiple via member
+OSM Warning:http://www.openstreetmap.org/relation/15087620 turn restriction: multiple from members
+OSM Warning:http://www.openstreetmap.org/relation/15087621 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/15087622 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/15675993 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/15912714 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/15912715 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/15912716 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/16024842 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/16786995 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/16786996 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/16786997 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/17147392 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/17147393 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/17721230 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/19324350 turn restriction: multiple from members
+OSM Warning:http://www.openstreetmap.org/relation/19391953 turn restriction: via member missing
+OSM Warning:http://www.openstreetmap.org/relation/20430684 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/20430685 turn restriction: from member missing
+OSM Warning:http://www.openstreetmap.org/relation/20434574 turn restriction: via member missing
+OSM Warning:http://www.openstreetmap.org/relation/20434575 turn restriction: to member missing
+OSM Warning:http://www.openstreetmap.org/relation/20434576 turn restriction: multiple from members
+worker 0 exit
+PROGRESS8: Processed 25732 nodes (25732 out) 0 ways 1170 relations 0 tiles 0:12 10 MB
+PROGRESS8: Processed 25732 nodes (25732 out) 0 ways 0 relations 0 tiles 0:12 10 MB
+process_multipolygons:process (thread 1)
+process_turn_restrictions:finish (thread 0)
+PROGRESS8: Processed 25732 nodes (25732 out) 0 ways 184 relations 0 tiles 0:13 10 MB
+PROGRESS: Phase 9: generating multipolygons 0:13 10 MB
+PROGRESS9: Processed 25732 nodes (25732 out) 0 ways 184 relations 0 tiles 0:13 10 MB
+process_multipolygons:setup (threads 1)
+worker 0 up
+OSM Warning:http://www.openstreetmap.org/relation/5386845 multipolygon: wrong type for outer member
+OSM Warning:http://www.openstreetmap.org/relation/6603799 multipolygon: wrong type for outer member
+OSM Warning:http://www.openstreetmap.org/relation/13855136 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/14742496 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/18509029 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/19079676 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/19079677 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/19079678 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/19079679 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/19079680 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/19286345 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/19316905 multipolygon: missing outer member
+OSM Warning:http://www.openstreetmap.org/relation/20205017 multipolygon: wrong type for inner member
+worker 0 exit
+PROGRESS9: Processed 25732 nodes (25732 out) 0 ways 2670 relations 0 tiles 0:14 10 MB
+PROGRESS9: Processed 25732 nodes (25732 out) 0 ways 0 relations 0 tiles 0:14 10 MB
+process_multipolygons:process (thread 0)
+process_multipolygons:finish (thread 0)
+OSM Warning:http://www.openstreetmap.org/relation/11522487 multipolygon: skipping non loop sequence
+OSM Warning:http://www.openstreetmap.org/relation/11522487 multipolygon: skipping non loop sequence
+OSM Warning:http://www.openstreetmap.org/relation/11522487 multipolygon: skipping non loop sequence
+OSM Warning:http://www.openstreetmap.org/relation/11522487 multipolygon: skipping non loop sequence
+OSM Warning:http://www.openstreetmap.org/relation/12873840 multipolygon: skipping non loop sequence
+PROGRESS9: Processed 25732 nodes (25732 out) 13872 ways 2476 relations 0 tiles 0:14 13 MB
+PROGRESS: Phase 10: processing associated street relations 0:14 13 MB
+PROGRESS: Phase 11: processing house number interpolations 0:15 13 MB
+PROGRESS: Phase 12: generating tiles 0:16 13 MB
+PROGRESS12: Processed 0 nodes (0 out) 0 ways 0 relations 0 tiles 0:16 13 MB
+OSM Info:http://www.openstreetmap.org/relation/1964696 slice down 4 steps from acd to (acdaaaa - adaaaaa)
+slice 31 intersection with acdabdd
+slice 53 intersection with acdadbb
+slice 74 intersection with acdbacc
+slice 75 intersection with acdbacd
+slice 96 intersection with acdbcaa
+slice 97 intersection with acdbcab
+PROGRESS: sorting 29479 tiles
+PROGRESS: sorting 29479 tiles done
+PROGRESS: merged 32541 tiles
+PROGRESS: sorting 4364 tiles
+PROGRESS: sorting 4364 tiles done
+PROGRESS: merged 2065 tiles
+PROGRESS: sorting 3376 tiles
+PROGRESS: sorting 3376 tiles done
+PROGRESS: merged 880 tiles
+PROGRESS: sorting 2761 tiles
+PROGRESS: sorting 2761 tiles done
+PROGRESS: merged 191 tiles
+PROGRESS: sorting 2637 tiles
+PROGRESS: sorting 2637 tiles done
+PROGRESS: merged 49 tiles
+PROGRESS: sorting 2606 tiles
+PROGRESS: sorting 2606 tiles done
+PROGRESS: merged 16 tiles
+PROGRESS: sorting 2598 tiles
+PROGRESS: sorting 2598 tiles done
+PROGRESS: merged 5 tiles
+PROGRESS: sorting 2597 tiles
+PROGRESS: sorting 2597 tiles done
+PROGRESS: merged 3 tiles
+PROGRESS: sorting 2596 tiles
+PROGRESS: sorting 2596 tiles done
+PROGRESS: merged 1 tiles
+PROGRESS: sorting 2596 tiles
+PROGRESS: sorting 2596 tiles done
+PROGRESS: merged 1 tiles
+PROGRESS: sorting 2596 tiles
+PROGRESS: sorting 2596 tiles done
+PROGRESS: merged 1 tiles
+PROGRESS: sorting 2596 tiles
+PROGRESS: sorting 2596 tiles done
+PROGRESS: merged 1 tiles
+PROGRESS: sorting 2596 tiles
+PROGRESS: sorting 2596 tiles done
+PROGRESS: merged 0 tiles
+PROGRESS12: Processed 240739 nodes (0 out) 956673 ways 0 relations 92877 tiles 0:17 26 MB
+PROGRESS: Phase 13: assembling map 0:17 26 MB
+Maximum slice size 268435456
+Slice 0 is of size 143697164
+PROGRESS13: Processed 0 nodes (0 out) 0 ways 0 relations 0 tiles 0:17 26 MB
+OSM Info:http://www.openstreetmap.org/relation/1964696 slice down 4 steps from acd to (acdaaaa - adaaaaa)
+slice 31 intersection with acdabdd
+slice 53 intersection with acdadbb
+slice 74 intersection with acdbacc
+slice 75 intersection with acdbacd
+slice 96 intersection with acdbcaa
+slice 97 intersection with acdbcab
+PROGRESS13: Processed 240739 nodes (0 out) 956673 ways 0 relations 0 tiles 0:18 26 MB
+Adding country_999_p_1.tmp as acdabs0
+Adding country_999_p_2.tmp as acdabs1
+Adding country_999_p_3.tmp as acdabs2
+Adding country_999_p_4.tmp as acdabs3
+Adding country_999_p_5.tmp as acdabs4
+Adding country_999_p_6.tmp as acdabs5
+Adding country_999_p_7.tmp as acdabs6
+Adding country_999_p_8.tmp as acdabs7
+Adding country_999_p_9.tmp as acdabs8
+Adding country_999_p_10.tmp as acdabs9
+Adding country_999_p_11.tmp as acdabs10
+Adding country_999_p_12.tmp as acdabs11
+Adding country_999_p_13.tmp as acdabs12
+Adding country_999_p_14.tmp as acdabs13
+Adding country_999_p_15.tmp as acdabs14
+Adding country_999_p_16.tmp as acdabs15
+Adding country_999_p_17.tmp as acdabs16
+Adding country_999_p_18.tmp as acdabs17
+Adding country_999_p_19.tmp as acdabs18
+Adding country_999_p_20.tmp as acdads0
+Adding country_999_p_21.tmp as acdads1
+Adding country_999_p_22.tmp as acdads2
+Adding country_999_p_23.tmp as acdbas0
+Adding country_999_p_24.tmp as acdbcs0
+Adding country_999_p_0.tmp as acds0
+PROGRESS13: Processed 240739 nodes (0 out) 956673 ways 0 relations 2597 tiles 0:48 26 MB
+PROGRESS: Phase 14: done 0:48 26 MB
