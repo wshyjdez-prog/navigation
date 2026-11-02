@@ -66,6 +66,41 @@ target_compile_options(p1-navigation-integration-tests PRIVATE
 add_test(NAME navigation-integration COMMAND p1-navigation-integration-tests)
 set_tests_properties(navigation-integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# ── 4 号：3 号真实 A* 规划器对接（P1_NAVIGATION_REAL_PLANNER=ON 时参与构建）──
+# 契约既定策略（DEC-20261101-4-planner-bridge-interface-01）：AsyncPlannerBridge 与控制器零改动，
+# 仅把 StubRoutePlanner 换成 3 号 BoostRoutePlanner（contracts::RoutePlanner 即插即换）。
+# 依赖根 CMakeLists：本开关开启时同步启用 P1_ALGORITHMS_BUILD_ASTAR / P1_ALGORITHMS_BUILD_QT_ADAPTER。
+if(P1_NAVIGATION_REAL_PLANNER)
+    if(NOT TARGET p1_algorithms_route_planner)
+        message(FATAL_ERROR "P1_NAVIGATION_REAL_PLANNER=ON 需要 src/algorithms 的 Qt 适配层（检查根 CMakeLists 的选项传递）")
+    endif()
+    find_package(Qt6 6.4.2 EXACT REQUIRED COMPONENTS Concurrent)
+
+    # 真实规划器对接演示：样例路网 + BoostRoutePlanner + GeoProjector，
+    # 成功 / stop 取消静默 / 不可达 / 非节点端点四条链路全部经桥正确回流。退出码 0 即成功。
+    qt_add_executable(p1-real-planner-demo demo/RealPlannerBridgeDemo.cpp)
+    target_link_libraries(p1-real-planner-demo PRIVATE
+        p1_navigation p1_algorithms_route_planner Qt6::Core Qt6::Concurrent)
+    target_compile_options(p1-real-planner-demo PRIVATE
+        "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
+        "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+    add_test(NAME navigation-real-planner-demo COMMAND p1-real-planner-demo)
+    set_tests_properties(navigation-real-planner-demo PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    if(BUILD_TESTING)
+        # 真实规划器对接测试：投影器往返、端到端采纳、"最新请求生效"、dataVersion 拒收、
+        # 不可达 / 非节点端点失败路径、桥析构静默（覆盖条款见文件头注释）。
+        qt_add_executable(p1-real-planner-tests tests/RealPlannerBridgeTests.cpp)
+        target_link_libraries(p1-real-planner-tests PRIVATE
+            p1_navigation p1_algorithms_route_planner Qt6::Test Qt6::Concurrent)
+        target_compile_options(p1-real-planner-tests PRIVATE
+            "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
+            "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
+        add_test(NAME navigation-real-planner COMMAND p1-real-planner-tests)
+        set_tests_properties(navigation-real-planner PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    endif()
+endif()
+
     # 契约测试：导航状态事件契约（转换表、非法事件、陈旧 requestId、快照字段）。
     qt_add_executable(p1-navigation-contract-tests tests/NavigationContractTests.cpp)
     target_link_libraries(p1-navigation-contract-tests PRIVATE p1_navigation Qt6::Test)
