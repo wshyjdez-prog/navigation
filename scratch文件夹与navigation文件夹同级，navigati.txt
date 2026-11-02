@@ -1,0 +1,1 @@
+scratch文件夹与navigation文件夹同级，navigation文件夹下有三个文件夹，分别是full-cmake-sim、osmx-build、osmx-build，其余均为与这三个文件夹同级别的文件。是因为个别文件夹过大，才特设置压缩包五个上传至github项目，运行时需将各压缩包的文件解压还原为正确包含关系。
