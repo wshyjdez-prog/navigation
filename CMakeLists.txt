@@ -11,18 +11,21 @@ if(BUILD_TESTING)
     find_package(Qt6 6.4.2 EXACT REQUIRED COMPONENTS Test)
 endif()
 add_subdirectory(src/data/import)
+add_subdirectory(src/pal/linux/renderer)
 
 add_library(p1_ui STATIC
     src/ui/common/Theme.cpp
     src/ui/common/Components.cpp
     src/ui/map/MapDemoWidget.cpp
     src/ui/map/MapDemoWidget.h
+    src/ui/map/MapPage.cpp
+    src/ui/map/MapPage.h
     src/app/ImportFactory.cpp
     src/app/ImportPage.cpp
     src/app/ImportTask.cpp
     src/app/MainWindow.cpp)
 target_include_directories(p1_ui PUBLIC src)
-target_link_libraries(p1_ui PUBLIC Qt6::Widgets p1_data_import PRIVATE Qt6::Concurrent)
+target_link_libraries(p1_ui PUBLIC Qt6::Widgets p1_data_import p1_renderer PRIVATE Qt6::Concurrent)
 target_compile_options(p1_ui PRIVATE
     "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
     "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")

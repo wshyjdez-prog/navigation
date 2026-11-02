@@ -154,12 +154,12 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | Linux 基础开发环境 | 1 | 进行中 | 历史基础验证通过；原机 emergency_ro 未修复，用户授权克隆的版本/应用自动验证及常规原生桌面补测通过；其他成员复现仍待完成 |
 | UI 设计规范 | 1，2/5 协作 | 已完成（文档） | design.md v1.0；主题/公共组件已有实现与 offscreen 截图；完整桌面、地图/导入业务验收待完成 |
 | Qt 工程/框架/CMake | 1 | 进行中 | 真实源码与更新 Linux 包已产出；offscreen/Wayland 测试各 8/0，常规桌面与文件选择已补测；高 DPI/200% 字号和完整人工键盘验收仍待进行 |
-| 第二次作业应用集成 | 1，3/5 提供业务模块 | 进行中 | 已将 3 号基础模型加入根构建/CTest，修正未接入地图入口及页面注册所有权；本轮 Ubuntu 根 CTest 6/6、offscreen/Wayland UI 各 11/0。真实算法页/渲染页未交付，Navit 对标受阻（未测）；见 docs/assignment-2-integration.md 与 NAVIT-20261101-1-integration-shell-01 |
+| 第二次作业应用集成 | 1，3/5 提供业务模块 | 进行中 | 3 号基础模型已入根构建/CTest；5 号 MapPage 与异步 LinuxRenderer 已提供 Mock MapScene 和单一地图渲染流程，仍需统一 Ubuntu 复验和真实数据接入。真实算法页未交付；见 docs/assignment-2-integration.md、docs/renderer/linux-renderer.md |
 | 窗口/导航/主题/公共组件基线 | 1 | 已完成（基础子项） | 真实 Wayland 桌面启动、屏幕适配、主题/组件与文件选择回传通过；源码、双平台测试、实际桌面截图与安装入口见框架说明；不包含真实导入和完整缩放验收 |
 | 数据导入/StorageAdapter/离线包 | 2（本次 1 号授权装配） | 进行中 | X01 已选 B：标准 OSM；libosmium＋SQLite 导入子项已验收，Navit 预处理成本已记录（有语义/负载限制）；完整存储及 X07 离线包待办 |
 | C++ A*/HMM/性能页 | 3 | 进行中 | P0 原版独立审核通过；用户确认 Linux 独立构建、模型 CTest、原 Qt 工程回归通过；T1–T4 边界补测已提供，待 Ubuntu 复验。A*/HMM/性能页未实现；算法来源与 X04/X05 待确认 |
 | LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；main（`9cc04b1`）Linux 复验通过（ctest 7/7）。**第二次作业对接层已交付（2026-11-01）**：`AsyncPlannerBridge`（QThread+Worker 线程化对接，落实契约"计算不阻塞 UI"）、`StubRoutePlanner`（确定性桩，延迟/失败/取消可注入）、`RecordingController`（验证桩）、`p1-planner-demo` 与 7 例集成测试；虚拟机实测 configure/build 零警告、全量 ctest **9/9**（新增 navigation-integration、navigation-planner-demo）。接口选择见 DEC-20261101-4-planner-bridge-interface-01（契约先行，3 号真实 A*/HMM 实现既定 `RoutePlanner` 接口即插即换）、DEC-20261101-4-async-model-01（本次忽略）。Navit 对标受阻未测（NAVIT-20261101-4-planner-bridge-01）。导航状态机、偏航/重算去重、GeoClue2、权限与 X06 联调未完成（第 3 次作业） |
-| LinuxRenderer/地图/仪表盘 | 5 | 未开始 | 选择渲染后端与绘制接口，满足第 2 次作业 |
+| LinuxRenderer/地图/仪表盘 | 5 | 进行中 | 已完成 MapScene、异步缓存底图渲染、MapPage 工厂和渲染测试；用户已取消界面 A/B 比较，正式页面只有单一地图流程。Windows Qt 6.12 冒烟通过，统一 Ubuntu/Qt 6.4.2 与真实数据待验收 |
 | LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 未开始 | 本地 TTS/ASR、FFI、中文与麦克风权限 |
 | Linux 发布与最终材料 | 全员，1 汇总 | 未开始 | 逐次收集运行证据、G6 报告和 3–5 分钟视频 |
 
@@ -365,3 +365,23 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 恢复前阶段记录：统一 Ubuntu 完整构建成功，运行测试待恢复 VM 后执行（当前黑屏、SSH 无响应）；湖北 PBF、UI 实际显示与 Navit 对标均未验证，不能标已完成。原始 OSM 缓存不生成可路由图，不宣称完整 StorageAdapter、G7 离线包或算法/渲染已集成。旧实现源码暂留，待验证后清理。下一步由 1/2 号恢复环境后执行 CTest、真实数据导入、安装与对标；报告 NAVIT-20261101-1-osm-import-01，AI 日志 11。未提交/推送。
 
 本轮恢复后结果：标准 OSM 导入子项已完成。Debug/Release CTest 各7/7，导入专项17/17、真实Wayland UI12/12；湖北节点9077243、道路593776、关系5262，缓存完整性ok，3类缺失关系引用警告保留。旧 OsmxParser/ImportLanding 四文件已清理，正式路径不再引用；61文件源码指纹一致。新版安装于 /home/navigation/p1-import-libosmium-20261101/install，现有P1快捷方式已更新并启动，重启恢复列表。Navit报告已完成本轮各自预处理测量，P1中位41.28秒/P95 215.78秒，Navit47.35/49.63秒；因snap-store负载干扰和输出语义不同不计算优劣。历史受阻已解除，完整StorageAdapter/G7离线包、路由图/地图消费仍未实现，模块整体保持进行中。证据见同名报告目录，日志11合并本任务结果，未提交/推送。
+
+### 2026-11-01：LinuxRenderer 无头场景与 A/B 模式
+
+日期 / 模块 / 负责人 / 状态：2026-11-01 / LinuxRenderer、MapPage 与异步渲染 / 5 / 进行中。
+
+已实现能力与正式入口：新增 `src/pal/linux/renderer/` 模块内 `MapScene`、Mock 场景、`LinuxRenderer`、最新 requestId 去重、后台 QImage 绘制和 `NavigationSnapshot` 覆盖层；新增 `src/ui/map/MapPage.*` 页面工厂并注册到主窗口 `map` 入口。正式地图页固定使用缓存底图，不显示 A/B 选择。旧 `MapDemoWidget.*` 保留，未删除。正式入口为 CMake 目标 `p1_renderer`、`p1-renderer-tests`；内部基准默认不构建。
+
+接口、数据约定和 PAL 边界：本轮采用 I1，由 `MockMapScene` 提供显式 `mock` 的 1024×640 场景、8 张瓦片、1 条路线和 3 个标记；`NavigationSnapshot` 只消费已有字段。MapScene 暂为模块内契约，真实 StorageAdapter、A*/HMM 结果和 G8/X08 接口未接入，不把 Mock 作为真实联调证据。
+
+跨组选择及确认依据：用户 2026-11-01 选择接口 I1；随后明确不需要 A/B 比较，只保留符合第二次作业需求的正常运行流程。地图页固定使用缓存底图；完整重绘代码保留作开发期正确性对照，但不显示入口。Navit 只作架构参考，未复制 GPL v2 源码。
+
+decision_log.md 记录 ID：`DEC-20261101-5-renderer-01`，用户已取消界面比较；正式路径固定为缓存底图。
+
+Linux 环境、验证步骤/结果/证据：Windows + Qt 6.12.0 + MinGW GCC 13.1.0 独立冒烟工程中，渲染测试通过，MapPage 单一入口异步首帧通过。Windows 数据不作为统一 Ubuntu/Qt 6.4.2 验收；统一 Linux 构建、CTest 和 Wayland 截图待补测。
+
+Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用依据：`NAVIT-20261101-5-renderer-01`。用户取消本轮 A/B 比较，普通构建不生成基准工具；Navit 仅用于接口和渲染流程参考。
+
+未实现/未验证内容、下一步与涉及组员：真实地图瓦片、路线/轨迹数据、导航快照运行时、G8/X08、平移缩放、OpenGL ES 和 Linux 运行验收待完成；需 1/2/3/4 号提供装配与数据接口。下一步在统一 Ubuntu 构建运行 `p1-renderer-tests` 并检查 Wayland 地图页面，不要求运行性能比较。
+
+关联日志 / 已有提交：ai_log 对话 13，`20261101-member5-linux-renderer-01`；本轮仅在本地分支修改，未提交或推送。
