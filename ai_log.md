@@ -17,6 +17,7 @@
 | 11 | 1 | Codex 桌面应用 | 具体模型及应用版本未提供/未记录 | 桌面对话、本地代码编辑、Ubuntu 构建 | 标准 OSM 导入替换、公共读取接口与运行受阻记录 |
 | 12 | 4 | WorkBuddy 桌面应用（Agent 模式） | 未提供/未记录 | 桌面对话、本地代码编辑、经 VirtualBox guestcontrol 在 Linux 虚拟机内执行构建与 ctest | main 集成版本（9cc04b1）统一虚拟机 Linux 复验、project.md 进度同步与依赖清单沉淀 |
 | 13 | 4 | WorkBuddy 桌面应用（Agent 模式） | 未提供/未记录 | 桌面对话、本地代码编辑、经 VirtualBox guestcontrol 在 Linux 虚拟机内执行构建与 ctest | 第二次作业规划对接层：AsyncPlannerBridge 线程化对接、StubRoutePlanner 确定性桩、7 例集成测试与演示程序 |
+| 14 | 5 | Codex 桌面应用 | GPT-5；应用版本未记录 | 桌面对话、读取 Navit 源码、本地代码编辑、Windows Qt 6.12 冒烟与 Release 基准 | LinuxRenderer、MapPage、异步地图渲染、渲染测试与接口协作 |
 
 ## 1. AI使用详情
 
@@ -761,3 +762,33 @@ AI回答：
 是否采用，以及原因：已按确认的两个方案落地（跨组接口方案 B、异步模型 QThread+Worker）；采用原因：契约先行与全队第一次作业风格一致，3 号只需实现既定接口；QThread+Worker 为契约注释预设模式，取消/生命周期语义清晰。
 
 对本组的实际价值：第二次作业"对接真实计算"的接缝就位——3 号真实 RoutePlanner 按契约实现后零改动替换，控制器/UI 不受影响；"不阻塞 UI"有了自动化证明（心跳测试 + 回流线程断言），不再只是口头承诺；stop() 取消、陈旧结果拒绝等契约硬性规则首次以可执行测试落地。限制与边界：RecordingController 仅验证桩，状态机仍属第 3 次；偏航触发/重算去重随第 3 次补测；Navit 对标按规范记受阻未测（NAVIT-20261101-4-planner-bridge-01），真实算法接入后补测规划 P50/P95 与取消响应。决策记录：DEC-20261101-4-planner-bridge-interface-01（已确认）、DEC-20261101-4-async-model-01（本次忽略）。
+
+### 对话 14：LinuxRenderer 地图异步渲染
+
+对话编号：14（组员 5；记录 ID：`20261101-member5-linux-renderer-01`）
+
+日期：2026-11-01（Asia/Shanghai）。
+
+场景：依据最新 main 和用户指定 Navit 源码，完成第二次作业的 LinuxRenderer、MapPage 和异步地图渲染；保留其他成员改动和旧地图文件。
+
+工具：Codex 桌面应用（GPT-5；具体应用版本未记录）。本地代码编辑、Navit 源码阅读、Windows Qt 6.12/MinGW 独立冒烟；用户取消比较后移除界面 A/B 入口。
+
+提示词：
+
+```text
+https://github.com/navit-gps/navit.git，第二次作业参考这个源代码去完成，我是5号记得去读我们那个项目的README.md里面内容
+
+接口1，算法A+B，我队友可能更新了你代码你能看到他们最近改的吗
+```
+
+AI回答：
+
+> 已拉取队友最新 main `cb056d0`，其中包含 2 号 OSM 导入、1 号第二次作业集成和 Navit 对标规范。已在基于该提交的新分支新增 `p1_renderer`、MapScene、MockMapScene、异步 LinuxRenderer、A 缓存底图/B 完整重绘、MapPage 工厂、渲染测试与基准工具，并只做必要的主窗口页面注册和现有 UI 测试调整。Navit GPL v2 源码仅作架构参考，没有复制；旧地图控件和其他成员文件未删除。
+>
+> 用户随后明确不需要 A/B 比较和测试操作，已从地图页移除模式选择，只保留正常地图流程；内部性能基准默认不构建。Windows Qt 6.12 冒烟通过，但 Linux/Qt 6.4.2 仍需复验。
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：接口 I1 和异步地图页已落地；用户随后取消 A/B 比较，正式页面只显示单一缓存底图渲染。采用原因和“我的理解”待用户填写。尚未提交、推送或创建 PR，未删除已有文件。
+
+对本组的实际价值：新增可运行的异步地图页，落实 drawTile→drawImage、drawRoute→折线、present→GUI 显示以及旧 requestId 丢弃；用户界面只有单一地图流程。渲染测试覆盖输出、非法数据、导航覆盖层和异步最新帧。Windows Qt 6.12 冒烟通过；限制：Mock MapScene 不代表真实 2/3/4 数据或 G8 联调，统一 Linux 构建尚未验证。

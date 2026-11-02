@@ -20,7 +20,7 @@ ctest --test-dir build --output-on-failure
 
 ## 第二次作业：应用集成
 
-1 号已将已有算法基础模型加入根工程测试，并修正未接入页面的入口状态及页面替换所有权；真实 A*/HMM 和 LinuxRenderer 尚待 3/5 号交付后接入。模块工厂、CMake 交接、语音边界准备与剩余验收见 [第二次作业集成说明](docs/assignment-2-integration.md)，Ubuntu 实测见 [验证记录](docs/verification/assignment2/README.md)。Navit 对标当前受阻（未测），详见说明中的报告。
+1 号已将已有算法基础模型加入根工程测试，并修正页面入口与替换所有权；5 号已提供基于 Mock MapScene 的异步 LinuxRenderer、瓦片/路线/标记绘制和 A/B 模式，真实 A*/HMM 与真实地图数据仍待接入。模块工厂、CMake 交接、语音边界准备与剩余验收见 [第二次作业集成说明](docs/assignment-2-integration.md)，LinuxRenderer 说明见 [渲染器文档](docs/renderer/linux-renderer.md)，统一 Ubuntu 复验与 Navit 对标状态见 [渲染对标报告](docs/benchmarks/navit/NAVIT-20261101-5-renderer-01.md)。
 
 ## 统一开发环境
 

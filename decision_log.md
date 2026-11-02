@@ -21,6 +21,7 @@
 | `DEC-20261028-4-offroute-reroute-01` | 偏航判定与重算去重 / 4 | 已确认（单方案，未按 7.1 做 2–3 种试验对比，见该记录第 2 节） | 候选 2（偏离 > 15 m 持续 ≥ 3 s；重算最小间隔 10 s；在途不重复请求） | 候选 2，已写入 `NavigationController.h` 第 ⑥ 节与样例 | project.md 2026-10-28 记录；ai_log 对话 8 |
 | `DEC-20261101-4-planner-bridge-interface-01` | 规划计算对接接口 / 4（AGENTS 第 3 节跨组接口选择） | 已确认（方案 B） | 不适用（接口选择，非算法试验） | 方案 B：沿用 `include/contracts/NavigationController.h` 既有 `RoutePlanner`/`MapMatcher` 抽象接口为对接缝，4 号交付 `AsyncPlannerBridge` + `StubRoutePlanner`；3 号真实 A*/HMM 实现该接口即插即换 | project.md 第二次作业 4 号行；ai_log 对话 13 |
 | `DEC-20261101-4-async-model-01` | 规划对接异步执行模型 / 4 | 本次忽略（单方案，未做 2–3 种试验对比） | QThread+Worker / QtConcurrent / 忽略 三选项展示 | QThread+Worker（`AsyncPlannerBridge` 内部 QThread，functor 队列投递 + QueuedConnection 回流）；契约注释 ① 预设该模式 | project.md 第二次作业 4 号行；ai_log 对话 13；Navit：NAVIT-20261101-4-planner-bridge-01 |
+| `DEC-20261101-5-renderer-01` | LinuxRenderer 渲染路径 / 5 | 本次取消界面比较 | 已撤回 A+B 试验入口 | 正式页面固定使用 A 缓存底图；B 仅保留为开发期正确性对照 | project.md 2026-11-01 记录；ai_log 对话 13；NAVIT-20261101-5-renderer-01 |
 | 暂无（其他） | — | 尚未开展 | — | — | — |
 
 ## 单次抉择模板（复制后填写，模板不是实际记录）
@@ -248,3 +249,54 @@
   （7 例集成测试已实测，VM ctest 9/9、警告 0）。
 - 正式路径：`AsyncPlannerBridge.{h,cpp}`（单方案去向）。清理范围：无（未产生未选方案代码）。
 - 状态：本次忽略。AI 日志关联：对话 13。
+
+### DEC-20261101-5-renderer-01：LinuxRenderer A/B 渲染组合
+
+#### 1. 背景与约束
+
+- 日期、组员和状态：2026-11-01（Asia/Shanghai）/ 5 / 试验中。
+- 目标：完成第二次作业的瓦片、路线、标记、导航覆盖层与异步绘制，并用同一 MapScene 比较缓存底图和每次完整重绘。
+- 基线：队友最新 `origin/main/cb056d0`；本地分支 `codex/member-5/linux-renderer` 上的未提交修改。
+- 输入接口：用户选择 I1，使用显式 Mock 的 `MapScene` 和 `NavigationSnapshot`；2 号真实数据、3 号算法结果、4 号运行期导航和 G8/X08 均未接入。
+- 参考源码：Navit `trunk/590b50a14731515307541b4f11ee51be9468e441` 的 `graphics.h`、`graphics.c`、`graphics/qt5/graphics_qt5.cpp`、`graphics/qt5/QNavitWidget.cpp`。参考文件为 GPL v2；本实现未复制源码。
+- 环境限制：统一 Ubuntu/Qt 6.4.2 构建与 Wayland 验收未取得；Windows Qt 6.12 仅作开发冒烟，不能替代目标环境。
+
+#### 2. 候选与组员选择
+
+| 组合 | 算法、数据结构与执行方式 | 适用性与代价 | 是否入选 |
+| --- | --- | --- | --- |
+| A 缓存底图 | 按 zOrder 排序显示列表；QImage 合成瓦片底图并按缓存键复用；每次绘制路线、标记、导航层；QThreadPool 后台渲染 | 导航变化而不换底图时减少瓦片重绘；需维护缓存键和失效 | 是 |
+| B 完整重绘 | 每次后台任务重画全部瓦片、路线、标记和导航层 | 实现简单、正确性基线清楚；底图静态时仍有重复成本 | 是 |
+| C 仅瓦片缓存，UI 线程即时叠加 | 瓦片缓存，路线与标记每帧在 GUI 线程绘制 | 架构更轻，但复杂路线可能阻塞 UI，和本次非阻塞目标冲突 | 否 |
+| 忽略：仅本次跳过方案对比规则 | 不进行 A/B 对比，选单一路径 | 不满足用户已选 A+B 的比较要求 | 否 |
+
+组员最初选择：“接口1，算法A+B”。随后明确要求“给我去掉这个比较我要的是符合需求的东西不需要什么测试”。因此 A+B 用户界面比较撤回，正式地图页只保留 A 缓存底图的一条流程；B 仅作为开发期正确性对照，不构建基准入口。
+
+#### 3. 实现与试验方法
+
+- 新增路径：`src/pal/linux/renderer/`、`src/ui/map/MapPage.*`、`tests/UiTests.cpp` 中的地图首帧检查；根 CMake 与 MainWindow 仅做装配修改。
+- 输入：`mock-campus-v1`，1024×640，8 张 256×320 瓦片，1 条路线，3 个标记；基准额外把路线扩展到 1024 点。
+- 基准：预热 5 次，A/B 各执行 50 次；进程内 `QElapsedTimer`；排序后取 P50/P95；Linux 额外记录 `/proc/self/status` 的 VmHWM。
+- Linux 计划：Release、`-j1`、Qt 6.4.2、GCC 13.3.0、同一 VM；记录 Wayland/图形后端和后台负载。
+- Navit 比较：本轮未建立 Navit 等价地图场景与交互输入，不计算本组/Navit 耗时差。
+
+#### 4. 当前结果
+
+| 组合 | 正确性 | Windows 预检中位/P95 µs | 缓存命中 | Linux 指标 |
+| --- | --- | ---: | ---: | --- |
+| A 缓存底图 | 渲染测试通过；连续请求只发布最新帧 | 9263 / 9691 | 50/50 | 未测 |
+| B 完整重绘 | 渲染测试通过；A/B 相同输入图像一致 | 9550 / 9983 | 0/50 | 未测 |
+
+Windows Qt 6.12 Release 预检中 A 相对 B 的中位耗时低约 3.0%，P95 低约 2.9%。样本和场景很小，且不是统一 Linux 环境，不能据此宣布性能优势。原始数据见 `docs/benchmarks/navit/NAVIT-20261101-5-renderer-01/evidence/windows-qt612-smoke.json`。
+
+#### 5. 最终确认
+
+- 组员已明确不需要比较。正式路径固定为 A 缓存底图。
+- A/B 切换入口已从 MapPage 移除，普通构建不生成基准程序。
+- B 完整重绘代码暂留作开发期正确性对照，不显示且不参与正常流程；为遵循用户不删除代码的要求，本轮不删除该实现。
+
+#### 6. 清理与复验
+
+- 用户入口、CMake 普通构建和文档演示只保留 A 缓存底图。
+- 自动化测试仍验证两条渲染函数输出一致，属于代码回归，不要求用户操作或比较。
+- 后续统一 Ubuntu 复验只运行正常地图页和根 CTest，不要求运行性能基准。

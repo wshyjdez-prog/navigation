@@ -29,8 +29,21 @@ void Theme::apply(QApplication& app) {
         "#345DB3", "#E9EFFC", "#21684F", "#E4F2EB", "#875016", "#FFF0DA", "#B32F49", "#FBE9EE"
     };
     const auto& c = colors_;
+    const QStringList installedFonts = QFontDatabase::families();
+    QStringList families;
+    for (const QString& candidate : {
+             QStringLiteral("Noto Sans CJK SC"),
+             QStringLiteral("Microsoft YaHei"),
+             QStringLiteral("Noto Sans"),
+             QStringLiteral("DejaVu Sans")
+         }) {
+        if (installedFonts.contains(candidate, Qt::CaseInsensitive)) {
+            families.push_back(candidate);
+        }
+    }
     QFont font;
-    font.setFamilies({"Noto Sans", "Noto Sans CJK SC", "DejaVu Sans"});
+    if (!families.isEmpty()) font.setFamilies(families);
+    font.setStyleHint(QFont::SansSerif);
     font.setPixelSize(14);
     app.setFont(font);
     QPalette palette;

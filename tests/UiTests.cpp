@@ -64,13 +64,23 @@ private slots:
     }
 
     void disabledRoutesDoNotChangePage() {
-        QVERIFY(!window_->setCurrentPage("map"));
+        QVERIFY(window_->setCurrentPage("map"));
         QVERIFY(!window_->setCurrentPage("algorithms"));
         QVERIFY(!window_->setCurrentPage("unknown"));
-        QCOMPARE(window_->currentPageId(),QString("import"));
-        QVERIFY(!window_->findChild<QPushButton*>("nav_map")->isEnabled());
+        QCOMPARE(window_->currentPageId(),QString("map"));
+        QVERIFY(window_->findChild<QPushButton*>("nav_map")->isEnabled());
         QVERIFY(!window_->findChild<QPushButton*>("nav_algorithms")->isEnabled());
         QVERIFY(!window_->findChild<QPushButton*>("startImportButton")->isEnabled());
+    }
+
+    void mapPagePublishesAsynchronousFrame() {
+        QVERIFY(window_->setCurrentPage("map"));
+        auto* canvas = window_->findChild<QWidget*>("mapRenderCanvas");
+        auto* status = window_->findChild<QLabel*>("mapRenderStats");
+        QVERIFY(canvas);
+        QVERIFY(status);
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("hasFrame").toBool(), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(status->text().contains("瓦片"), 5000);
     }
 
     void selectedFileSurvivesThemeAndInvalidSelection() {
@@ -95,7 +105,7 @@ private slots:
         auto* replacement = new QWidget;
         QVERIFY(window_->registerPage("import","已接入页面","测试模块替换",replacement));
         QCOMPARE(stack->currentWidget(),replacement);
-        QCOMPARE(stack->count(),3);
+        QCOMPARE(stack->count(),4);
         QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
         QVERIFY(oldPage.isNull());
         QVERIFY(window_->registerPage("map","地图模块","测试注册",new QWidget));
@@ -140,7 +150,7 @@ private slots:
         QCOMPARE(child->parentWidget(),importPage);
         QCOMPARE(stack->count(),count);
         QCOMPARE(stack->currentWidget(),importPage);
-        QVERIFY(!window_->findChild<QPushButton*>("nav_map")->isEnabled());
+        QVERIFY(window_->findChild<QPushButton*>("nav_map")->isEnabled());
     }
 
     void samePageRegistrationRefreshesMetadataWithoutDeletingPage() {

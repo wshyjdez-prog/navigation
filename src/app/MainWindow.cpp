@@ -2,6 +2,7 @@
 #include "app/ImportFactory.h"
 #include "ui/common/Components.h"
 #include "ui/common/Theme.h"
+#include "ui/map/MapPage.h"
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
@@ -42,7 +43,7 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     navigation_->setSpacing(8);
     sidebarLayout->addLayout(navigation_);
     addNavigation("import","数据导入","upload",true);
-    addNavigation("map","地图导航","map",false);
+    addNavigation("map","地图导航","map",true);
     addNavigation("algorithms","算法实验","code",false);
     addNavigation("offline","离线数据","folder",false);
     addNavigation("history","收藏历史","clock",false);
@@ -84,13 +85,14 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     auto* status = new QHBoxLayout;
     status->addWidget(label("●  本地会话", "caption"));
     status->addStretch();
-    auto* serviceStatus = label("算法、渲染待接入  /  定位、语音尚未启用", "caption");
+    auto* serviceStatus = label("地图为 Mock 场景  /  算法、定位、语音待接入", "caption");
     serviceStatus->setWordWrap(false);
     status->addWidget(serviceStatus);
     work->addLayout(status);
     shell_->addWidget(workspace,1);
 
     registerPage("import","数据导入","导入 OpenStreetMap 路网数据，并保存到本机。",ImportFactory::createImportPage(theme,nullptr,importCacheDirectory));
+    registerPage("map","地图导航","固定 MapScene 的 LinuxRenderer 异步绘制演示。",createMapPage(theme));
     registerPage("components","组件预览","检查公共控件与交互状态。此页为独立演示，不导入业务数据。",makeGallery());
     registerPage("settings","设置与帮助","让工作台适合你。偏好仅在本次会话中保留。",makeSettings());
     connect(&theme_, &Theme::changed, this, &MainWindow::refreshNavigation);
@@ -297,7 +299,7 @@ void MainWindow::showHelp() {
     auto* layout = new QVBoxLayout(dialog);
     layout->setContentsMargins(24,24,24,24); layout->setSpacing(24);
     layout->addWidget(label("P1 导航 · 0.1.0", "sectionTitle"));
-    layout->addWidget(label("支持 PBF、OSM XML 与 gzip/bzip2 压缩的 OSM 数据导入，数据保存在本机。\n\n算法调用、地图导航、定位与语音尚待接入。", "secondary"));
+    layout->addWidget(label("支持 PBF、OSM XML 与 gzip/bzip2 压缩的 OSM 数据导入，数据保存在本机。\n\n地图页当前使用固定 MapScene 与 Mock 导航快照；真实算法、定位和语音仍待接入。", "secondary"));
     auto* close = button("知道了",true);
     connect(close,&QPushButton::clicked,dialog,&QDialog::accept);
     layout->addWidget(close); dialog->open(); close->setFocus();
