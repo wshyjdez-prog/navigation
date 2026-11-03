@@ -77,11 +77,16 @@ private slots:
     void mapPagePublishesAsynchronousFrame() {
         QVERIFY(window_->setCurrentPage("map"));
         auto* canvas = window_->findChild<QWidget*>("mapRenderCanvas");
-        auto* status = window_->findChild<QLabel*>("mapRenderStats");
         QVERIFY(canvas);
-        QVERIFY(status);
         QTRY_VERIFY_WITH_TIMEOUT(canvas->property("hasFrame").toBool(), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(status->text().contains("绘制"), 5000);
+        QVERIFY(!window_->findChild<QLabel*>("mapRenderStats"));
+        QVERIFY(window_->property("mapOnly").toBool());
+        QVERIFY(!window_->findChild<QWidget*>("workspaceHeader")->isVisible());
+        QVERIFY(!window_->findChild<QWidget*>("workspaceStatus")->isVisible());
+        window_->toggleMapOnly();
+        QVERIFY(!window_->property("mapOnly").toBool());
+        QVERIFY(window_->findChild<QWidget*>("workspaceHeader")->isVisible());
+        window_->toggleMapOnly();
         const QString captures = qEnvironmentVariable("P1_UI_CAPTURE_DIR");
         if (!captures.isEmpty()) {
             QVERIFY(QDir().mkpath(captures));

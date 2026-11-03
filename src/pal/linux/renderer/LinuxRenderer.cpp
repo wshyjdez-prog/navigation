@@ -128,6 +128,12 @@ void drawOverlays(QPainter& painter,
         painter.setPen(QPen(Qt::white, 3));
         painter.setBrush(markerColor(marker));
         painter.drawEllipse(marker.position, marker.radius, marker.radius);
+        if (marker.label == "A" || marker.label == "B") {
+            painter.setPen(Qt::white);
+            painter.drawText(QRectF(marker.position.x()-marker.radius, marker.position.y()-marker.radius,
+                                    marker.radius*2, marker.radius*2),Qt::AlignCenter,marker.label);
+            continue;
+        }
         if (!marker.label.isEmpty()) {
             const QRectF labelRect(marker.position.x() + marker.radius + 6,
                                    marker.position.y() - 26,

@@ -8,7 +8,7 @@
 
 namespace p1::data {
 std::shared_ptr<const OsmxDataset> ImportedDataset::roads(const OsmxBounds& b,
-        const std::shared_ptr<std::atomic_bool>& cancelled) const {
+        const std::shared_ptr<std::atomic_bool>& cancelled, bool allowEmpty) const {
     if (!b.valid || !std::isfinite(b.minLat) || !std::isfinite(b.maxLat) ||
         !std::isfinite(b.minLon) || !std::isfinite(b.maxLon) || b.minLat < -90 || b.maxLat > 90 ||
         b.minLon < -180 || b.maxLon > 180 || b.minLat >= b.maxLat || b.minLon >= b.maxLon ||
@@ -82,7 +82,7 @@ std::shared_ptr<const OsmxDataset> ImportedDataset::roads(const OsmxBounds& b,
         if(d.nodes.size()>250000 || d.wayNodes.size()>500000) throw std::runtime_error("区域路网过大，请缩小半径");
     }
     check();
-    if(d.ways.isEmpty()) throw std::runtime_error("区域内没有道路，请调整中心或半径");
+    if(d.ways.isEmpty() && !allowEmpty) throw std::runtime_error("区域内没有道路，请调整中心或半径");
     d.info.wayTagCount=quint64(d.wayTags.size());
     d.info.wayNodeReferenceCount=quint64(d.wayNodes.size());
     OsmxError error; auto result=OsmxDataset::create(std::move(d), &error);

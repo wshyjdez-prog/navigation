@@ -165,8 +165,22 @@ void NavigationWorkflow::beginMapPick(bool start) {
 void NavigationWorkflow::acceptMapPoint(QPointF geo) {
     if(!pickMode_ || !std::isfinite(geo.x()) || !std::isfinite(geo.y()) ||
         std::abs(geo.x())>180 || std::abs(geo.y())>90) return;
-    emit endpointSelected(pickMode_==1,geo);pickMode_=0;
-    status_="已选择坐标，请计算 A* 路线";emit changed();
+    const bool start=pickMode_==1;pickMode_=0;setEndpoint(start,geo);
+}
+void NavigationWorkflow::setEndpoint(bool start,QPointF geo) {
+    if(!std::isfinite(geo.x())||!std::isfinite(geo.y())||std::abs(geo.x())>180||std::abs(geo.y())>90) return;
+    if(busy_) cancel();
+    pickMode_=0;
+    (start?startPoint_:endPoint_)=geo;
+    state_.route.clear();state_.distanceM=0;
+    emit endpointSelected(start,geo);
+    status_=startPoint_&&endPoint_?"起终点已选好，可计算路线":"请右键地图设置另一个端点";
+    emit changed();
+}
+void NavigationWorkflow::clearEndpoints() {
+    if(busy_) cancel();
+    pickMode_=0;startPoint_.reset();endPoint_.reset();state_.route.clear();state_.distanceM=0;
+    status_="已清除路线；右键地图设置起点和终点";emit changed();
 }
 void NavigationWorkflow::cancel() { for(const auto& c:cancellations_) c->store(true); ++generation_;
     busy_=false; status_="已取消；先前已发布结果保留"; emit changed(); }
@@ -184,24 +198,12 @@ void NavigationWorkflow::run(const QString& kind,std::function<WorkflowResult(st
             .arg(r.elapsedMs,0,'f',1).arg(r.algorithmMs,0,'f',1).arg(r.count).arg(rss());
         if(!r.ok && state_.network) status_ += "（保留上次成功结果）";
         if(r.ok) { if(kind=="加载路网") { state_=r; pickMode_=0; data::OsmxStore::shared().publish(r.network->roads);
-                const auto& roads=*r.network->roads;
-                // Prefill endpoints from a real directed way, instead of using
-                // arbitrary geographic defaults which may lie on disconnected roads.
-                bool preset=false;
-                for(int pass=0;pass<2&&!preset;++pass) for(quint32 wi=0;wi<roads.wayCount();++wi) {
-                    const auto& way=roads.wayAt(wi);
-                    if(!way.attributes.isRoutable()||way.refCount<2||
-                        (pass==0&&(way.refCount<3||way.attributes.roadClass!=data::RoadClass::Residential))) continue;
-                    const auto ai=roads.wayNodePool().at(int(way.refFirst));
-                    const auto bi=roads.wayNodePool().at(int(way.refFirst+way.refCount-1));
-                    const auto& a=roads.nodeAt(ai);const auto& b=roads.nodeAt(bi);
-                    if(ai==bi||roads.nearestNode(a.lat,a.lon)!=ai||roads.nearestNode(b.lat,b.lon)!=bi) continue;
-                    QPointF from(a.lon,a.lat),to(b.lon,b.lat);
-                    if(way.attributes.isOnewayReversed()) std::swap(from,to);
-                    emit endpointSelected(true,from);emit endpointSelected(false,to);preset=true;break;
-                }
+                activeDataset_=pendingDataset_;++datasetRevision_;startPoint_.reset();endPoint_.reset();
             }
-            else if(kind=="A* 规划") { state_.route=r.route; state_.distanceM=r.distanceM; }
+            else if(kind=="A* 规划") { state_.route=r.route; state_.distanceM=r.distanceM;
+                if(r.network) state_.network=r.network;
+                if(r.loadedArea.valid) state_.loadedArea=r.loadedArea;
+            }
             else { state_.observations=r.observations; state_.matched=r.matched; } }
         emit changed(); emit completed(kind,r.ok);
     });
@@ -212,6 +214,7 @@ void NavigationWorkflow::run(const QString& kind,std::function<WorkflowResult(st
     }));
 }
 void NavigationWorkflow::load(const ImportResult& entry,double lat,double lon,double radiusKm) {
+    pendingDataset_=entry;
     run("加载路网",[entry,lat,lon,radiusKm](auto c) {
         WorkflowResult r; std::shared_ptr<const data::OsmxDataset> ds;
         if(entry.sourceFormat=="osmx") {
@@ -223,7 +226,8 @@ void NavigationWorkflow::load(const ImportResult& entry,double lat,double lon,do
             if(!std::isfinite(lat)||!std::isfinite(lon)||std::abs(lat)>85||std::abs(lon)>180||
                 !std::isfinite(radiusKm)||radiusKm<0.2||radiusKm>10) throw std::runtime_error("区域中心或半径无效");
             const double dy=radiusKm*1000/111195.08,dx=dy/std::cos(lat*std::acos(-1.0)/180);
-            ds=data::ImportedDataset(entry.cachePath).roads({lat-dy,lon-dx,lat+dy,lon+dx,true},c);
+            r.loadedArea={std::max(-85.,lat-dy),std::max(-180.,lon-dx),std::min(85.,lat+dy),std::min(180.,lon+dx),true};
+            ds=data::ImportedDataset(entry.cachePath).roads(r.loadedArea,c);
         }
         r.network=buildNetwork(ds,c); r.ok=true; r.count=int(ds->edges().size());
         r.message=QString("真实路网：%1 · %2 节点 / %3 道路 / %4 有向边；规划限当前工作区域")
@@ -232,13 +236,31 @@ void NavigationWorkflow::load(const ImportResult& entry,double lat,double lon,do
 }
 void NavigationWorkflow::plan(QPointF start,QPointF end) {
     auto n=state_.network;
-    run("A* 规划",[n,start,end](auto c) {
+    startPoint_=start;endPoint_=end;
+    const auto entry=activeDataset_;
+    const auto loadedArea=state_.loadedArea;
+    run("A* 规划",[n,entry,start,end,loadedArea](auto c) mutable {
         if(!n) throw std::runtime_error("请先加载路网");
+        if(!std::isfinite(start.x())||!std::isfinite(start.y())||!std::isfinite(end.x())||!std::isfinite(end.y())||
+            std::abs(start.x())>180||std::abs(end.x())>180||std::abs(start.y())>85||std::abs(end.y())>85)
+            throw std::runtime_error("起终点必须是有效 WGS84 经纬度（非极地）");
+        auto area=loadedArea;
+        const auto& bounds=area.valid?area:n->roads->bounds();
+        auto contains=[&](QPointF p){return p.x()>=bounds.minLon&&p.x()<=bounds.maxLon&&p.y()>=bounds.minLat&&p.y()<=bounds.maxLat;};
+        if(entry&&entry->sourceFormat!="osmx"&&(!contains(start)||!contains(end))) {
+            // Reuse the approved regional adapter; map panning never cancels a
+            // route calculation. Query both endpoints with room for nearby links.
+            const double dy=1000./111195.08,dx=dy/std::cos((start.y()+end.y())*.5*std::acos(-1.)/180.);
+            area={
+                std::max(-85.,std::min(start.y(),end.y())-dy),std::max(-180.,std::min(start.x(),end.x())-dx),
+                std::min(85.,std::max(start.y(),end.y())+dy),std::min(180.,std::max(start.x(),end.x())+dx),true};
+            n=buildNetwork(data::ImportedDataset(entry->cachePath).roads(area,c),c);
+        }
         const auto a=snap(*n,start,true),b=snap(*n,end,false);
         const auto path=algorithms::findRoute(n->graph,algorithms::model::NodeId(a+1),algorithms::model::NodeId(b+1),c);
         if(path.status!=algorithms::RouteStatus::Success) throw std::runtime_error(("无法规划："+path.message).c_str());
         if(path.geometry.size()<2) throw std::runtime_error("起终点吸附到同一节点，请拉开距离");
-        WorkflowResult r; r.ok=true; r.distanceM=path.total_distance_m; r.algorithmMs=path.elapsed_ms; r.count=int(path.edges.size());
+        WorkflowResult r; r.ok=true; r.network=n; r.loadedArea=area;r.distanceM=path.total_distance_m; r.algorithmMs=path.elapsed_ms; r.count=int(path.edges.size());
         for(const auto& p:path.geometry) {
             const auto geo=n->unproject({p.x_m,p.y_m});
             if(r.route.isEmpty() || r.route.last()!=geo) r.route.append(geo);

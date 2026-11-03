@@ -13,6 +13,12 @@ struct Colors {
     QString text, secondary, placeholder, disabled, border, control, focus;
     QString info, infoBg, success, successBg, warning, warningBg, error, errorBg;
 };
+struct MapColors {
+    QColor land, road, roadEdge, majorRoad, label, route, track;
+    QColor landuse, green, water, building, buildingEdge;
+};
+// Cartographic colors are independent of the purple application chrome.
+MapColors mapColors(bool dark);
 
 // One application-owned theme. Changing it updates existing widgets in place.
 class Theme final : public QObject {

@@ -33,8 +33,9 @@ public:
     // Read-only regional road snapshot. Keeps whole highway ways with at least
     // one node in the requested WGS84 rectangle. Missing references reject the
     // way; no fabricated links across gaps. Cancellation includes SQLite scans.
+    // Browsing may opt into an empty snapshot; routing keeps empty-area errors.
     std::shared_ptr<const OsmxDataset> roads(const OsmxBounds& bounds,
-        const std::shared_ptr<std::atomic_bool>& cancelled = {}) const;
+        const std::shared_ptr<std::atomic_bool>& cancelled = {}, bool allowEmpty = false) const;
 private:
     QString path_;
 };

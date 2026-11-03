@@ -7,6 +7,7 @@
 #include <QThreadPool>
 #include <atomic>
 #include <functional>
+#include <optional>
 
 namespace p1::app {
 // GUI-owned coordinator. All parsing, graph conversion and external processes
@@ -21,6 +22,7 @@ struct RoadNetwork {
 };
 struct WorkflowResult {
     std::shared_ptr<const RoadNetwork> network;
+    data::OsmxBounds loadedArea;
     QVector<QPointF> route, observations, matched;
     QString message;
     bool ok=false;
@@ -38,6 +40,12 @@ public:
     void cancel();
     void beginMapPick(bool start);
     void acceptMapPoint(QPointF geo);
+    void setEndpoint(bool start, QPointF geo);
+    void clearEndpoints();
+    const std::optional<QPointF>& startPoint() const { return startPoint_; }
+    const std::optional<QPointF>& endPoint() const { return endPoint_; }
+    const std::optional<ImportResult>& activeDataset() const { return activeDataset_; }
+    quint64 datasetRevision() const { return datasetRevision_; }
     bool busy() const { return busy_; }
     QString status() const { return status_; }
     QString metrics() const { return metrics_; }
@@ -61,5 +69,8 @@ private:
     QString status_=QStringLiteral("请先选择已导入的数据并加载工作区域"), metrics_;
     WorkflowResult state_;
     WorkflowResult lastResult_;
+    std::optional<ImportResult> activeDataset_, pendingDataset_;
+    std::optional<QPointF> startPoint_, endPoint_;
+    quint64 datasetRevision_=0;
 };
 }

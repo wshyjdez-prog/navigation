@@ -65,7 +65,8 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     auto* workspace = new QWidget;
     auto* work = new QVBoxLayout(workspace);
     work->setContentsMargins(0,0,0,0); work->setSpacing(24);
-    auto* header = new QHBoxLayout;
+    header_=new QWidget;header_->setObjectName("workspaceHeader");
+    auto* header = new QHBoxLayout(header_);header->setContentsMargins(0,0,0,0);
     auto* headings = new QVBoxLayout;
     headings->setSpacing(8);
     title_ = label({},"pageTitle"); title_->setObjectName("pageTitle");
@@ -80,24 +81,28 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     themeButton_->setAccessibleName("切换浅色或深色主题");
     header->addWidget(themeButton_,0,Qt::AlignTop);
     connect(themeButton_, &QPushButton::clicked, &theme_, &Theme::setDark);
-    work->addLayout(header);
+    work->addWidget(header_);
     pages_ = new QStackedWidget;
     pages_->setObjectName("pageStack");
     work->addWidget(pages_,1);
-    auto* status = new QHBoxLayout;
+    status_=new QWidget;status_->setObjectName("workspaceStatus");
+    auto* status = new QHBoxLayout(status_);status->setContentsMargins(0,0,0,0);
     status->addWidget(label("●  本地会话", "caption"));
     status->addStretch();
     auto* serviceStatus = label("真实路网 / A* / FMM  ·  定位与语音属于后续作业", "caption");
     serviceStatus->setWordWrap(false);
     status->addWidget(serviceStatus);
-    work->addLayout(status);
+    work->addWidget(status_);
     shell_->addWidget(workspace,1);
 
     registerPage(ImportFactory::pageId(),ImportFactory::pageTitle(),ImportFactory::pageDescription(),ImportFactory::createImportPage(theme,nullptr,importCacheDirectory));
     auto* workflow = new NavigationWorkflow(this);
     workflow->setObjectName("navigationWorkflow");
     connect(workflow,&NavigationWorkflow::mapPickRequested,this,[this]{setCurrentPage("map");});
-    registerPage("map","地图导航","真实道路、路径与轨迹 · 拖动平移，滚轮缩放。",createMapPage(theme,workflow,importCacheDirectory));
+    auto* map=createMapPage(theme,workflow,importCacheDirectory);
+    registerPage("map","地图导航","拖动自动加载本地地图，右键设置起终点。",map);
+    connect(map,SIGNAL(pageRequested(QString)),this,SLOT(openPage(QString)));
+    connect(map,SIGNAL(toggleMapOnlyRequested()),this,SLOT(toggleMapOnly()));
     registerPage("algorithms","算法实验","真实路网上的 A* 路径规划与 FMM/HMM 轨迹匹配。",createAlgorithmsPage(theme,workflow,importCacheDirectory));
     connect(qobject_cast<ImportPage*>(registry_["import"].widget), &ImportPage::importFinished, this,
         [this,workflow](const ImportResult& result) { if(result.ok) {
@@ -115,6 +120,8 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     connect(importShortcut,&QShortcut::activated,this,[this]{setCurrentPage("import");});
     auto* settingsShortcut = new QShortcut(QKeySequence("Ctrl+,"),this);
     connect(settingsShortcut,&QShortcut::activated,this,[this]{setCurrentPage("settings");});
+    auto* mapShortcut=new QShortcut(QKeySequence("Ctrl+M"),this);
+    connect(mapShortcut,&QShortcut::activated,this,&MainWindow::toggleMapOnly);
     setCurrentPage("import");
     refreshNavigation();
 }
@@ -166,7 +173,20 @@ bool MainWindow::setCurrentPage(const QString& id) {
     pages_->setCurrentWidget(found->widget);
     title_->setText(found->title); description_->setText(found->description);
     for (auto it=buttons_.begin();it!=buttons_.end();++it) it.value()->setChecked(it.key()==id);
+    applyMapLayout();
     return true;
+}
+
+void MainWindow::toggleMapOnly() {
+    if(currentId_!="map") return;
+    mapOnly_=!mapOnly_;applyMapLayout();
+}
+void MainWindow::applyMapLayout() {
+    const bool onlyMap=currentId_=="map"&&mapOnly_;
+    setProperty("mapOnly",onlyMap);
+    sidebar_->setVisible(!onlyMap);header_->setVisible(!onlyMap);status_->setVisible(!onlyMap);
+    const int margin=onlyMap?0:(compact_?16:24);
+    shell_->setContentsMargins(margin,margin,margin,margin);shell_->setSpacing(margin);
 }
 
 void MainWindow::refreshNavigation() {
@@ -186,9 +206,7 @@ void MainWindow::resizeEvent(QResizeEvent* event) {
     QMainWindow::resizeEvent(event);
     compact_ = width() < 1280;
     sidebar_->setFixedWidth(compact_ ? 72 : 192);
-    const int margin = compact_ ? 16 : 24;
-    shell_->setContentsMargins(margin,margin,margin,margin);
-    shell_->setSpacing(margin);
+    applyMapLayout();
     refreshNavigation();
 }
 

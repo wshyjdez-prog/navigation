@@ -23,6 +23,9 @@ public:
     bool setCurrentPage(const QString& id);
     QString currentPageId() const { return currentId_; }
     bool isCompact() const { return compact_; }
+public slots:
+    void toggleMapOnly();
+    void openPage(const QString& id) { setCurrentPage(id); }
 protected:
     void resizeEvent(QResizeEvent* event) override;
 private:
@@ -32,8 +35,10 @@ private:
     QPushButton* addNavigation(const QString& id, const QString& text, const QString& icon, bool enabled);
     void refreshNavigation();
     void showHelp();
+    void applyMapLayout();
     ui::Theme& theme_;
     QFrame* sidebar_;
+    QWidget *header_,*status_;
     QVBoxLayout* navigation_;
     QHBoxLayout* shell_;
     QStackedWidget* pages_;
@@ -47,5 +52,6 @@ private:
     QMap<QString, QPushButton*> buttons_;
     QString currentId_;
     bool compact_ = false;
+    bool mapOnly_ = true;
 };
 }

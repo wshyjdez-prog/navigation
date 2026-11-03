@@ -25,7 +25,12 @@ add_library(p1_ui STATIC
     src/ui/map/MapDemoWidget.cpp
     src/ui/map/MapDemoWidget.h
     src/ui/map/MapPage.cpp
+    src/ui/map/MapView.cpp
+    src/ui/map/TilePyramid.cpp
+    src/ui/map/TilePyramid.h
     src/ui/map/MapPage.h
+    src/ui/map/MapRegionLoader.cpp
+    src/ui/map/MapRegionLoader.h
     src/app/NavigationWorkflow.cpp
     src/app/NavigationWorkflow.h
     src/app/MainWindow.cpp)
@@ -69,8 +74,12 @@ if(NOT P1_NAVIGATION_REAL_PLANNER OR NOT P1_ALGORITHMS_BUILD_FMM_ADAPTER)
 endif()
 target_link_libraries(p1_ui PUBLIC p1_algorithms_astar p1_algorithms_fmm)
 if(BUILD_TESTING)
+    qt_add_executable(p1-pyramid-tests tests/TilePyramidTests.cpp)
+    target_link_libraries(p1-pyramid-tests PRIVATE p1_ui Qt6::Test)
+    add_test(NAME tile-pyramid COMMAND p1-pyramid-tests)
+    set_tests_properties(tile-pyramid PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     qt_add_executable(p1-business-tests tests/BusinessTests.cpp)
     target_link_libraries(p1-business-tests PRIVATE p1_ui Qt6::Test)
-    add_test(NAME business-workflow COMMAND p1-business-tests regionalRoads routeAndCancel uiPipeline malformedTrajectory)
+    add_test(NAME business-workflow COMMAND p1-business-tests regionalRoads routeAndCancel uiPipeline automaticMapRegions panZoomKeepsVisibleMapBeforeWorkerReturns newestMapRegionWins malformedTrajectory)
     set_tests_properties(business-workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

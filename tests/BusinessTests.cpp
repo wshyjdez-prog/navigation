@@ -5,6 +5,8 @@
 #include "contracts/ImportedDataset.h"
 #include "algorithms/core/BoostAStar.h"
 #include "ui/common/Theme.h"
+#include "ui/map/MapRegionLoader.h"
+#include "ui/map/TilePyramid.h"
 #include <QtTest>
 #include <QTemporaryDir>
 #include <QFile>
@@ -19,6 +21,10 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QXmlStreamWriter>
+#include <QAction>
+#include <QContextMenuEvent>
+#include <QMenu>
+#include <QPointer>
 using namespace p1;
 namespace {
 QByteArray fixture(){return R"(<osm version="0.6">
@@ -29,6 +35,13 @@ QByteArray fixture(){return R"(<osm version="0.6">
 <way id="11"><nd ref="4"/><nd ref="5"/><tag k="highway" v="residential"/></way>
 <way id="12"><nd ref="6"/><nd ref="7"/><tag k="highway" v="primary"/></way></osm>)";}
 void write(const QString& path,const QByteArray& b){QFile f(path);if(!f.open(QIODevice::WriteOnly)||f.write(b)!=b.size())throw std::runtime_error("fixture write failed");}
+QPoint mapPixel(QWidget* canvas,const app::RoadNetwork& projection,QPointF point) {
+    Q_UNUSED(projection);
+    const auto center=ui::mapProject({canvas->property("centerLongitude").toDouble(),canvas->property("centerLatitude").toDouble()});
+    const auto p=ui::mapProject(point);
+    return {qRound((.5+(p.x()-center.x())/canvas->property("viewWidthMetres").toDouble())*canvas->width()),
+            qRound((.5-(p.y()-center.y())/canvas->property("viewHeightMetres").toDouble())*canvas->height())};
+}
 }
 class BusinessTests:public QObject{
     Q_OBJECT
@@ -55,14 +68,86 @@ private slots:
         QSignalSpy done(flow,&app::NavigationWorkflow::completed);int ticks=0;QTimer heartbeat;connect(&heartbeat,&QTimer::timeout,[&]{++ticks;});heartbeat.start(5);
         import->selectFile(source_);import->startImport();QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,15000);QVERIFY2(done[0][1].toBool(),qPrintable(flow->status()));
         QCOMPARE(window.currentPageId(),QString("map"));auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");QTRY_VERIFY_WITH_TIMEOUT(canvas->property("realDataset").toBool(),10000);
-        auto* map=window.findChild<QWidget*>("mapPage");map->findChild<QDoubleSpinBox*>("routeEndLatitude")->setValue(30.593);map->findChild<QDoubleSpinBox*>("routeEndLongitude")->setValue(114.307);
-        map->findChild<QTabWidget*>()->setCurrentIndex(1);
+        auto* map=window.findChild<QWidget*>("mapPage");QVERIFY(!map->findChild<QDoubleSpinBox*>());
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1,10000);
+        auto choose=[&](bool start,QPointF geo) {
+            const auto point=mapPixel(canvas,*flow->state().network,geo);
+            QContextMenuEvent event(QContextMenuEvent::Mouse,point,canvas->mapToGlobal(point));QApplication::sendEvent(canvas,&event);
+            auto* menu=canvas->findChild<QMenu*>("mapPointMenu");if(!menu) return false;
+            auto* action=menu->findChild<QAction*>(start?"setMapStart":"setMapEnd");if(!action) return false;
+            action->trigger();menu->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);return true;
+        };
+        QVERIFY(choose(true,{114.305,30.593}));QVERIFY(flow->startPoint());
+        QVERIFY(std::abs(flow->startPoint()->x()-114.305)<.00001);
+        QVERIFY(choose(false,{114.307,30.593}));QVERIFY(flow->endPoint());
+        QTRY_COMPARE_WITH_TIMEOUT(canvas->property("markerCount").toInt(),2,10000);
         QTest::mouseClick(map->findChild<QPushButton*>("calculateRoute"),Qt::LeftButton);QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);QVERIFY(done[1][1].toBool());
         QTRY_COMPARE_WITH_TIMEOUT(canvas->property("routeCount").toInt(),1,10000);QVERIFY(canvas->property("cacheHit").toBool());QVERIFY(ticks>2);QVERIFY(window.setCurrentPage("algorithms"));QVERIFY(window.findChild<QLabel*>("algorithmMetrics")->text().contains("耗时"));
         auto* algorithms=window.findChild<QWidget*>("algorithmsPage");algorithms->findChild<QTabWidget*>()->setCurrentIndex(1);
         QTest::mouseClick(algorithms->findChild<QPushButton*>("pickRouteStart"),Qt::LeftButton);QCOMPARE(window.currentPageId(),QString("map"));
         QTest::mouseClick(canvas,Qt::LeftButton,Qt::NoModifier,canvas->rect().center());
-        QCOMPARE(map->findChild<QDoubleSpinBox*>("routeStartLongitude")->value(),algorithms->findChild<QDoubleSpinBox*>("routeStartLongitude")->value());}
+        QVERIFY(std::abs(flow->startPoint()->x()-algorithms->findChild<QDoubleSpinBox*>("routeStartLongitude")->value())<.0000001);}
+    void automaticMapRegions(){
+        ui::Theme theme;theme.apply(*qApp);app::MainWindow window(theme,nullptr,dir_->filePath("cache"));window.show();window.setCurrentPage("map");
+        auto* flow=window.findChild<app::NavigationWorkflow*>();QSignalSpy done(flow,&app::NavigationWorkflow::completed);
+        flow->load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
+        auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1,10000);
+        flow->plan({114.305,30.593},{114.307,30.593});QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);
+        const auto originalRoute=flow->state().route;const auto originalStart=flow->startPoint();
+        const double x=(ui::mapProject({115.5005,31.5005}).x()-ui::mapProject({canvas->property("centerLongitude").toDouble(),canvas->property("centerLatitude").toDouble()}).x())/canvas->property("viewWidthMetres").toDouble();
+        const double y=(ui::mapProject({115.5005,31.5005}).y()-ui::mapProject({canvas->property("centerLongitude").toDouble(),canvas->property("centerLatitude").toDouble()}).y())/canvas->property("viewHeightMetres").toDouble();
+        const auto revision=canvas->property("regionRevision").toULongLong();
+        QVERIFY(QMetaObject::invokeMethod(canvas,"panned",Q_ARG(QPointF,QPointF(x,y))));
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>revision,10000);
+        QCOMPARE(canvas->property("roadCount").toUInt(),quint32(1));
+        QVERIFY(std::abs(canvas->property("centerLongitude").toDouble()-115.5005)<.00001);
+        QCOMPARE(flow->state().route,originalRoute);QVERIFY(flow->startPoint()==originalStart);
+        // Planning on roads discovered by browsing loads the endpoints' region.
+        flow->plan({115.5,31.5},{115.501,31.501});QTRY_COMPARE_WITH_TIMEOUT(done.count(),3,10000);
+        QVERIFY2(done.last()[1].toBool(),qPrintable(flow->status()));
+        QVERIFY(flow->state().route.front().x()>115.49);
+        const auto after=canvas->property("regionRevision").toULongLong();
+        QVERIFY(QMetaObject::invokeMethod(canvas,"panned",Q_ARG(QPointF,QPointF(20,0))));
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>after,10000);
+        QCOMPARE(canvas->property("roadCount").toUInt(),quint32(0));
+        QVERIFY(canvas->property("tileCount").toInt()>0);
+    }
+    void panZoomKeepsVisibleMapBeforeWorkerReturns(){
+        ui::Theme theme;theme.apply(*qApp);app::MainWindow window(theme,nullptr,dir_->filePath("cache"));window.show();window.setCurrentPage("map");
+        auto* flow=window.findChild<app::NavigationWorkflow*>();QSignalSpy done(flow,&app::NavigationWorkflow::completed);
+        flow->load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
+        auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");auto* map=window.findChild<QWidget*>("mapPage");
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1,10000);
+        const auto point=mapPixel(canvas,*flow->state().network,{114.306,30.593});
+        const auto center=QPointF(canvas->width()/2.,canvas->height()/2.);
+        const auto original=canvas->grab().toImage();QSignalSpy published(map,SIGNAL(framePublished()));
+        auto roadVisible=[&](const QImage& image,QPointF p){
+            for(int y=qRound(p.y())-2;y<=qRound(p.y())+2;++y)for(int x=qRound(p.x())-2;x<=qRound(p.x())+2;++x)
+                if(image.rect().contains(x,y)&&image.pixelColor(x,y)!=ui::mapColors(false).land)return true;
+            return false;};
+        QVERIFY(roadVisible(original,point));
+        QVERIFY(QMetaObject::invokeMethod(canvas,"zoomed",Q_ARG(double,1.25)));
+        const auto smaller=canvas->grab().toImage();QCOMPARE(published.count(),0);QVERIFY(smaller!=original);
+        QVERIFY(roadVisible(smaller,center+(QPointF(point)-center)/1.25));
+        QVERIFY(QMetaObject::invokeMethod(canvas,"zoomed",Q_ARG(double,.8)));
+        const auto restored=canvas->grab().toImage();QCOMPARE(published.count(),0);QVERIFY(restored!=smaller);QVERIFY(roadVisible(restored,point));
+        QVERIFY(QMetaObject::invokeMethod(canvas,"panned",Q_ARG(QPointF,QPointF(.05,0))));
+        const auto moved=canvas->grab().toImage();QCOMPARE(published.count(),0);QVERIFY(moved!=restored);
+        QVERIFY(roadVisible(moved,QPointF(point)-QPointF(canvas->width()*.05,0)));
+    }
+    void newestMapRegionWins(){
+        const auto initial=data::ImportedDataset(imported_.cachePath).roads({30.59,114.30,30.60,114.31,true});
+        ui::MapRegionLoader loader;loader.setDataset(imported_,initial);QSignalSpy changes(&loader,&ui::MapRegionLoader::changed);
+        loader.request({31.499,115.499,31.502,115.502,true});
+        loader.request({30.59,114.30,30.60,114.31,true});
+        QTRY_VERIFY_WITH_TIMEOUT(changes.count()>0,10000);QVERIFY(loader.roads()->wayIndex(10));QVERIFY(!loader.roads()->wayIndex(12));
+        QTest::qWait(150);QVERIFY(loader.roads()->wayIndex(10));
+        // Replacing a dataset invalidates old work even while its worker exits.
+        loader.request({31.499,115.499,31.502,115.502,true});loader.setDataset(imported_,initial);
+        QTest::qWait(150);QVERIFY(loader.roads()->wayIndex(10));QVERIFY(!loader.roads()->wayIndex(12));
+        const auto empty=data::ImportedDataset(imported_.cachePath).roads({32.,116.,32.01,116.01,true},{},true);
+        QCOMPARE(empty->wayCount(),quint32(0));
+    }
     void malformedTrajectory(){app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);flow.load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
         const auto csv=dir_->filePath("bad.csv");write(csv,"lat,lon\n30.593,114.305\n");flow.match(csv);QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);QVERIFY(!done.last()[1].toBool());QVERIFY(flow.state().matched.isEmpty());}
     void realHubei(){const auto cache=qEnvironmentVariable("P1_REAL_MAP_CACHE");if(cache.isEmpty())QSKIP("Set P1_REAL_MAP_CACHE for real Hubei acceptance");
@@ -84,7 +169,7 @@ private slots:
         qInfo().noquote()<<"Synthetic GPS on actual Hubei road path; real FMM process:"<<flow.status()<<flow.metrics()<<"GUI heartbeat ticks"<<ticks;
         auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");QTRY_COMPARE_WITH_TIMEOUT(canvas->property("routeCount").toInt(),3,10000);
         const auto captures=qEnvironmentVariable("P1_BUSINESS_CAPTURE_DIR");if(!captures.isEmpty()){
-            QTest::mouseClick(window.findChild<QPushButton*>("fitNavigationResult"),Qt::LeftButton);QTest::qWait(400);
+            window.findChild<QAction*>("fitNavigationResult")->trigger();QTest::qWait(400);
             QVERIFY(QDir().mkpath(captures));QVERIFY(window.grab().save(QDir(captures).filePath("hubei-route-match-light.png")));
             theme.setDark(true);QTest::qWait(500);QVERIFY(window.grab().save(QDir(captures).filePath("hubei-route-match-dark.png")));
             window.resize(1024,720);QTest::qWait(500);QVERIFY(window.grab().save(QDir(captures).filePath("hubei-compact.png")));
@@ -126,7 +211,7 @@ private slots:
         for(int i=-1;i<10;++i){QEventLoop loop;QElapsedTimer clock;
             auto c=connect(map,SIGNAL(framePublished()),&loop,SLOT(quit()));
             QTimer::singleShot(10000,&loop,&QEventLoop::quit);clock.start();
-            QTest::mouseClick(window.findChild<QPushButton*>("fitRoadNetwork"),Qt::LeftButton);loop.exec();disconnect(c);
+            window.findChild<QAction*>("fitRoadNetwork")->trigger();loop.exec();disconnect(c);
             if(i>=0)redraws.append(QJsonObject{{"request_to_frame_ms",clock.nsecsElapsed()/1e6},
                 {"worker_ms",canvas->property("renderElapsedMs").toDouble()},{"base_cache_hit",canvas->property("cacheHit").toBool()}});}
         const auto network=flow.state().network;const auto bounds=network->roads->bounds();
