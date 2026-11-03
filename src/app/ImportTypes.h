@@ -15,6 +15,10 @@ struct ImportStats {
     quint64 nodeReferences = 0;
     quint64 relationMembers = 0;
     quint64 tags = 0;
+    // OSMX only: precomputed routing topology shared with 3/5. Zero for other
+    // formats, where the consumer derives its own graph.
+    quint64 routableWays = 0;
+    quint64 directedEdges = 0;
 };
 
 // Outcome of one import run. The struct is copied across the worker/UI thread

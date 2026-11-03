@@ -91,7 +91,7 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     work->addLayout(status);
     shell_->addWidget(workspace,1);
 
-    registerPage("import","数据导入","导入 OpenStreetMap 路网数据，并保存到本机。",ImportFactory::createImportPage(theme,nullptr,importCacheDirectory));
+    registerPage(ImportFactory::pageId(),ImportFactory::pageTitle(),ImportFactory::pageDescription(),ImportFactory::createImportPage(theme,nullptr,importCacheDirectory));
     registerPage("map","地图导航","固定 MapScene 的 LinuxRenderer 异步绘制演示。",createMapPage(theme));
     registerPage("components","组件预览","检查公共控件与交互状态。此页为独立演示，不导入业务数据。",makeGallery());
     registerPage("settings","设置与帮助","让工作台适合你。偏好仅在本次会话中保留。",makeSettings());
@@ -299,7 +299,7 @@ void MainWindow::showHelp() {
     auto* layout = new QVBoxLayout(dialog);
     layout->setContentsMargins(24,24,24,24); layout->setSpacing(24);
     layout->addWidget(label("P1 导航 · 0.1.0", "sectionTitle"));
-    layout->addWidget(label("支持 PBF、OSM XML 与 gzip/bzip2 压缩的 OSM 数据导入，数据保存在本机。\n\n地图页当前使用固定 MapScene 与 Mock 导航快照；真实算法、定位和语音仍待接入。", "secondary"));
+    layout->addWidget(label("支持 OSMX、PBF、OSM XML 与 gzip/bzip2 压缩的 OSM 数据导入，数据保存在本机。\n\n地图页当前使用固定 MapScene 与 Mock 导航快照；算法调用页面、真实导航、定位和语音仍待接入。", "secondary"));
     auto* close = button("知道了",true);
     connect(close,&QPushButton::clicked,dialog,&QDialog::accept);
     layout->addWidget(close); dialog->open(); close->setFocus();

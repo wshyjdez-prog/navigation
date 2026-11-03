@@ -1,0 +1,144 @@
+[1/141] Automatic MOC for target p1_ui_common
+[2/141] Building CXX object CMakeFiles/p1_ui_common.dir/p1_ui_common_autogen/mocs_compilation.cpp.o
+[3/141] Building CXX object CMakeFiles/p1_ui_common.dir/src/ui/common/Theme.cpp.o
+[4/141] Building CXX object CMakeFiles/p1_ui_common.dir/src/ui/common/Components.cpp.o
+[5/141] Linking CXX static library libp1_ui_common.a
+[6/141] Automatic MOC for target p1_data_import
+[7/141] Building CXX object src/data/import/CMakeFiles/p1_data_import.dir/p1_data_import_autogen/mocs_compilation.cpp.o
+[8/141] Building CXX object src/data/import/CMakeFiles/p1_data_import.dir/OsmImportParser.cpp.o
+[9/141] Building CXX object src/data/import/CMakeFiles/p1_data_import.dir/ImportedDataset.cpp.o
+[10/141] Linking CXX static library src/data/import/libp1_data_import.a
+[11/141] Automatic MOC for target p1-import-cli
+[12/141] Building CXX object src/data/import/CMakeFiles/p1-import-cli.dir/p1-import-cli_autogen/mocs_compilation.cpp.o
+[13/141] Building CXX object src/data/import/CMakeFiles/p1-import-cli.dir/tools/ImportCli.cpp.o
+[14/141] Linking CXX executable src/data/import/p1-import-cli
+[15/141] Automatic MOC for target p1-import-tests
+[16/141] Building CXX object src/data/import/CMakeFiles/p1-import-tests.dir/p1-import-tests_autogen/mocs_compilation.cpp.o
+[17/141] Building CXX object src/data/import/CMakeFiles/p1-import-tests.dir/tests/ImportTests.cpp.o
+[18/141] Linking CXX executable src/data/import/p1-import-tests
+[19/141] Automatic MOC for target p1_data_osmx
+[20/141] Building CXX object src/data/osmx/CMakeFiles/p1_data_osmx.dir/p1_data_osmx_autogen/mocs_compilation.cpp.o
+[21/141] Building CXX object src/data/osmx/CMakeFiles/p1_data_osmx.dir/OsmxTypes.cpp.o
+[22/141] Building CXX object src/data/osmx/CMakeFiles/p1_data_osmx.dir/OsmxDataset.cpp.o
+[23/141] Building CXX object src/data/osmx/CMakeFiles/p1_data_osmx.dir/OsmxParser.cpp.o
+[24/141] Building CXX object src/data/osmx/CMakeFiles/p1_data_osmx.dir/OsmxCache.cpp.o
+[25/141] Building CXX object src/data/osmx/CMakeFiles/p1_data_osmx.dir/OsmxStore.cpp.o
+[26/141] Linking CXX static library src/data/osmx/libp1_data_osmx.a
+[27/141] Automatic MOC for target p1-osmx-cli
+[28/141] Building CXX object src/data/osmx/CMakeFiles/p1-osmx-cli.dir/p1-osmx-cli_autogen/mocs_compilation.cpp.o
+[29/141] Building CXX object src/data/osmx/CMakeFiles/p1-osmx-cli.dir/tools/OsmxCli.cpp.o
+[30/141] Linking CXX executable src/data/osmx/p1-osmx-cli
+[31/141] Automatic MOC for target p1-osmx-tests
+[32/141] Building CXX object src/data/osmx/CMakeFiles/p1-osmx-tests.dir/p1-osmx-tests_autogen/mocs_compilation.cpp.o
+[33/141] Building CXX object src/data/osmx/CMakeFiles/p1-osmx-tests.dir/tests/OsmxTests.cpp.o
+[34/141] Linking CXX executable src/data/osmx/p1-osmx-tests
+[35/141] Automatic MOC for target p1_renderer
+[36/141] Building CXX object src/pal/linux/renderer/CMakeFiles/p1_renderer.dir/p1_renderer_autogen/mocs_compilation.cpp.o
+[37/141] Building CXX object src/pal/linux/renderer/CMakeFiles/p1_renderer.dir/MapScene.cpp.o
+/home/navigation/p1-team-final-20261103/source/src/pal/linux/renderer/MapScene.cpp:15:9: warning: ‘QString p1::renderer::{anonymous}::pointText(const QPointF&)’ defined but not used [-Wunused-function]
+   15 | QString pointText(const QPointF& point) {
+      |         ^~~~~~~~~
+[38/141] Building CXX object src/pal/linux/renderer/CMakeFiles/p1_renderer.dir/MockMapScene.cpp.o
+[39/141] Building CXX object src/pal/linux/renderer/CMakeFiles/p1_renderer.dir/LinuxRenderer.cpp.o
+[40/141] Linking CXX static library src/pal/linux/renderer/libp1_renderer.a
+[41/141] Automatic MOC for target p1-renderer-tests
+[42/141] Building CXX object src/pal/linux/renderer/CMakeFiles/p1-renderer-tests.dir/p1-renderer-tests_autogen/mocs_compilation.cpp.o
+[43/141] Building CXX object src/pal/linux/renderer/CMakeFiles/p1-renderer-tests.dir/tests/RendererTests.cpp.o
+[44/141] Linking CXX executable src/pal/linux/renderer/p1-renderer-tests
+[45/141] Automatic MOC for target p1_import_page
+[46/141] Building CXX object src/app/CMakeFiles/p1_import_page.dir/p1_import_page_autogen/mocs_compilation.cpp.o
+[47/141] Building CXX object src/app/CMakeFiles/p1_import_page.dir/ImportFactory.cpp.o
+[48/141] Building CXX object src/app/CMakeFiles/p1_import_page.dir/ImportPage.cpp.o
+[49/141] Building CXX object src/app/CMakeFiles/p1_import_page.dir/ImportTask.cpp.o
+[50/141] Building CXX object src/app/CMakeFiles/p1_import_page.dir/OsmxImportAdapter.cpp.o
+[51/141] Building CXX object src/app/CMakeFiles/p1_import_page.dir/OsmxDatasetLoader.cpp.o
+[52/141] Linking CXX static library src/app/libp1_import_page.a
+[53/141] Automatic MOC for target p1_ui
+[54/141] Building CXX object CMakeFiles/p1_ui.dir/p1_ui_autogen/mocs_compilation.cpp.o
+[55/141] Building CXX object CMakeFiles/p1_ui.dir/src/ui/map/MapDemoWidget.cpp.o
+[56/141] Building CXX object CMakeFiles/p1_ui.dir/src/ui/map/MapPage.cpp.o
+[57/141] Building CXX object CMakeFiles/p1_ui.dir/src/app/MainWindow.cpp.o
+[58/141] Linking CXX static library libp1_ui.a
+[59/141] Automatic MOC for target p1-navigation
+[60/141] Building CXX object CMakeFiles/p1-navigation.dir/p1-navigation_autogen/mocs_compilation.cpp.o
+[61/141] Building CXX object CMakeFiles/p1-navigation.dir/src/app/main.cpp.o
+[62/141] Linking CXX executable p1-navigation
+[63/141] Automatic MOC for target p1-ui-tests
+[64/141] Building CXX object CMakeFiles/p1-ui-tests.dir/p1-ui-tests_autogen/mocs_compilation.cpp.o
+[65/141] Building CXX object CMakeFiles/p1-ui-tests.dir/tests/UiTests.cpp.o
+[66/141] Linking CXX executable p1-ui-tests
+[67/141] Automatic MOC for target p1-import-page-tests
+[68/141] Building CXX object src/app/CMakeFiles/p1-import-page-tests.dir/p1-import-page-tests_autogen/mocs_compilation.cpp.o
+[69/141] Building CXX object src/app/CMakeFiles/p1-import-page-tests.dir/tests/ImportPageTests.cpp.o
+[70/141] Linking CXX executable src/app/p1-import-page-tests
+[71/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_model.dir/model/Validation.cpp.o
+[72/141] Linking CXX static library src/algorithms/libp1_algorithms_model.a
+[73/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_model_tests.dir/tests/ModelTests.cpp.o
+[74/141] Linking CXX executable src/algorithms/p1_algorithms_model_tests
+[75/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_astar.dir/core/BoostAStar.cpp.o
+[76/141] Linking CXX static library src/algorithms/libp1_algorithms_astar.a
+[77/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_astar_demo.dir/demo/AStarDemo.cpp.o
+[78/141] Linking CXX executable src/algorithms/p1_algorithms_astar_demo
+[79/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_astar_tests.dir/tests/AStarTests.cpp.o
+[80/141] Linking CXX executable src/algorithms/p1_algorithms_astar_tests
+[81/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_fmm_process_fixture.dir/tests/FmmProcessFixture.cpp.o
+[82/141] Linking CXX executable src/algorithms/p1_algorithms_fmm_process_fixture
+[83/141] Automatic MOC for target p1_algorithms_contracts
+[84/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_contracts.dir/p1_algorithms_contracts_autogen/mocs_compilation.cpp.o
+[85/141] Linking CXX static library src/algorithms/libp1_algorithms_contracts.a
+[86/141] Automatic MOC for target p1_algorithms_route_planner
+[87/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_route_planner.dir/p1_algorithms_route_planner_autogen/mocs_compilation.cpp.o
+[88/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_route_planner.dir/qt/BoostRoutePlanner.cpp.o
+[89/141] Linking CXX static library src/algorithms/libp1_algorithms_route_planner.a
+[90/141] Automatic MOC for target p1_algorithms_route_planner_tests
+[91/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_route_planner_tests.dir/p1_algorithms_route_planner_tests_autogen/mocs_compilation.cpp.o
+[92/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_route_planner_tests.dir/tests/RoutePlannerTests.cpp.o
+[93/141] Linking CXX executable src/algorithms/p1_algorithms_route_planner_tests
+[94/141] Automatic MOC for target p1_algorithms_fmm
+[95/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_fmm.dir/p1_algorithms_fmm_autogen/mocs_compilation.cpp.o
+[96/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_fmm.dir/fmm/FmmClient.cpp.o
+[97/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_fmm.dir/qt/FmmMapMatcher.cpp.o
+[98/141] Linking CXX static library src/algorithms/libp1_algorithms_fmm.a
+[99/141] Automatic MOC for target p1_algorithms_fmm_tests
+[100/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_fmm_tests.dir/p1_algorithms_fmm_tests_autogen/mocs_compilation.cpp.o
+[101/141] Building CXX object src/algorithms/CMakeFiles/p1_algorithms_fmm_tests.dir/tests/FmmTests.cpp.o
+[102/141] Linking CXX executable src/algorithms/p1_algorithms_fmm_tests
+[103/141] Automatic MOC for target p1_navigation
+[104/141] Building CXX object src/navigation/CMakeFiles/p1_navigation.dir/p1_navigation_autogen/mocs_compilation.cpp.o
+[105/141] Building CXX object src/navigation/CMakeFiles/p1_navigation.dir/MockLocationSource.cpp.o
+[106/141] Building CXX object src/navigation/CMakeFiles/p1_navigation.dir/FixedTrackLoader.cpp.o
+[107/141] Building CXX object src/navigation/CMakeFiles/p1_navigation.dir/AsyncPlannerBridge.cpp.o
+[108/141] Building CXX object src/navigation/CMakeFiles/p1_navigation.dir/StubRoutePlanner.cpp.o
+[109/141] Linking CXX static library src/navigation/libp1_navigation.a
+[110/141] Automatic MOC for target p1-location-demo
+[111/141] Building CXX object src/navigation/CMakeFiles/p1-location-demo.dir/p1-location-demo_autogen/mocs_compilation.cpp.o
+[112/141] Building CXX object src/navigation/CMakeFiles/p1-location-demo.dir/demo/LocationReplayDemo.cpp.o
+[113/141] Linking CXX executable src/navigation/p1-location-demo
+[114/141] Automatic MOC for target p1-navigation-tests
+[115/141] Building CXX object src/navigation/CMakeFiles/p1-navigation-tests.dir/p1-navigation-tests_autogen/mocs_compilation.cpp.o
+[116/141] Building CXX object src/navigation/CMakeFiles/p1-navigation-tests.dir/tests/LocationReplayTests.cpp.o
+[117/141] Linking CXX executable src/navigation/p1-navigation-tests
+[118/141] Automatic MOC for target p1-planner-demo
+[119/141] Building CXX object src/navigation/CMakeFiles/p1-planner-demo.dir/p1-planner-demo_autogen/mocs_compilation.cpp.o
+[120/141] Building CXX object src/navigation/CMakeFiles/p1-planner-demo.dir/demo/PlannerBridgeDemo.cpp.o
+[121/141] Linking CXX executable src/navigation/p1-planner-demo
+[122/141] Automatic MOC for target p1-navigation-integration-tests
+[123/141] Building CXX object src/navigation/CMakeFiles/p1-navigation-integration-tests.dir/p1-navigation-integration-tests_autogen/mocs_compilation.cpp.o
+[124/141] Building CXX object src/navigation/CMakeFiles/p1-navigation-integration-tests.dir/tests/PlannerBridgeTests.cpp.o
+[125/141] Linking CXX executable src/navigation/p1-navigation-integration-tests
+[126/141] Automatic MOC for target p1-real-planner-demo
+[127/141] Building CXX object src/navigation/CMakeFiles/p1-real-planner-demo.dir/p1-real-planner-demo_autogen/mocs_compilation.cpp.o
+[128/141] Building CXX object src/navigation/CMakeFiles/p1-real-planner-demo.dir/demo/RealPlannerBridgeDemo.cpp.o
+[129/141] Linking CXX executable src/navigation/p1-real-planner-demo
+[130/141] Automatic MOC for target p1-real-planner-tests
+[131/141] Building CXX object src/navigation/CMakeFiles/p1-real-planner-tests.dir/p1-real-planner-tests_autogen/mocs_compilation.cpp.o
+[132/141] Building CXX object src/navigation/CMakeFiles/p1-real-planner-tests.dir/tests/RealPlannerBridgeTests.cpp.o
+[133/141] Linking CXX executable src/navigation/p1-real-planner-tests
+[134/141] Automatic MOC for target p1-navigation-contract-tests
+[135/141] Building CXX object src/navigation/CMakeFiles/p1-navigation-contract-tests.dir/p1-navigation-contract-tests_autogen/mocs_compilation.cpp.o
+[136/141] Building CXX object src/navigation/CMakeFiles/p1-navigation-contract-tests.dir/tests/NavigationContractTests.cpp.o
+[137/141] Linking CXX executable src/navigation/p1-navigation-contract-tests
+[138/141] Automatic MOC for target p1-location-fixture-tests
+[139/141] Building CXX object src/navigation/CMakeFiles/p1-location-fixture-tests.dir/p1-location-fixture-tests_autogen/mocs_compilation.cpp.o
+[140/141] Building CXX object src/navigation/CMakeFiles/p1-location-fixture-tests.dir/tests/LocationFixtureTests.cpp.o
+[141/141] Linking CXX executable src/navigation/p1-location-fixture-tests

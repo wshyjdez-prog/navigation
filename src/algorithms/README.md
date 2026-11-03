@@ -1,6 +1,14 @@
-# 第三位组员 P0：模块私有模型
+# 第三位组员：P0 模型、Boost.Graph A* 与 FMM 适配
 
-本目录实现 C++17 图、轨迹、基础校验和只读快照。命名空间为 `p1::algorithms::model`，仅依赖标准库；类型是第三位组员的内部表示。依据《第三位组员技术架构与分阶段开发方案-2026-10-28.md》修订审核版第 9 节实施。
+P0 部分实现 C++17 图、轨迹、基础校验和只读快照。命名空间为 `p1::algorithms::model`，仅依赖标准库；类型是第三位组员的内部表示。依据《第三位组员技术架构与分阶段开发方案-2026-10-28.md》修订审核版第 9 节实施。
+
+2026-11-01：按用户新授权新增可选 Boost.Graph A* 核心、固定样例、测试和 RoutePlanner 后台适配器。详见 [A* 接入说明](ASTAR_INTEGRATION.md)，包括来源/许可证、坐标和契约边界、实际 Windows 检查以及 Ubuntu 构建命令。两个新构建开关默认 OFF；以下保留 P0 的数据规则与历史验证记录，后续 P1 授权限制描述属于当时阶段记录。
+
+同日审核收尾：修复重算期间旧路线保留与交接后显式释放；A* 增加独立于 P0 的道路数值域校验。P0 用例全部保留，仅共用重复辅助代码；A* 及 Qt 测试合并重复流程，CTest 精简为模型、A*、RoutePlanner 三项，demo 单独运行。修复后的 Windows 非 Qt 目标文件编译通过，Qt/Ubuntu 验证仍待用户执行；前后数量和理由见接入说明。
+
+后续最新反馈：用户已确认 Ubuntu 24.04 / Boost 1.83.0 下 Debug、Release 各 CTest 3/3 及 demo 正常；前次 Release 单次 demo 为 0.035558 ms。用户另已确认固定 FMM `19ef34e1f57ff2f2484231aa0d01dfffea986ec1` 独立编译、UBODT 生成和真正 HMM 三条样例运行成功，本次新 Qt 适配器独立模块已在 Ubuntu 实测 CTest 5/5、失败 0、3.51 秒；真实 HMM 测试约 0.47 秒，三条新 CSV 已核查。根回归已执行为 4/5，ui-contracts 的两个断言失败，完整导航联调未完成。A* 结果见 [A* 接入说明](ASTAR_INTEGRATION.md)。
+
+本轮新增可选 `P1_ALGORITHMS_BUILD_FMM_ADAPTER=ON`，提供 `p1_algorithms_fmm`：轨迹 CSV 转换、后台调用外部 fmm、严格解析、有限窗口和公共 MapMatcher 适配；不依赖 A* 开关，不将 GDAL/FMM 源码引入本模块编译。新增夹具测试和条件注册的真实 HMM 样例测试；Ubuntu 命令、坐标/道路 ID/版本边界、四五号交接和验证状态见 [FMM 接入说明](FMM_INTEGRATION.md)。Windows 前端检查是历史开发证据；现已有 Qt 6.4.2/Ubuntu 构建与运行日志，A* 功能代码和原测试保持。本次 A* demo 节点/边/距离正确，单次 0.03672 ms。共享 out/member3-test-evidence 下 15 个文件已核查并在仓库外保全；根 UI 失败交一号核查。内部 AI 报告继续保存在仓库外审查资料目录。
 
 ## 文件与入口
 

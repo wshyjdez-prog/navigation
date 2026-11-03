@@ -20,7 +20,7 @@ ctest --test-dir build --output-on-failure
 
 ## 第二次作业：应用集成
 
-1 号已将已有算法基础模型加入根工程测试，并修正页面入口与替换所有权；5 号已提供基于 Mock MapScene 的异步 LinuxRenderer、瓦片/路线/标记绘制和 A/B 模式，真实 A*/HMM 与真实地图数据仍待接入。模块工厂、CMake 交接、语音边界准备与剩余验收见 [第二次作业集成说明](docs/assignment-2-integration.md)，LinuxRenderer 说明见 [渲染器文档](docs/renderer/linux-renderer.md)，统一 Ubuntu 复验与 Navit 对标状态见 [渲染对标报告](docs/benchmarks/navit/NAVIT-20261101-5-renderer-01.md)。
+团队整合版将 2 号 OSMX 源码、3 号 Boost A*/FMM 适配层、4 号异步规划桥和 5 号 LinuxRenderer 纳入同一根工程；导入页保留标准 OSM/PBF 与 OSMX 两条真实路径，地图页仍明确标注 Mock。默认开启真实 A* 对接与 FMM 适配层构建，需补齐 Boost 头文件；真实 HMM 运行另需配置外部 FMM 程序、网络和 UBODT。构建方法、验证证据及未贯通能力见 [团队整合说明](docs/assignment-2-team-integration.md)。算法调用页面、监控及真实数据到算法/地图的转换仍待完成，不把共同构建通过等同完整作业验收。
 
 ## 统一开发环境
 

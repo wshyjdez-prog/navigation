@@ -5,6 +5,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDialog>
+#include <QDir>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPointer>
@@ -81,6 +82,13 @@ private slots:
         QVERIFY(status);
         QTRY_VERIFY_WITH_TIMEOUT(canvas->property("hasFrame").toBool(), 5000);
         QTRY_VERIFY_WITH_TIMEOUT(status->text().contains("瓦片"), 5000);
+        const QString captures = qEnvironmentVariable("P1_UI_CAPTURE_DIR");
+        if (!captures.isEmpty()) {
+            QVERIFY(QDir().mkpath(captures));
+            QVERIFY(window_->grab().save(QDir(captures).filePath("map-light.png")));
+            theme_->setDark(true);
+            QVERIFY(window_->grab().save(QDir(captures).filePath("map-dark.png")));
+        }
     }
 
     void selectedFileSurvivesThemeAndInvalidSelection() {

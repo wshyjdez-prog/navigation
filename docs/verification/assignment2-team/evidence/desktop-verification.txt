@@ -1,0 +1,1 @@
+Wayland UI, OSMX page, captures, installation and runtime dependencies: PASS

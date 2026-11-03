@@ -1,6 +1,6 @@
 # P1 Linux 导航应用：总体规划与实现状态
 
-最后更新：2026-11-01（Asia/Shanghai）。组员：1、2、3、4、5。
+最后更新：2026-11-03（Asia/Shanghai）。组员：1、2、3、4、5。
 
 ## 1. 组名、任务依据与当前事实
 
@@ -154,12 +154,12 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | Linux 基础开发环境 | 1 | 进行中 | 历史基础验证通过；原机 emergency_ro 未修复，用户授权克隆的版本/应用自动验证及常规原生桌面补测通过；其他成员复现仍待完成 |
 | UI 设计规范 | 1，2/5 协作 | 已完成（文档） | design.md v1.0；主题/公共组件已有实现与 offscreen 截图；完整桌面、地图/导入业务验收待完成 |
 | Qt 工程/框架/CMake | 1 | 进行中 | 真实源码与更新 Linux 包已产出；offscreen/Wayland 测试各 8/0，常规桌面与文件选择已补测；高 DPI/200% 字号和完整人工键盘验收仍待进行 |
-| 第二次作业应用集成 | 1，3/5 提供业务模块 | 进行中 | 3 号基础模型已入根构建/CTest；5 号 MapPage 与异步 LinuxRenderer 已提供 Mock MapScene 和单一地图渲染流程，仍需统一 Ubuntu 复验和真实数据接入。真实算法页未交付；见 docs/assignment-2-integration.md、docs/renderer/linux-renderer.md |
+| 第二次作业应用集成 | 1 汇总，2/3/4/5 协作 | 进行中 | 五人源码已共同装配，Ubuntu CTest 17/17、Wayland UI 13/13、OSMX 页面4/4；真实 A* 桥与 FMM 调用层进入根构建。算法调用页/监控和生产数据转换未贯通；见 docs/assignment-2-team-integration.md |
 | 窗口/导航/主题/公共组件基线 | 1 | 已完成（基础子项） | 真实 Wayland 桌面启动、屏幕适配、主题/组件与文件选择回传通过；源码、双平台测试、实际桌面截图与安装入口见框架说明；不包含真实导入和完整缩放验收 |
-| 数据导入/StorageAdapter/离线包 | 2（本次 1 号授权装配） | 进行中 | X01 已选 B：标准 OSM；libosmium＋SQLite 导入子项已验收，Navit 预处理成本已记录（有语义/负载限制）；完整存储及 X07 离线包待办 |
-| C++ A*/HMM/性能页 | 3 | 进行中 | P0 原版独立审核通过；用户确认 Linux 独立构建、模型 CTest、原 Qt 工程回归通过；T1–T4 边界补测已提供，待 Ubuntu 复验。A*/HMM/性能页未实现；算法来源与 X04/X05 待确认 |
+| 数据导入/StorageAdapter/离线包 | 2（1 号整合） | 进行中 | 标准 OSM/PBF 与 OSMX 均进入根工程，Ubuntu 导入/缓存/重开测试通过；真实 OSMX 样例本次缺失跳过，完整存储及 G7/X07 离线包仍待办 |
+| C++ A*/HMM/性能页 | 3（1/4 号整合） | 进行中 | 算法源码已合并，真实 A* 与4号桥共建回归通过；FMM 适配层已编译/调度测试，当前 VM 真实 FMM 未复验。算法页/监控/生产转换仍待完成 |
 | LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；main（`9cc04b1`）Linux 复验通过（ctest 7/7）。**第二次作业对接层已交付（2026-11-01）**：`AsyncPlannerBridge`（QThread+Worker 线程化对接，落实契约"计算不阻塞 UI"）、`StubRoutePlanner`（确定性桩，延迟/失败/取消可注入）、`RecordingController`（验证桩）、`p1-planner-demo` 与 7 例集成测试；虚拟机实测 configure/build 零警告、全量 ctest **9/9**（新增 navigation-integration、navigation-planner-demo）。接口选择见 DEC-20261101-4-planner-bridge-interface-01（契约先行，3 号真实 A*/HMM 实现既定 `RoutePlanner` 接口即插即换）、DEC-20261101-4-async-model-01（本次忽略）。Navit 对标受阻未测（NAVIT-20261101-4-planner-bridge-01）。导航状态机、偏航/重算去重、GeoClue2、权限与 X06 联调未完成（第 3 次作业） |
-| LinuxRenderer/地图/仪表盘 | 5 | 进行中 | 已完成 MapScene、异步缓存底图渲染、MapPage 工厂和渲染测试；用户已取消界面 A/B 比较，正式页面只有单一地图流程。Windows Qt 6.12 冒烟通过，统一 Ubuntu/Qt 6.4.2 与真实数据待验收 |
+| LinuxRenderer/地图/仪表盘 | 5（1 号整合复验） | 进行中 | 异步 Qt 渲染与 MapPage 在统一 Ubuntu 测试和真实 Wayland 首帧/截图通过；输入仍为 Mock，真实数据、仪表盘及 OpenGL ES 未验收 |
 | LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 未开始 | 本地 TTS/ASR、FFI、中文与麦克风权限 |
 | Linux 发布与最终材料 | 全员，1 汇总 | 未开始 | 逐次收集运行证据、G6 报告和 3–5 分钟视频 |
 
@@ -384,4 +384,16 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 
 未实现/未验证内容、下一步与涉及组员：真实地图瓦片、路线/轨迹数据、导航快照运行时、G8/X08、平移缩放、OpenGL ES 和 Linux 运行验收待完成；需 1/2/3/4 号提供装配与数据接口。下一步在统一 Ubuntu 构建运行 `p1-renderer-tests` 并检查 Wayland 地图页面，不要求运行性能比较。
 
-关联日志 / 已有提交：ai_log 对话 13，`20261101-member5-linux-renderer-01`；本轮仅在本地分支修改，未提交或推送。
+关联日志 / 已有提交：ai_log 对话 14，`20261101-member5-linux-renderer-01`；本轮仅在本地分支修改，未提交或推送。
+
+### 2026-11-01：三号算法模块成果与交接
+
+3 号负责 C++ A*/HMM 集成、坐标与数据转换、后台计算及算法调用/性能页。已完成 Boost.Graph A*、Qt RoutePlanner、外部固定 FMM 的有限窗口 Qt MapMatcher，以及取消、过期结果过滤和结果所有权管理；源码在 `src/algorithms/`，算法提交 `1ab1cbe` 已推送个人分支。Ubuntu 24.04／Qt 6.4.2／G++ 13.3.0／CMake 3.28.3／Boost 1.83.0 下，A* Debug/Release 各 3/3，完整独立模块五项 CTest 5/5；三条真实 FMM 新输出与官方合成轨迹预期一致，15 个原始证据文件及 SHA256 保存在仓库外 `../navigation-仓库审查资料/member3-acceptance-evidence-20261101-145035/`。合并前根回归为 4/5，UI 的 map 入口与页面栈数量两断言失败；本次通过合并提交 `ad4073d` 保留组长 `9cc04b1` 的导入/页面更新与算法成果；用户最新确认 Ubuntu 独立算法 CTest 5/5、根工程 CTest 7/7、失败 0，新增依赖 libbz2-dev、libosmium2-dev 已补齐。这是合并后新结果，来源为用户反馈；未补写新耗时、构建模式或用例明细。公共 RoutePlanner/MapMatcher 签名保持，生产 WGS84↔米制投影、可路由图/UBODT 来源和 ID 映射由 2/3 号交接；4 号接请求、会话重置和空匹配处理，既定路线偏离量仍待路线几何；5 号确认几何转换与只读句柄，1 号负责页面和根工程装配。算法页、性能监控、真实导航联调及三号 Navit 对标尚未完成，模块整体为进行中。使用说明见 [A*](src/algorithms/ASTAR_INTEGRATION.md)、[FMM](src/algorithms/FMM_INTEGRATION.md)，选型见 `DEC-20261101-3-open-source-01`；AI 记录：A* 合并后对应对话 15，FMM/HMM 对应对话 16（原记录 ID 保留，避免与 4/5 号编号冲突）。
+
+### 2026-11-03：五人第二次作业源码整合与共同验证
+
+负责人：1；保留 2 号标准 OSM 兼容的 OSMX 交付、3 号 c7ee852 算法分支、4 号桥和真实 A* 对接、5 号渲染源码。主线基线 e3fb6a6，在 codex/member-1/assignment2-team-integration 完成已有合并流程。日志/进度冲突保留双方内容，3号日志顺延15/16并保留原记录ID。入口及数据边界见 docs/assignment-2-team-integration.md；源文件不再依赖交付压缩包解压，历史压缩包保留未删。
+
+装配/共同验证子项已完成：Release完整构建、最终CTest17/17、真实Wayland UI13/13、OSMX页面4/4、BUILD_TESTING=OFF构建/启动、安装及库依赖检查通过；122源码指纹0差异，原始证据见 docs/verification/assignment2-team/。已有MapScene未使用函数warning1条保留；OSMX真实样例缺失跳过1项，真实FMM官方样例未注册。新版路径 /home/navigation/p1-team-final-20261103/install/bin/p1-navigation，既有桌面/菜单快捷方式已更新。
+
+功能、验收和下一步：共同构建与模块回归已通过，完整第二次作业仍进行中。1号算法调用页面与性能面板、2/3号生产路由图/ID/坐标转换、3号真实FMM配置、5号真实MapScene与4号导航快照连通均未完成；不把Mock地图或进程fixture当作完整导航。Navit报告 NAVIT-20261103-1-team-integration-01 如实记录未测与恢复条件，不生成性能倍数。关键算法/外部方案未变更；用户已授权最终提交与上传，日志17记录本轮成果。

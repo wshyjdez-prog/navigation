@@ -1,0 +1,1 @@
+P1 shell startup: PASS

@@ -1,0 +1,6 @@
+-- Could NOT find XKB (missing: XKB_LIBRARY XKB_INCLUDE_DIR) (Required is at least version "0.5.0")
+-- Member 3 Boost version: 1.83.0
+-- Real FMM HMM test NOT registered: supply P1_FMM_* paths
+-- Configuring done (0.9s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/navigation/p1-team-final-20261103/build

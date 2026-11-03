@@ -54,3 +54,5 @@
 - 连续请求只发布最新 `requestId` 的帧。
 
 可选的 `p1-renderer-benchmark` 默认关闭。只有显式设置 `P1_BUILD_RENDERER_BENCHMARK=ON` 才会构建，普通用户不需要使用。
+
+2026-11-03补充：本模块已随1号团队整合在统一Ubuntu/Qt6.4.2通过测试及真实Wayland地图首帧与截图检查；原先Windows结果保留为历史。输入仍为Mock，实际证据和剩余事项见 [团队整合验证](../verification/assignment2-team/README.md)。

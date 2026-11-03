@@ -1,0 +1,2 @@
+-- Install configuration: "Release"
+-- Installing: /home/navigation/p1-team-final-20261103/install/bin/p1-navigation

@@ -1,4 +1,5 @@
 #include "model/Validation.h"
+#include "TestSupport.h"
 
 #include <exception>
 #include <functional>
@@ -21,9 +22,7 @@ static_assert(!std::is_constructible_v<TrajectorySnapshot, TrajectoryData&&>);
 
 namespace {
 
-void require(bool condition, const char* message) {
-    if (!condition) throw std::runtime_error(message);
-}
+using test_support::require;
 
 DatasetMetadata metadata() {
     return {"member3-fixed-model", "fixture-v1", "synthetic model test",
@@ -56,19 +55,7 @@ void expectErrors(const ValidationResult& result,
     }
 }
 
-int passed = 0;
-int failed = 0;
-
-void test(const std::string& name, const std::function<void()>& body) {
-    try {
-        body();
-        ++passed;
-        std::cout << "PASS " << name << '\n';
-    } catch (const std::exception& e) {
-        ++failed;
-        std::cerr << "FAIL " << name << ": " << e.what() << '\n';
-    }
-}
+test_support::Runner test;
 
 void badGraph(const std::string& name, const std::function<void(GraphData&)>& change,
               std::initializer_list<ValidationError> expected) {
@@ -352,6 +339,5 @@ int main() {
                 input.points[1].unix_time_ms == 0 && input.points[0].accuracy_m == -2,
                 "invalid input silently repaired");
     });
-    std::cout << passed << " passed, " << failed << " failed\n";
-    return failed == 0 ? 0 : 1;
+    return test.finish();
 }

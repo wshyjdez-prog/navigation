@@ -23,6 +23,7 @@
 | `DEC-20261101-4-async-model-01` | 规划对接异步执行模型 / 4 | 本次忽略（单方案，未做 2–3 种试验对比） | QThread+Worker / QtConcurrent / 忽略 三选项展示 | QThread+Worker（`AsyncPlannerBridge` 内部 QThread，functor 队列投递 + QueuedConnection 回流）；契约注释 ① 预设该模式 | project.md 第二次作业 4 号行；ai_log 对话 13；Navit：NAVIT-20261101-4-planner-bridge-01 |
 | `DEC-20261101-5-renderer-01` | LinuxRenderer 渲染路径 / 5 | 本次取消界面比较 | 已撤回 A+B 试验入口 | 正式页面固定使用 A 缓存底图；B 仅保留为开发期正确性对照 | project.md 2026-11-01 记录；ai_log 对话 13；NAVIT-20261101-5-renderer-01 |
 | 暂无（其他） | — | 尚未开展 | — | — | — |
+| `DEC-20261101-3-open-source-01` | A*/HMM 来源与 Qt 适配 / 3 | 本次忽略多方案比较；独立验收通过，Navit 待测 | Boost.Graph A*、固定 FMM HMM | h=0 有向图、外部 CLI 与有限窗口，公共契约不变 | project.md 三号汇总；ai_log：A* 对话 12，FMM/HMM 对话 13（原 ID 保留） |
 
 ## 单次抉择模板（复制后填写，模板不是实际记录）
 
@@ -196,6 +197,14 @@
   按 7.3 不标"已完成"（"已完成"要求确认、清理、复验三项齐备且包含试验流程）。
   待第 3 次作业实现状态机并用真实/更完整的匹配结果复核后，再新建关联记录结案。
 
+### 2026-11-01：三号算法来源与进程适配（DEC-20261101-3-open-source-01）
+
+- 负责人：3；采用用户指定的成熟开源组件。确认原文：“本次无需重新进行大范围算法选型。”“如果仓库 W03 流程要求多方案选型，将本次请求视为选择其中的单方案工作路径，按规范记录选择及跳过多方案比较的原因，但不得跳过必要的正确性和集成验证。”状态为本次忽略多方案比较，功能独立验收已通过，Navit 对标待开展。
+- A*：系统 Boost.Graph（BSL-1.0，Ubuntu 实际 1.83.0），以有向图保留道路方向/平行边。P0 允许零代价，未保证几何距离为代价下界，因此使用 h=0；最小代价与声明道路长度分开返回。路由数值域单边 ≤1e9 m、全图长度/代价各自总量 ≤1e12 m，P0 通用模型不收紧。
+- HMM：固定 FMM `19ef34e1f57ff2f2484231aa0d01dfffea986ec1`，顶层 Apache-2.0，保留 fiboheap 等独立依赖许可。通过 Qt 工作任务调用已独立验证的外部 fmm CLI，避免把上游全局 CMake 及 GDAL/OpenMP/Serialization/H3 依赖带入导航工程；代价是每窗口启动进程和重载数据，后续以实测决定是否替换后端。外部 C++17、跳过 Python/SWIG、本地输出及 GDAL const 兼容补丁保留在外部源码。
+- 适配边界：维持公共 RoutePlanner/MapMatcher 签名，配置只读、轨迹窗口有界，取消及旧结果在所属线程过滤。生产使用显式 WGS84↔米制投影、独立道路 ID 映射及同版本路网/UBODT；未提供既定路线几何时路线距离为空。
+- 结果与交接：Ubuntu 独立五项 CTest 5/5，真实 HMM 三轨迹通过；详细输出与原始证据在仓库外，接口说明见 `src/algorithms/ASTAR_INTEGRATION.md`、`FMM_INTEGRATION.md`。合并前根 4/5 的 UI 失败保留为历史；通过 `ad4073d` 合入 `9cc04b1` 后，用户最新确认独立算法 5/5、根工程 7/7、失败 0，libbz2-dev、libosmium2-dev 已补齐；新结果不扩张为完整导航联调或 Navit 对标完成。真实数据/投影由二号协作，四五号负责导航和几何消费。没有其他候选实现需要清理；该决定不代表已完成多方案比较或 Navit 对标。AI 记录：A* 见对话 12，FMM/HMM 及独立验收见对话 13（原记录 ID 保留）。
+
 ### DEC-20261101-1-import-backend-01：标准 OSM 导入替换
 
 - 日期：2026-11-01；组员 1 授权跨模块替换，影响 2 号导入、3/5 号数据消费与 1 号装配。基线 main/ca12fe6，已有未提交修改保留，无提交/推送。
@@ -300,3 +309,13 @@ Windows Qt 6.12 Release 预检中 A 相对 B 的中位耗时低约 3.0%，P95 �
 - 用户入口、CMake 普通构建和文档演示只保留 A 缓存底图。
 - 自动化测试仍验证两条渲染函数输出一致，属于代码回归，不要求用户操作或比较。
 - 后续统一 Ubuntu 复验只运行正常地图页和根 CTest，不要求运行性能基准。
+
+### INT-20261103-1-team-merge-01：第二次作业团队装配
+
+- 负责人/日期：1 / 2026-11-03。用户授权原文：“进行整合与合并，并将最后的项目上传github。”
+- 基线：main/e3fb6a6，合并来源 origin/feature/member3-open-source-integration/c7ee852；开始时已有合并状态及2号解包/适配改动，均保留，未abort/reset覆盖。4号真实规划桥、5号渲染已在main；2号交付压缩包保留，源码另进入正式src目录。
+- 方案范围：沿用已确认的标准 OSM libosmium＋SQLite（DEC-20261101-1-import-backend-01）、3号 Boost A*/FMM（DEC-20261101-3-open-source-01）、4号契约/QThread工作线程及5号缓存渲染。加入OSMX格式分发与目录合并、共享导入页目标、公开工厂元数据装配；没有重选关键算法，不新启候选比较。X07/G7、G6等未确认接口未替代。
+- 合并取舍：保留双方project/AI记录，3号两条顺延至15/16，原记录ID保留；引用同步。保留原PBF/OSM/压缩XML导入和SQLite数据集，不以OSMX覆盖；两种目录/格式并列显示，只有OSMX可重新装载到OsmxStore。默认装配真实A*桥及FMM调用层，但不声称完整生产业务已连通。
+- 验证：独立干净Release目录完整构建141/141；根CTest两次17/17，Wayland UI13/13、OSMX页面4/4；关闭测试的默认构建与启动通过，恢复ON；122源码指纹0差异，安装及快捷方式更新完成。旧目录两次并行构建已停止，最终证据仅使用独立目录；MapScene已有warning1条保留。OSMX真实样例跳过1项、真实FMM官方样例未注册，完整导航/算法页/监控仍未完成。
+- 保留/清理：保留2/3/4/5号交付代码、标准导入、历史交付包和独立模块用例，无未选候选源码清理需求；未删除其他成员文件。完整清单及Linux日志见docs/verification/assignment2-team，说明见docs/assignment-2-team-integration.md。
+- Navit：NAVIT-20261103-1-team-integration-01，完整业务性能未测，无新的比较数值或倍数。AI日志17。状态：装配与共同回归已完成；完整第二次作业进行中。

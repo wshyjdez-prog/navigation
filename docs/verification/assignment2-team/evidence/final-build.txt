@@ -1,0 +1,13 @@
+[0/1] Re-running CMake...
+-- Could NOT find XKB (missing: XKB_LIBRARY XKB_INCLUDE_DIR) (Required is at least version "0.5.0")
+-- Member 3 Boost version: 1.83.0
+-- Real FMM HMM test NOT registered: supply P1_FMM_* paths
+-- Configuring done (0.9s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/navigation/p1-team-final-20261103/build
+[1/10] Automatic MOC for target p1_ui_common
+[2/7] Automatic MOC for target p1_ui
+[3/6] Building CXX object CMakeFiles/p1_ui.dir/src/app/MainWindow.cpp.o
+[4/6] Linking CXX static library libp1_ui.a
+[5/6] Linking CXX executable p1-navigation
+[6/6] Linking CXX executable p1-ui-tests

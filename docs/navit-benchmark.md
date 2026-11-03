@@ -89,3 +89,5 @@ project.md / decision_log.md / ai_log.md 的引用与下一步：
 | 待填写；耗时、峰值内存、吞吐量及模块补充指标逐项列出 | 待测 | 待测 | 未测不计算 | 待填写；缺失项须给原因 | 待填写 |
 
 - 2026-11-01：[标准 OSM 导入替换](benchmarks/navit/NAVIT-20261101-1-osm-import-01.md)，NAVIT-20261101-1-osm-import-01：已比较各自预处理成本，原始数据缓存/导航bin语义不同，且后台负载干扰明显，不计算优劣比例。
+
+- 2026-11-03：[团队整合回归](benchmarks/navit/NAVIT-20261103-1-team-integration-01.md)，NAVIT-20261103-1-team-integration-01：功能共同回归通过，完整业务性能仍受同源数据、真实FMM配置和生产数据转换缺口阻塞，无新性能倍数。

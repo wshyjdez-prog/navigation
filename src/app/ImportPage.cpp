@@ -4,6 +4,8 @@
 #include "app/ImportParser.h"
 #include "app/ImportTask.h"
 #include "contracts/ImportedDataset.h"
+#include "data/osmx/OsmxCache.h"
+#include "data/osmx/OsmxParser.h"
 
 #include "ui/common/Components.h"
 #include "ui/common/Theme.h"
@@ -29,6 +31,7 @@
 #include <QtConcurrentRun>
 #include <QVBoxLayout>
 
+#include <algorithm>
 #include <memory>
 #include <utility>
 
@@ -51,17 +54,50 @@ QString formatCoordinate(double value) {
     return QString::number(value, 'f', 6);
 }
 
+// Catalog rows come from two storage shapes: the standard OSM SQLite cache and
+// the OSMX dataset directories with manifest.json. Merge them off the GUI
+// thread and report unreadable entries as log lines instead of failing the page.
+struct CatalogLoad {
+    QVector<ImportResult> entries;
+    QStringList problems;
+};
+
+CatalogLoad loadCatalog(const QString& directory) {
+    CatalogLoad load;
+    try {
+        load.entries = data::listImportedDatasets(directory);
+    } catch (const std::exception& error) {
+        load.problems.append(QStringLiteral("读取标准 OSM 数据集失败：%1")
+                                 .arg(QString::fromUtf8(error.what())));
+    }
+    const data::OsmxCacheListing osmx = data::OsmxCache::list(directory);
+    load.entries += osmx.entries;
+    load.problems += osmx.problems;
+    std::sort(load.entries.begin(), load.entries.end(),
+              [](const ImportResult& left, const ImportResult& right) {
+                  return left.importedAt > right.importedAt;
+              });
+    return load;
+}
+
 } // namespace
 
 ImportPage::ImportPage(ui::Theme& theme, QWidget* parent, const QString& cacheDirectory)
-    : QWidget(parent), theme_(theme), cacheDirectory_(cacheDirectory.isEmpty()?data::defaultImportCacheDirectory():cacheDirectory) {
+    : QWidget(parent),
+      theme_(theme),
+      cacheDirectory_(cacheDirectory.isEmpty() ? data::defaultImportCacheDirectory() : cacheDirectory) {
     setObjectName("importPage");
     buildUi();
 
     connect(chooseButton_, &QPushButton::clicked, this, &ImportPage::chooseFile);
     connect(startButton_, &QPushButton::clicked, this, &ImportPage::startImport);
     connect(cancelButton_, &QPushButton::clicked, this, &ImportPage::cancelImport);
+    connect(openButton_, &QPushButton::clicked, this, &ImportPage::openSelectedDataset);
+    connect(datasetList_, &QListWidget::itemDoubleClicked, this, [this](QListWidgetItem*) {
+        openSelectedDataset();
+    });
     connect(datasetList_, &QListWidget::currentRowChanged, this, [this](int row) {
+        updateOpenButtonState();
         if (!importing_ && row >= 0 && row < datasets_.size()) showSummary(datasets_[row]);
     });
     refreshCatalog();
@@ -92,7 +128,7 @@ void ImportPage::buildUi() {
     auto* pickerBody = picker->body();
     pickerBody->addWidget(ui::label(QStringLiteral("01  /  添加数据"), "eyebrow"));
     pickerBody->addWidget(ui::label(QStringLiteral("导入本地地图数据"), "sectionTitle"));
-    pickerBody->addWidget(ui::label(QStringLiteral("支持 PBF、OSM XML，以及 gzip/bzip2 压缩的 OSM 文件。"),
+    pickerBody->addWidget(ui::label(QStringLiteral("支持 OSMX 统一路网、PBF、OSM XML，以及 gzip/bzip2 压缩的 OSM 文件。"),
                                     "secondary"));
 
     fileName_ = ui::label(QStringLiteral("尚未选择文件"), "cardTitle");
@@ -190,7 +226,19 @@ void ImportPage::buildUi() {
     datasetList_ = new QListWidget;
     datasetList_->setObjectName("importedDatasets");
     datasetList_->setAccessibleName("本机已导入的数据集");
-    detailsTabs_->addTab(datasetList_, "本地数据集");
+    auto* datasetTab = new QWidget;
+    datasetTab_ = datasetTab;
+    auto* datasetLayout = new QVBoxLayout(datasetTab);
+    datasetLayout->setContentsMargins(0, 0, 0, 0);
+    datasetLayout->setSpacing(8);
+    datasetLayout->addWidget(datasetList_, 1);
+    openButton_ = ui::button(QStringLiteral("从本机加载所选数据集"));
+    openButton_->setObjectName("openDatasetButton");
+    openButton_->setAccessibleName(QStringLiteral("重新加载选中的本地 OSMX 数据集"));
+    openButton_->setEnabled(false);
+    openButton_->setToolTip(QStringLiteral("请选择一个已导入的 OSMX 数据集"));
+    datasetLayout->addWidget(openButton_);
+    detailsTabs_->addTab(datasetTab, "本地数据集");
     logView_ = new QPlainTextEdit;
     logView_->setObjectName("importLog");
     logView_->setReadOnly(true);
@@ -235,11 +283,14 @@ void ImportPage::selectFile(const QString& path) {
     fileName_->setText(info.fileName());
     fileName_->setToolTip(selectedPath_);
     if (ImportFactory::supports(selectedPath_)) {
-        fileInfo_->setText(QStringLiteral("%1 · OpenStreetMap 数据文件").arg(formatSize(info.size())));
+        fileInfo_->setText(QStringLiteral("%1 · 地图数据文件（%2）")
+                               .arg(formatSize(info.size()))
+                               .arg(data::OsmxParser::supports(selectedPath_) ? QStringLiteral("OSMX 统一路网")
+                                                                              : QStringLiteral("OpenStreetMap")));
         setStatusBadge(QStringLiteral("!  待导入"), "warning");
     } else {
         const QString suffix = info.suffix();
-        fileInfo_->setText(QStringLiteral("%1 · 不支持扩展名“%2”。请选择 .osm、.pbf、.osm.gz 或 .osm.bz2 文件。")
+        fileInfo_->setText(QStringLiteral("%1 · 不支持扩展名“%2”。请选择 .osmx、.osm、.pbf、.osm.gz 或 .osm.bz2 文件。")
                                .arg(formatSize(info.size()))
                                .arg(suffix.isEmpty() ? QStringLiteral("无") : suffix));
         setStatusBadge(QStringLiteral("!  格式可能不受支持"), "warning");
@@ -259,7 +310,7 @@ void ImportPage::startImport() {
         return;
     }
 
-    std::unique_ptr<ImportParser> parser = ImportFactory::createParser(selectedPath_,cacheDirectory_);
+    std::unique_ptr<ImportParser> parser = ImportFactory::createParser(selectedPath_, cacheDirectory_);
     if (!parser) {
         const QFileInfo info(selectedPath_);
         const QString suffix = info.suffix();
@@ -272,21 +323,47 @@ void ImportPage::startImport() {
         return;
     }
 
+    const QFileInfo info(selectedPath_);
+    appendLog(QStringLiteral("开始导入 %1（%2）").arg(info.fileName()).arg(formatSize(info.size())));
+    startTask(std::move(parser), selectedPath_, QStringLiteral("准备读取文件…"));
+}
+
+void ImportPage::openSelectedDataset() {
+    if (importing_) return;
+    const int row = datasetList_->currentRow();
+    if (row < 0 || row >= datasets_.size()) {
+        appendLog(QStringLiteral("尚未选择本地数据集，无法加载。"));
+        return;
+    }
+    const ImportResult entry = datasets_.at(row);
+    std::unique_ptr<ImportParser> loader = ImportFactory::createDatasetLoader(entry);
+    if (!loader) {
+        const QString message = QStringLiteral("只有 OSMX 统一路网数据集可以从本机重新加载。");
+        appendLog(message);
+        setStatusBadge(QStringLiteral("!  无法加载"), "error");
+        QMessageBox::warning(this, QStringLiteral("无法加载数据集"), message);
+        return;
+    }
+    appendLog(QStringLiteral("从本机缓存加载数据集 %1（%2）").arg(entry.fileName, entry.datasetId));
+    // The loader ignores the path and reads <cachePath>/data.osmx itself; passing
+    // the dataset directory keeps the call site unambiguous.
+    startTask(std::move(loader), entry.cachePath, QStringLiteral("读取本地数据集…"));
+}
+
+void ImportPage::startTask(std::unique_ptr<ImportParser> parser, const QString& filePath,
+                           const QString& initialStage) {
     resetResultView();
     detailsTabs_->setCurrentWidget(logView_);
     importing_ = true;
     setBusy(true);
-    setStatusBadge(QStringLiteral("…  正在解析"), "info");
-    stageLabel_->setText(QStringLiteral("准备读取文件…"));
-
-    const QFileInfo info(selectedPath_);
-    appendLog(QStringLiteral("开始导入 %1（%2）").arg(info.fileName()).arg(formatSize(info.size())));
-
-    task_ = new ImportTask(std::move(parser), selectedPath_, this);
+    setStatusBadge(QStringLiteral("…  正在读取"), "info");
+    stageLabel_->setText(initialStage);
+    task_ = new ImportTask(std::move(parser), filePath, this);
     connect(task_, &ImportTask::progressChanged, this, &ImportPage::onProgress);
     connect(task_, &ImportTask::logMessage, this, &ImportPage::onLog);
     connect(task_, &ImportTask::completed, this, &ImportPage::onCompleted);
     task_->start();
+    updateOpenButtonState();
 }
 
 void ImportPage::cancelImport() {
@@ -338,10 +415,20 @@ void ImportPage::onCompleted(const ImportResult& result) {
 
     progressBar_->setValue(100);
     setStatusBadge(result.warnings.isEmpty()?QStringLiteral("✓  已保存到本机"):QStringLiteral("!  已保存，含数据警告"), result.warnings.isEmpty()?"success":"warning");
-    stageLabel_->setText(result.warnings.isEmpty()?QStringLiteral("导入完成 · 用时 %1 ms").arg(result.elapsedMs):result.warnings.join('\n'));
+    const bool osmx = result.sourceFormat.compare(QLatin1String("osmx"), Qt::CaseInsensitive) == 0;
+    if (osmx) {
+        stageLabel_->setText(result.warnings.isEmpty()
+                                 ? QStringLiteral("导入完成 · 统一数据已就绪，算法与渲染可读取同一数据集")
+                                 : result.warnings.join('\n'));
+        appendLog(QStringLiteral("统一数据就绪：可导航道路 %1 条、有向边 %2 条；3/5 号通过 OsmxStore 读取同一数据集。")
+                      .arg(formatCount(result.stats.routableWays))
+                      .arg(formatCount(result.stats.directedEdges)));
+    } else {
+        stageLabel_->setText(result.warnings.isEmpty()?QStringLiteral("导入完成 · 用时 %1 ms").arg(result.elapsedMs):result.warnings.join('\n'));
+    }
     showSummary(result);
     refreshCatalog();
-    detailsTabs_->setCurrentWidget(datasetList_);
+    detailsTabs_->setCurrentWidget(datasetTab_);
     emit importFinished(result);
 }
 
@@ -352,7 +439,9 @@ void ImportPage::showSummary(const ImportResult& result) {
     relationsValue_->setText(formatCount(result.stats.relations));
     tagsValue_->setText(formatCount(result.stats.tags));
 
-    versionValue_->setText(result.sourceFormat);
+    versionValue_->setText(result.sourceFormat.compare(QLatin1String("osmx"), Qt::CaseInsensitive) == 0
+                               ? QStringLiteral("OSMX v%1").arg(result.formatVersion)
+                               : result.sourceFormat);
     if (result.sourceName.isEmpty()) {
         sourceValue_->setText(QStringLiteral("未提供"));
         sourceValue_->setToolTip(QString());
@@ -423,32 +512,68 @@ void ImportPage::setBusy(bool busy) {
     } else {
         startButton_->setToolTip(QStringLiteral("开始导入所选文件"));
     }
+    updateOpenButtonState();
+}
+
+void ImportPage::updateOpenButtonState() {
+    if (openButton_ == nullptr || datasetList_ == nullptr) return;
+    const int row = datasetList_->currentRow();
+    const bool hasRow = row >= 0 && row < datasets_.size();
+    const bool canOpen = !importing_ && hasRow && ImportFactory::canReopenCachedDataset(datasets_.at(row));
+    openButton_->setEnabled(canOpen);
+    if (importing_) {
+        openButton_->setToolTip(QStringLiteral("导入进行中"));
+    } else if (!hasRow) {
+        openButton_->setToolTip(QStringLiteral("请选择一个已导入的 OSMX 数据集"));
+    } else if (!ImportFactory::canReopenCachedDataset(datasets_.at(row))) {
+        openButton_->setToolTip(QStringLiteral("只有 OSMX 统一路网数据集可以从本机重新加载"));
+    } else {
+        openButton_->setToolTip(QStringLiteral("重新加载所选数据集并共享给算法与渲染模块"));
+    }
 }
 
 void ImportPage::refreshCatalog() {
-    const int generation=++catalogGeneration_;
-    auto* watcher=new QFutureWatcher<QVector<ImportResult>>(this);
-    connect(watcher,&QFutureWatcher<QVector<ImportResult>>::finished,this,[this,watcher,generation] {
+    const int generation = ++catalogGeneration_;
+    auto* watcher = new QFutureWatcher<CatalogLoad>(this);
+    connect(watcher, &QFutureWatcher<CatalogLoad>::finished, this, [this, watcher, generation] {
         watcher->deleteLater();
-        if(generation!=catalogGeneration_) return;
+        if (generation != catalogGeneration_) return;
         try {
-            datasets_=watcher->result(); datasetList_->clear();
-            for(const auto& r:datasets_) {
-                auto* item=new QListWidgetItem(QString("%1 · %2\n节点 %3 / 道路 %4 / 关系 %5 · %6")
-                    .arg(r.fileName,r.sourceFormat,formatCount(r.stats.nodes),formatCount(r.stats.ways),formatCount(r.stats.relations),r.warnings.isEmpty()?"已保存":"已保存，含数据警告"),datasetList_);
-                item->setToolTip(r.cachePath+"\n"+r.importedAt+"\n"+r.warnings.join('\n'));
+            const CatalogLoad loaded = watcher->result();
+            for (const auto& problem : loaded.problems) appendLog(problem);
+            datasets_ = loaded.entries;
+            datasetList_->clear();
+            for (const auto& r : datasets_) {
+                const QString format = r.sourceFormat.compare(QLatin1String("osmx"), Qt::CaseInsensitive) == 0
+                                           ? QStringLiteral("OSMX 统一路网")
+                                           : r.sourceFormat;
+                auto* item = new QListWidgetItem(
+                    QStringLiteral("%1 · %2\n节点 %3 / 道路 %4 / 关系 %5 · %6")
+                        .arg(r.fileName, format, formatCount(r.stats.nodes), formatCount(r.stats.ways),
+                             formatCount(r.stats.relations),
+                             r.warnings.isEmpty() ? QStringLiteral("已保存")
+                                                  : QStringLiteral("已保存，含数据警告")),
+                    datasetList_);
+                item->setToolTip(r.cachePath + '\n' + r.importedAt + '\n' + r.warnings.join('\n'));
+                if (r.stats.directedEdges > 0) {
+                    item->setToolTip(item->toolTip() + QStringLiteral("\n可导航道路 %1 / 有向边 %2")
+                                                           .arg(formatCount(r.stats.routableWays),
+                                                                formatCount(r.stats.directedEdges)));
+                }
             }
-            if(datasets_.isEmpty()) datasetList_->addItem("尚无导入数据。选择文件并开始导入。");
-            else if (!importing_) {
+            if (datasets_.isEmpty()) {
+                datasetList_->addItem(QStringLiteral("尚无导入数据。选择文件并开始导入。"));
+            } else if (!importing_) {
                 datasetList_->setCurrentRow(0);
-                detailsTabs_->setCurrentWidget(datasetList_);
+                detailsTabs_->setCurrentWidget(datasetTab_);
             }
-        } catch(const std::exception& e) {
-            appendLog(QString("读取本地数据集失败：%1").arg(QString::fromUtf8(e.what())));
+            updateOpenButtonState();
+        } catch (const std::exception& error) {
+            appendLog(QStringLiteral("读取本地数据集失败：%1").arg(QString::fromUtf8(error.what())));
         }
     });
-    const auto directory=cacheDirectory_;
-    watcher->setFuture(QtConcurrent::run([directory] { return data::listImportedDatasets(directory); }));
+    const QString directory = cacheDirectory_;
+    watcher->setFuture(QtConcurrent::run([directory] { return loadCatalog(directory); }));
 }
 
 void ImportPage::resizeEvent(QResizeEvent* event) {
