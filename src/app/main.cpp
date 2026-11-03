@@ -11,10 +11,10 @@ int main(int argc, char* argv[]) {
     QApplication app(argc,argv);
     QApplication::setStyle("Fusion");
     QCoreApplication::setApplicationName("p1-navigation");
-    QCoreApplication::setApplicationVersion("0.1.0");
+    QCoreApplication::setApplicationVersion("0.2.0");
     QCoreApplication::setOrganizationName("P1Linux");
     QCommandLineParser args;
-    args.setApplicationDescription("P1 Linux navigation · assignment 2 integration shell");
+    args.setApplicationDescription("P1 Linux navigation · offline road map, A* and FMM workflow");
     args.addHelpOption(); args.addVersionOption();
     args.addOption({"smoke","Show the window and exit after processing initial events."});
     args.addOption({"capture-dir","Capture application views for UI review, then exit.","directory"});

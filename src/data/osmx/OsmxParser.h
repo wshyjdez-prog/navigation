@@ -9,6 +9,10 @@
 
 namespace p1::data {
 
+// Shared OSM tag interpretation for validated OSMX and SQLite road adapters.
+void fillRoadAttributes(const QVector<OsmxTag>& tags, quint32 first, quint32 count,
+                        const QStringList& strings, quint32 refCount, RoadAttributes& attributes);
+
 struct OsmxParseOptions {
     // Builds the uniform node grid used by nearestNode(). Disable only for
     // memory-constrained validation tools.

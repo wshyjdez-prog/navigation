@@ -1,5 +1,7 @@
 #include "app/MainWindow.h"
 #include "app/ImportFactory.h"
+#include "app/ImportPage.h"
+#include "app/NavigationWorkflow.h"
 #include "ui/common/Components.h"
 #include "ui/common/Theme.h"
 #include "ui/map/MapPage.h"
@@ -85,14 +87,25 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     auto* status = new QHBoxLayout;
     status->addWidget(label("●  本地会话", "caption"));
     status->addStretch();
-    auto* serviceStatus = label("地图为 Mock 场景  /  算法、定位、语音待接入", "caption");
+    auto* serviceStatus = label("真实路网 / A* / FMM  ·  定位与语音属于后续作业", "caption");
     serviceStatus->setWordWrap(false);
     status->addWidget(serviceStatus);
     work->addLayout(status);
     shell_->addWidget(workspace,1);
 
     registerPage(ImportFactory::pageId(),ImportFactory::pageTitle(),ImportFactory::pageDescription(),ImportFactory::createImportPage(theme,nullptr,importCacheDirectory));
-    registerPage("map","地图导航","固定 MapScene 的 LinuxRenderer 异步绘制演示。",createMapPage(theme));
+    auto* workflow = new NavigationWorkflow(this);
+    workflow->setObjectName("navigationWorkflow");
+    connect(workflow,&NavigationWorkflow::mapPickRequested,this,[this]{setCurrentPage("map");});
+    registerPage("map","地图导航","真实道路、路径与轨迹 · 拖动平移，滚轮缩放。",createMapPage(theme,workflow,importCacheDirectory));
+    registerPage("algorithms","算法实验","真实路网上的 A* 路径规划与 FMM/HMM 轨迹匹配。",createAlgorithmsPage(theme,workflow,importCacheDirectory));
+    connect(qobject_cast<ImportPage*>(registry_["import"].widget), &ImportPage::importFinished, this,
+        [this,workflow](const ImportResult& result) { if(result.ok) {
+            const bool wuhan=result.hasBounds && result.minLat<=30.593 && result.maxLat>=30.593 &&
+                result.minLon<=114.305 && result.maxLon>=114.305;
+            const double lat=wuhan?30.593:(result.minLat+result.maxLat)*0.5;
+            const double lon=wuhan?114.305:(result.minLon+result.maxLon)*0.5;
+            workflow->load(result,lat,lon,1.0); setCurrentPage("map"); } });
     registerPage("components","组件预览","检查公共控件与交互状态。此页为独立演示，不导入业务数据。",makeGallery());
     registerPage("settings","设置与帮助","让工作台适合你。偏好仅在本次会话中保留。",makeSettings());
     connect(&theme_, &Theme::changed, this, &MainWindow::refreshNavigation);
@@ -298,8 +311,8 @@ void MainWindow::showHelp() {
     dialog->setWindowTitle("关于 P1 导航"); dialog->setMinimumWidth(480);
     auto* layout = new QVBoxLayout(dialog);
     layout->setContentsMargins(24,24,24,24); layout->setSpacing(24);
-    layout->addWidget(label("P1 导航 · 0.1.0", "sectionTitle"));
-    layout->addWidget(label("支持 OSMX、PBF、OSM XML 与 gzip/bzip2 压缩的 OSM 数据导入，数据保存在本机。\n\n地图页当前使用固定 MapScene 与 Mock 导航快照；算法调用页面、真实导航、定位和语音仍待接入。", "secondary"));
+    layout->addWidget(label("P1 导航 · 0.2.0", "sectionTitle"));
+    layout->addWidget(label("导入 OSMX、PBF、OSM XML 或 gzip/bzip2 压缩的 OSM 数据，然后在地图页加载工作区域。拖动平移、滚轮缩放；在路线页选起终点并计算 A*。\n\n轨迹 CSV 首行为 latitude,longitude，使用 WGS84 度，支持 2–256 点。也可先导出路线为合成测试轨迹，再运行真实 FMM/HMM。性能面板显示耗时、应用进程内存和线程状态。\n\n路线限当前已加载的通用路网，可包含步行/骑行道路；不是汽车专用路径，不含转向限制和实时路况。定位导航、语音属于后续作业。", "secondary"));
     auto* close = button("知道了",true);
     connect(close,&QPushButton::clicked,dialog,&QDialog::accept);
     layout->addWidget(close); dialog->open(); close->setFocus();

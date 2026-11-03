@@ -385,6 +385,11 @@ void reportProgress(const OsmxParseCallbacks& callbacks, int& lastPercent, QStri
 
 } // namespace
 
+void fillRoadAttributes(const QVector<OsmxTag>& tags, quint32 first, quint32 count,
+                        const QStringList& strings, quint32 refs, RoadAttributes& attributes) {
+    fillAttributes(tags, first, count, strings, refs, attributes);
+}
+
 QString OsmxParser::inputFormat(const QString& path) {
     const QString name = QFileInfo(path).fileName().toLower();
     if (name.endsWith(QLatin1String(".osmx"))) return QStringLiteral("osmx");

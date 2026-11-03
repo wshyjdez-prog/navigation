@@ -66,11 +66,11 @@ private slots:
 
     void disabledRoutesDoNotChangePage() {
         QVERIFY(window_->setCurrentPage("map"));
-        QVERIFY(!window_->setCurrentPage("algorithms"));
+        QVERIFY(window_->setCurrentPage("algorithms"));
         QVERIFY(!window_->setCurrentPage("unknown"));
-        QCOMPARE(window_->currentPageId(),QString("map"));
+        QCOMPARE(window_->currentPageId(),QString("algorithms"));
         QVERIFY(window_->findChild<QPushButton*>("nav_map")->isEnabled());
-        QVERIFY(!window_->findChild<QPushButton*>("nav_algorithms")->isEnabled());
+        QVERIFY(window_->findChild<QPushButton*>("nav_algorithms")->isEnabled());
         QVERIFY(!window_->findChild<QPushButton*>("startImportButton")->isEnabled());
     }
 
@@ -81,7 +81,7 @@ private slots:
         QVERIFY(canvas);
         QVERIFY(status);
         QTRY_VERIFY_WITH_TIMEOUT(canvas->property("hasFrame").toBool(), 5000);
-        QTRY_VERIFY_WITH_TIMEOUT(status->text().contains("瓦片"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(status->text().contains("绘制"), 5000);
         const QString captures = qEnvironmentVariable("P1_UI_CAPTURE_DIR");
         if (!captures.isEmpty()) {
             QVERIFY(QDir().mkpath(captures));
@@ -113,7 +113,7 @@ private slots:
         auto* replacement = new QWidget;
         QVERIFY(window_->registerPage("import","已接入页面","测试模块替换",replacement));
         QCOMPARE(stack->currentWidget(),replacement);
-        QCOMPARE(stack->count(),4);
+        QCOMPARE(stack->count(),5);
         QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
         QVERIFY(oldPage.isNull());
         QVERIFY(window_->registerPage("map","地图模块","测试注册",new QWidget));

@@ -93,8 +93,9 @@ struct OsmxDatasetInfo {
 // WGS84 degrees; lengths are metres; IDs are the signed 64-bit OSM IDs.
 class OsmxDataset final {
 public:
-    // Builder input. It exists for OsmxParser and unit tests only; callers who
-    // want a dataset from a file must use OsmxParser so validation runs.
+    // Builder input for OsmxParser, the validated SQLite road adapter and tests.
+    // Consumers load files through their format-specific reader; no raw SQL or
+    // unchecked file records enter the rendering/algorithm modules.
     struct Data {
         OsmxDatasetInfo info;
         QVector<OsmxNode> nodes;

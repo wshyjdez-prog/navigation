@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28.3)
-project(P1Navigation VERSION 0.1.0 LANGUAGES CXX)
+project(P1Navigation VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,6 +26,8 @@ add_library(p1_ui STATIC
     src/ui/map/MapDemoWidget.h
     src/ui/map/MapPage.cpp
     src/ui/map/MapPage.h
+    src/app/NavigationWorkflow.cpp
+    src/app/NavigationWorkflow.h
     src/app/MainWindow.cpp)
 target_include_directories(p1_ui PUBLIC src)
 target_link_libraries(p1_ui PUBLIC p1_ui_common p1_import_page Qt6::Widgets p1_renderer PRIVATE Qt6::Concurrent)
@@ -62,3 +64,13 @@ endif()
 add_subdirectory(src/algorithms)
 # 4 号：位置源契约、固定轨迹读取与 Mock 回放。
 add_subdirectory(src/navigation)
+if(NOT P1_NAVIGATION_REAL_PLANNER OR NOT P1_ALGORITHMS_BUILD_FMM_ADAPTER)
+    message(FATAL_ERROR "The business workflow requires the selected A* and FMM adapters")
+endif()
+target_link_libraries(p1_ui PUBLIC p1_algorithms_astar p1_algorithms_fmm)
+if(BUILD_TESTING)
+    qt_add_executable(p1-business-tests tests/BusinessTests.cpp)
+    target_link_libraries(p1-business-tests PRIVATE p1_ui Qt6::Test)
+    add_test(NAME business-workflow COMMAND p1-business-tests regionalRoads routeAndCancel uiPipeline malformedTrajectory)
+    set_tests_properties(business-workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
