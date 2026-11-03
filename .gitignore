@@ -3,3 +3,5 @@
 *.user
 *.user.*
 .DS_Store
+/*.zip
+/*.zip.[0-9]*
