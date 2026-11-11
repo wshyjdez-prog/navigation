@@ -1,7 +1,6 @@
 #include "contracts/MapGeometry.h"
+#include "FeatureRules.h"
 #include "Sqlite.h"
-#include <QJsonDocument>
-#include <QJsonArray>
 #include <cmath>
 namespace p1::data {
 namespace {
@@ -27,19 +26,12 @@ void visitMapRoads(const app::ImportResult& entry,std::shared_ptr<const OsmxData
     }
     detail::Db db(entry.cachePath,true);
     if(cancel)sqlite3_progress_handler(db.value,2000,[](void* p){return static_cast<std::atomic_bool*>(p)->load()?1:0;},cancel.get());
-    detail::Statement ways(db,"SELECT id,tags FROM ways ORDER BY id");
-    while(ways.row()) {
-        check();QJsonParseError error;const auto tags=QJsonDocument::fromJson(ways.text(1).toUtf8(),&error);
-        if(error.error!=QJsonParseError::NoError||!tags.isArray())throw std::runtime_error("地图道路标签损坏");
-        QString highway,name,localName;
-        for(const auto& t:tags.array()){auto pair=t.toArray();if(pair.size()!=2)throw std::runtime_error("地图标签格式错误");
-            auto key=pair[0].toString(),value=pair[1].toString();if(key=="highway")highway=value;else if(key=="name")name=value;else if(key=="name:zh")localName=value;}
-        if(highway.isEmpty())continue;
-        MapRoad r;r.name=localName.isEmpty()?name:localName;r.minZoom=zoom(roadClassFromHighway(highway));
-        detail::Statement refs(db,"SELECT n.lon,n.lat,n.id FROM way_nodes w LEFT JOIN nodes n ON n.id=w.node_id WHERE w.way_id=? ORDER BY w.seq");refs.integer(1,ways.integer(0));
-        bool missing=false;while(refs.row()){check();if(sqlite3_column_type(refs.value,2)==SQLITE_NULL){missing=true;break;}
-            const double x=refs.real(0),y=refs.real(1);if(!std::isfinite(x)||!std::isfinite(y)||std::abs(x)>180||std::abs(y)>90)throw std::runtime_error("地图包含无效坐标");r.points.append({x,y});}
-        if(!missing&&r.points.size()>1)visit(r);
+    detail::Statement roads(db,"SELECT highway,name,coords FROM roads ORDER BY id");
+    while(roads.row()) {
+        check();MapRoad r;r.name=roads.text(1);r.minZoom=zoom(roadClassFromHighway(roads.text(0)));
+        detail::unpack(roads.blob(2),r.points);
+        for(const auto& p:r.points)if(!std::isfinite(p.x())||!std::isfinite(p.y())||std::abs(p.x())>180||std::abs(p.y())>90)throw std::runtime_error("地图包含无效坐标");
+        if(r.points.size()>1)visit(r);
     }
 }
 }

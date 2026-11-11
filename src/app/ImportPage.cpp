@@ -174,7 +174,9 @@ void ImportPage::buildUi() {
     addRow(1, QStringLiteral("数据来源"), sourceValue_);
     addRow(2, QStringLiteral("覆盖范围"), boundsValue_);
     addRow(3, QStringLiteral("标签数量"), tagsValue_);
-    addRow(4, QStringLiteral("解析用时"), durationValue_);
+    addRow(4, QStringLiteral("提取要素"), featuresValue_);
+    addRow(5, QStringLiteral("解析用时"), durationValue_);
+    featuresValue_->setWordWrap(true);
     sourceValue_->setTextFormat(Qt::PlainText);
     details->body()->addLayout(grid);
     left->addWidget(details);
@@ -438,6 +440,13 @@ void ImportPage::showSummary(const ImportResult& result) {
     waysValue_->setText(formatCount(result.stats.ways));
     relationsValue_->setText(formatCount(result.stats.relations));
     tagsValue_->setText(formatCount(result.stats.tags));
+    // Standard OSM only: features the libosmium importer extracted. POIs are
+    // stored for search and are not drawn on the map.
+    featuresValue_->setText(result.sourceFormat.compare(QLatin1String("osmx"), Qt::CaseInsensitive) == 0
+                                ? QStringLiteral("—")
+                                : QStringLiteral("POI %1 · 道路 %2 · 面 %3（POI 不在地图上显示）")
+                                      .arg(formatCount(result.stats.pois), formatCount(result.stats.roads),
+                                           formatCount(result.stats.areas)));
 
     versionValue_->setText(result.sourceFormat.compare(QLatin1String("osmx"), Qt::CaseInsensitive) == 0
                                ? QStringLiteral("OSMX v%1").arg(result.formatVersion)
@@ -478,6 +487,7 @@ void ImportPage::resetResultView() {
         waysValue_->setText(QStringLiteral("—"));
         relationsValue_->setText(QStringLiteral("—"));
         tagsValue_->setText(QStringLiteral("—"));
+        featuresValue_->setText(QStringLiteral("—"));
         versionValue_->setText(QStringLiteral("—"));
         sourceValue_->setText(QStringLiteral("—"));
         boundsValue_->setText(QStringLiteral("—"));
@@ -547,10 +557,13 @@ void ImportPage::refreshCatalog() {
                 const QString format = r.sourceFormat.compare(QLatin1String("osmx"), Qt::CaseInsensitive) == 0
                                            ? QStringLiteral("OSMX 统一路网")
                                            : r.sourceFormat;
+                const bool osmx = r.sourceFormat.compare(QLatin1String("osmx"), Qt::CaseInsensitive) == 0;
                 auto* item = new QListWidgetItem(
-                    QStringLiteral("%1 · %2\n节点 %3 / 道路 %4 / 关系 %5 · %6")
-                        .arg(r.fileName, format, formatCount(r.stats.nodes), formatCount(r.stats.ways),
-                             formatCount(r.stats.relations),
+                    (osmx ? QStringLiteral("%1 · %2\n节点 %3 / 道路 %4 / 关系 %5 · %6")
+                          : QStringLiteral("%1 · %2\nPOI %3 / 道路 %4 / 面 %5 · %6"))
+                        .arg(r.fileName, format, formatCount(osmx ? r.stats.nodes : r.stats.pois),
+                             formatCount(osmx ? r.stats.ways : r.stats.roads),
+                             formatCount(osmx ? r.stats.relations : r.stats.areas),
                              r.warnings.isEmpty() ? QStringLiteral("已保存")
                                                   : QStringLiteral("已保存，含数据警告")),
                     datasetList_);

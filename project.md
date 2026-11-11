@@ -1,6 +1,8 @@
 # P1 Linux 导航应用：总体规划与实现状态
 
-最后更新：2026-11-03（Asia/Shanghai）。组员：1、2、3、4、5。
+最后更新：2026-11-11（Asia/Shanghai）。组员：1、2、3、4、5。
+
+当前导入增量（2026-11-11，1 号授权跨模块修改，主责 2 号）：标准 OSM 导入改为 libosmium 要素导入，导入时直接提取 **POI、道路、面** 写入 schema 2 缓存（`pois` / `roads` / `areas`），面的外环/内洞由 `osmium::area::Assembler` 组装，取代标准 OSM 路径上的手写拼接；**POI 只入库、可按矩形/类别/名称查询，不在地图上显示**。`ImportedDataset` 删除原始节点/路/关系读取，新增 `pois()` / `findPois()`，`roads()` 与 `MapGeometry.h` 接口不变；OSMX 入口不变。旧 schema 1 缓存需重新导入。云端容器（Ubuntu 24.04.5 / Qt 6.4.2 / GCC 13.3.0，非统一虚拟机）根 CTest 19/19 通过；**统一虚拟机复验、湖北真实 PBF 与桌面检查未做，Navit 对标受阻未测**，状态保持进行中。详见 [导入说明](docs/osm-import.md)、`DEC-20261111-1-osm-feature-import-01`、`NAVIT-20261111-1-osm-feature-import-01`、AI 日志 18。下文“标准OSM缓存”的面拼接描述以本段为准。
 
 当前面要素增量：`MapGeometry.h` / `MapAreas.cpp` 提供标准OSM缓存与OSMX的闭合面、multipolygon外环/内洞流，供 `TilePyramid` 写入独立面RTree后绘制水域、绿地、土地利用、建筑；沿用既有异步执行、XYZ及LRU方案，派生缓存升级为 `xyz-v2-areas1` / `raster-style3`，不改路由图与源缓存。1号授权装配，2号维护数据契约、5号维护绘制。Windows Qt6.4.2预检已通过面拼接、内洞、道路覆盖、取消及主题像素测试；统一Ubuntu Release构建、根CTest 19/19（13.73 s）及启动检查通过，新版已安装并打开于 install-map-areas1；全省实际面数据视觉复核与同源Navit性能补测尚未完成，整体保持进行中。未支持海岸线开放链构面、嵌套relation成员和任意自交多边形修复；缺失/不闭合引用跳过，派生metadata保存 emitted/skipped 数量。用户要求本次不新增日志记录。
 
@@ -166,7 +168,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | Qt 工程/框架/CMake | 1 | 进行中 | 真实源码与更新 Linux 包已产出；offscreen/Wayland 测试各 8/0，常规桌面与文件选择已补测；高 DPI/200% 字号和完整人工键盘验收仍待进行 |
 | 第二次作业应用集成 | 1 汇总，2/3/4/5 协作 | 进行中 | 五人源码已共同装配，Ubuntu CTest 17/17、Wayland UI 13/13、OSMX 页面4/4；真实 A* 桥与 FMM 调用层进入根构建。算法调用页/监控和生产数据转换未贯通；见 docs/assignment-2-team-integration.md |
 | 窗口/导航/主题/公共组件基线 | 1 | 已完成（基础子项） | 真实 Wayland 桌面启动、屏幕适配、主题/组件与文件选择回传通过；源码、双平台测试、实际桌面截图与安装入口见框架说明；不包含真实导入和完整缩放验收 |
-| 数据导入/StorageAdapter/离线包 | 2（1 号整合） | 进行中 | 标准 OSM/PBF 与 OSMX 均进入根工程，Ubuntu 导入/缓存/重开测试通过；真实 OSMX 样例本次缺失跳过，完整存储及 G7/X07 离线包仍待办 |
+| 数据导入/StorageAdapter/离线包 | 2（1 号整合） | 进行中 | 标准 OSM/PBF 与 OSMX 均进入根工程，Ubuntu 导入/缓存/重开测试通过；真实 OSMX 样例本次缺失跳过，完整存储及 G7/X07 离线包仍待办。**2026-11-11**：标准 OSM 改为 libosmium 提取 POI/道路/面（schema 2，POI 不上图），云端容器根 CTest 19/19；统一虚拟机复验、真实 PBF、Navit 对标（NAVIT-20261111-1-osm-feature-import-01）未完成，旧缓存需重新导入，见 docs/osm-import.md |
 | C++ A*/HMM/性能页 | 3（1/4 号整合） | 进行中 | 算法源码已合并，真实 A* 与4号桥共建回归通过；FMM 适配层已编译/调度测试，当前 VM 真实 FMM 未复验。算法页/监控/生产转换仍待完成 |
 | LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；main（`9cc04b1`）Linux 复验通过（ctest 7/7）。**第二次作业对接层已交付（2026-11-01）**：`AsyncPlannerBridge`（QThread+Worker 线程化对接，落实契约"计算不阻塞 UI"）、`StubRoutePlanner`（确定性桩，延迟/失败/取消可注入）、`RecordingController`（验证桩）、`p1-planner-demo` 与 7 例集成测试；虚拟机实测 configure/build 零警告、全量 ctest **9/9**（新增 navigation-integration、navigation-planner-demo）。接口选择见 DEC-20261101-4-planner-bridge-interface-01（契约先行，3 号真实 A*/HMM 实现既定 `RoutePlanner` 接口即插即换）、DEC-20261101-4-async-model-01（本次忽略）。Navit 对标受阻未测（NAVIT-20261101-4-planner-bridge-01）。导航状态机、偏航/重算去重、GeoClue2、权限与 X06 联调未完成（第 3 次作业） |
 | LinuxRenderer/地图/仪表盘 | 5（1 号整合复验） | 进行中 | 异步 Qt 渲染与 MapPage 在统一 Ubuntu 测试和真实 Wayland 首帧/截图通过；输入仍为 Mock，真实数据、仪表盘及 OpenGL ES 未验收 |
@@ -407,3 +409,14 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 装配/共同验证子项已完成：Release完整构建、最终CTest17/17、真实Wayland UI13/13、OSMX页面4/4、BUILD_TESTING=OFF构建/启动、安装及库依赖检查通过；122源码指纹0差异，原始证据见 docs/verification/assignment2-team/。已有MapScene未使用函数warning1条保留；OSMX真实样例缺失跳过1项，真实FMM官方样例未注册。新版路径 /home/navigation/p1-team-final-20261103/install/bin/p1-navigation，既有桌面/菜单快捷方式已更新。
 
 功能、验收和下一步：共同构建与模块回归已通过，完整第二次作业仍进行中。1号算法调用页面与性能面板、2/3号生产路由图/ID/坐标转换、3号真实FMM配置、5号真实MapScene与4号导航快照连通均未完成；不把Mock地图或进程fixture当作完整导航。Navit报告 NAVIT-20261103-1-team-integration-01 如实记录未测与恢复条件，不生成性能倍数。关键算法/外部方案未变更；用户已授权最终提交与上传，日志17记录本轮成果。
+
+### 2026-11-11：标准 OSM 要素导入（POI / 道路 / 面）
+
+- 负责人：1 号授权跨模块修改；模块主责 2 号，消费方 3 号（`roads()`）、5 号（`MapGeometry.h`）。状态：**进行中**（功能已实现并通过自动化测试，目标环境未验收）。
+- 能力：libosmium 2.20.0 两遍读取 `.osm`/`.pbf`/`.osm.gz`/`.osm.bz2`，提取 POI、道路、面；面由 libosmium 组装；POI 只入库不上图。
+- 代码/入口：`src/data/import/OsmImportParser.cpp`、`FeatureRules.h`、`ImportedDataset.cpp`、`ImportedRoads.cpp`、`MapGeometry.cpp`、`MapAreas.cpp`；契约 `include/contracts/ImportedDataset.h`；页面 `src/app/ImportPage.cpp`；命令行 `p1-import-cli`。
+- 接口与数据约定：WGS84 度、有符号 OSM ID；缓存 schema 2 私有；契约删除原始对象读取、新增 `OsmPoi` / `pois()` / `findPois()`；`ImportStats` 新增 `pois`/`roads`/`areas`/`areasSkipped`。跨组接口 X01 沿用方案 B（本组读取标准 OSM），未变更。
+- 测试：云端容器 Release、offscreen，根 CTest 19/19；导入专项 19 用例、金字塔 7 用例通过；合成 31 MB 样例导入约 1.5 s（非基准）。
+- 未实现/未验证：统一 Ubuntu 虚拟机复验；湖北真实 PBF 的耗时、内存与面质量；POI 搜索界面；按瓦片的 POI 空间索引；Navit 对标。
+- 下一步：2 号/1 号在统一虚拟机复验并重新导入真实数据；需要 POI 搜索页面时由 1 号基于 `findPois()` 实现；补 Navit 同源对标。
+- 记录：`DEC-20261111-1-osm-feature-import-01`、`NAVIT-20261111-1-osm-feature-import-01`、AI 日志 18。

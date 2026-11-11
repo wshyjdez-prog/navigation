@@ -95,6 +95,7 @@ private:
     QLabel* waysValue_ = nullptr;
     QLabel* relationsValue_ = nullptr;
     QLabel* tagsValue_ = nullptr;
+    QLabel* featuresValue_ = nullptr;
     QLabel* stageLabel_ = nullptr;
     QPushButton* chooseButton_ = nullptr;
     QPushButton* startButton_ = nullptr;

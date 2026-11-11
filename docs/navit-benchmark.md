@@ -56,6 +56,7 @@ Navit 是否支持某项任务、能否在相同计时边界观测，须在实�
 | `NAVIT-20261101-1-integration-shell-01` / 2026-11-01 | 第二次作业应用集成准备 / 1 | 本组 ca12fe6 + 本轮未提交修改；Navit 未安装、版本待建立 | 未接入业务页面的应用外壳；无等价业务数据 | 受阻（未测） | Ubuntu 正确性检查通过；缺少 Navit 基线、真实算法/地图页面与统一场景，不计算性能差值 | [报告及恢复步骤](benchmarks/navit/NAVIT-20261101-1-integration-shell-01.md)；[正确性证据](verification/assignment2/README.md) |
 | `NAVIT-20261101-4-planner-bridge-01` / 2026-11-01 | 规划对接层（对接真实计算）/ 4 | 本组 main `cb056d0` + 对接层提交；Navit 未建立基线（VM 未安装） | 规划请求链路（stub 模拟延迟）；无真实算法与同源路网场景 | 受阻（未测） | 对接层正确性实测通过（ctest 9/9、警告 0；心跳证明 UI 不阻塞）；规划为 stub 模拟、偏航状态机属第 3 次，无等价任务可比，不计算性能差值 | [报告及恢复步骤](benchmarks/navit/NAVIT-20261101-4-planner-bridge-01.md) |
 | `NAVIT-20261101-5-renderer-01` / 2026-11-01 | LinuxRenderer 功能验收 / 5 | 本组 main/cb056d0 + 未提交修改；Navit trunk/590b50a 源码参考 | 单一路径 Mock MapScene | 本次取消比较；统一 Ubuntu 功能验收待测 | 用户明确不需要 A/B 比较，界面和正常构建不提供比较入口；Windows 预检数据不作为验收结论 | [说明与功能验收边界](benchmarks/navit/NAVIT-20261101-5-renderer-01.md) |
+| `NAVIT-20261111-1-osm-feature-import-01` / 2026-11-11 | 标准 OSM 要素导入（POI/道路/面）/ 1 授权，主责 2 | 本组 562119e + 本轮修改；Navit 本环境未安装 | OSM→要素缓存的预处理；仅有合成样例 | 受阻（未测） | 云端容器正确性测试通过；无统一虚拟机、无同源真实数据、无 Navit，未产生性能数值 | [报告](benchmarks/navit/NAVIT-20261111-1-osm-feature-import-01.md) |
 
 每次完成或受阻时更新索引和 `project.md` 的模块记录；算法试验还需在 `decision_log.md` 引用报告，将候选与正式方案区分。重要 AI 成果在 `ai_log.md` 记录摘要和报告 ID。阶段交付汇总全部模块，包括退化、未测和不适用项。
 
@@ -91,3 +92,5 @@ project.md / decision_log.md / ai_log.md 的引用与下一步：
 - 2026-11-01：[标准 OSM 导入替换](benchmarks/navit/NAVIT-20261101-1-osm-import-01.md)，NAVIT-20261101-1-osm-import-01：已比较各自预处理成本，原始数据缓存/导航bin语义不同，且后台负载干扰明显，不计算优劣比例。
 
 - 2026-11-03：[团队整合回归](benchmarks/navit/NAVIT-20261103-1-team-integration-01.md)，NAVIT-20261103-1-team-integration-01：功能共同回归通过，完整业务性能仍受同源数据、真实FMM配置和生产数据转换缺口阻塞，无新性能倍数。
+
+- 2026-11-11：[标准 OSM 要素导入](benchmarks/navit/NAVIT-20261111-1-osm-feature-import-01.md)，NAVIT-20261111-1-osm-feature-import-01：受阻未测；云端容器只做了正确性测试，缺统一虚拟机、同源真实 PBF 与 Navit 运行基线。

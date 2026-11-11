@@ -24,6 +24,7 @@
 | `DEC-20261101-5-renderer-01` | LinuxRenderer 渲染路径 / 5 | 本次取消界面比较 | 已撤回 A+B 试验入口 | 正式页面固定使用 A 缓存底图；B 仅保留为开发期正确性对照 | project.md 2026-11-01 记录；ai_log 对话 13；NAVIT-20261101-5-renderer-01 |
 | 暂无（其他） | — | 尚未开展 | — | — | — |
 | `DEC-20261101-3-open-source-01` | A*/HMM 来源与 Qt 适配 / 3 | 本次忽略多方案比较；独立验收通过，Navit 待测 | Boost.Graph A*、固定 FMM HMM | h=0 有向图、外部 CLI 与有限窗口，公共契约不变 | project.md 三号汇总；ai_log：A* 对话 12，FMM/HMM 对话 13（原 ID 保留） |
+| `DEC-20261111-1-osm-feature-import-01` | 标准 OSM 要素导入（POI/道路/面）/ 1 授权，主责 2 | 用户指定单方案；未做 2–3 种试验对比，也未选择“忽略”，待用户确认是否补做 | 不适用 | libosmium 两遍读取 + Assembler 组面 + SQLite schema 2 | project.md 2026-11-11 记录；ai_log 对话 18；NAVIT-20261111-1-osm-feature-import-01 |
 
 ## 单次抉择模板（复制后填写，模板不是实际记录）
 
@@ -319,3 +320,14 @@ Windows Qt 6.12 Release 预检中 A 相对 B 的中位耗时低约 3.0%，P95 �
 - 验证：独立干净Release目录完整构建141/141；根CTest两次17/17，Wayland UI13/13、OSMX页面4/4；关闭测试的默认构建与启动通过，恢复ON；122源码指纹0差异，安装及快捷方式更新完成。旧目录两次并行构建已停止，最终证据仅使用独立目录；MapScene已有warning1条保留。OSMX真实样例跳过1项、真实FMM官方样例未注册，完整导航/算法页/监控仍未完成。
 - 保留/清理：保留2/3/4/5号交付代码、标准导入、历史交付包和独立模块用例，无未选候选源码清理需求；未删除其他成员文件。完整清单及Linux日志见docs/verification/assignment2-team，说明见docs/assignment-2-team-integration.md。
 - Navit：NAVIT-20261103-1-team-integration-01，完整业务性能未测，无新的比较数值或倍数。AI日志17。状态：装配与共同回归已完成；完整第二次作业进行中。
+
+### DEC-20261111-1-osm-feature-import-01：标准 OSM 要素导入（POI / 道路 / 面）
+
+- 负责人/日期：1（用户在对话中确认编号“1 号”）/ 2026-11-11。跨模块修改，主责 2 号，影响 3 号（`roads()`）、5 号（面/道路几何）。基线：分支 `claude/nice-brahmagupta-rrnz67` @ `562119e`，工作区干净。关联旧记录 `DEC-20261101-1-import-backend-01`（libosmium＋SQLite 原始缓存），本记录取代其缓存内容设计，解析库选择不变。
+- 用户请求原文：“使用开源代码 libosmium替换现在项目中的数据导入模块，使项目能解析osm数据中的POI、道路数据和面数据，POI数据不显示在地图上。”
+- 范围确认原文（AI 提供三个选项后用户所选）：“重写 OSM 导入，保留 OSMX (Recommended)”。未入选选项：同时移除 OSMX 导入入口；只增量补 POI 与面组装。
+- 与第 7 节的关系：方案由用户直接指定（libosmium），AI 未提供 2–3 种候选组合，用户也**没有**选择“忽略：仅本次跳过方案对比规则”。因此不标“本次忽略”，如实记为“用户指定单方案、未对比”。受影响的关键算法点：multipolygon 组面由手写端点拼接改为 `osmium::area::Assembler`；区域道路选取由全表节点扫描改为道路外包矩形的普通 B-tree 索引 + 逐点判定（未引入 R-tree 等新空间索引）。若需按第 7 节补做对比，请用户明确。
+- 正式方案：两遍读取（关系预扫 → 全量）；`NodeLocationsForWays` + `SparseFileArray`/`SparseMemArray` 提供节点坐标；`MultipolygonManager<Assembler>` 组面；要素规则集中在 `src/data/import/FeatureRules.h`；SQLite schema 2 单事务、原子发布。POI 不进入地图绘制路径。
+- 新增/修改文件：新增 `src/data/import/FeatureRules.h`；修改 `OsmImportParser.cpp`、`ImportedDataset.cpp`、`ImportedRoads.cpp`、`MapGeometry.cpp`、`MapAreas.cpp`、`Sqlite.h`、`tools/ImportCli.cpp`、`tests/ImportTests.cpp`、`include/contracts/ImportedDataset.h`、`src/app/ImportTypes.h`、`src/app/ImportPage.{h,cpp}`、`tests/TilePyramidTests.cpp`。无未选候选代码，无清理项；`MapAreas.cpp` 的手写拼接仅保留给 OSMX。
+- 验证：云端容器 Ubuntu 24.04.5 / Qt 6.4.2 / GCC 13.3.0 / CMake 3.28.3 / libosmium 2.20.0，Release。修改前根 CTest 19/19，修改后 19/19；导入专项 19 用例通过。**非统一虚拟机**；统一环境复验、真实 PBF 与性能未测，不提供性能结论。
+- Navit：`NAVIT-20261111-1-osm-feature-import-01`，受阻未测。AI 日志：18。状态：功能实现完成、目标环境待复验；方案对比是否补做待用户确认。

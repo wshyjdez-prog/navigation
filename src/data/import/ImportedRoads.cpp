@@ -1,8 +1,8 @@
 #include "contracts/ImportedDataset.h"
 #include "data/osmx/OsmxParser.h"
+#include "FeatureRules.h"
 #include "Sqlite.h"
-#include <QJsonArray>
-#include <QJsonDocument>
+#include <QHash>
 #include <cmath>
 #include <stdexcept>
 
@@ -21,16 +21,11 @@ std::shared_ptr<const OsmxDataset> ImportedDataset::roads(const OsmxBounds& b,
     if (cancelled) sqlite3_progress_handler(db.value, 2000, [](void* p) {
         return static_cast<std::atomic_bool*>(p)->load() ? 1 : 0;
     }, cancelled.get());
-    // This bounded query deliberately uses the existing cache schema. It does
-    // not modify the source or introduce another spatial-index implementation.
-    detail::Statement candidates(db,
-        "SELECT DISTINCT way_id FROM way_nodes WHERE node_id IN "
-        "(SELECT id FROM nodes WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?) ORDER BY way_id");
-    candidates.real(1,b.minLat); candidates.real(2,b.maxLat);
-    candidates.real(3,b.minLon); candidates.real(4,b.maxLon);
-    QVector<qint64> ids;
-    while (candidates.row()) { check(); ids.append(candidates.integer(0));
-        if (ids.size()>100000) throw std::runtime_error("区域过大，请缩小工作半径"); }
+    // Bounding boxes stored with each road narrow the scan; the exact rule
+    // (at least one node inside the rectangle) is applied to the geometry.
+    detail::Statement roads(db,
+        "SELECT id,tags,refs,coords FROM roads WHERE max_lat>=? AND min_lat<=? AND max_lon>=? AND min_lon<=? ORDER BY id");
+    roads.real(1,b.minLat); roads.real(2,b.maxLat); roads.real(3,b.minLon); roads.real(4,b.maxLon);
     OsmxDataset::Data d;
     d.info.datasetId = meta.datasetId;
     d.info.sourceFileName = meta.fileName; d.info.sourcePath = meta.filePath;
@@ -41,40 +36,29 @@ std::shared_ptr<const OsmxDataset> ImportedDataset::roads(const OsmxBounds& b,
     auto intern = [&](const QString& s) { auto it=strings.constFind(s);
         if(it!=strings.cend()) return *it;
         const auto index=quint32(d.strings.size()); d.strings.append(s); strings.insert(s,index); return index; };
-    for (qint64 id:ids) {
+    int selected=0;
+    while (roads.row()) {
         check();
-        detail::Statement w(db,"SELECT tags FROM ways WHERE id=?"); w.integer(1,id);
-        if (!w.row()) throw std::runtime_error("损坏的道路缓存");
-        QJsonParseError parseError;
-        const auto json=QJsonDocument::fromJson(w.text(0).toUtf8(), &parseError);
-        if(parseError.error!=QJsonParseError::NoError || !json.isArray())
-            throw std::runtime_error("道路标签损坏");
-        const auto tags=json.array(); bool highway=false;
-        for(const auto& t:tags) { const auto pair=t.toArray(); if(!pair.isEmpty()&&pair.at(0).toString()=="highway") highway=true; }
-        if(!highway) continue;
-        struct Ref { qint64 id; double lat,lon; };
-        QVector<Ref> refs; bool missing=false;
-        detail::Statement r(db,"SELECT wn.node_id,n.lat,n.lon,n.id FROM way_nodes wn "
-            "LEFT JOIN nodes n ON n.id=wn.node_id WHERE wn.way_id=? ORDER BY wn.seq");
-        r.integer(1,id);
-        while(r.row()) {
-            if(sqlite3_column_type(r.value,3)==SQLITE_NULL) { missing=true; break; }
-            const double lat=r.real(1),lon=r.real(2);
-            if(!std::isfinite(lat)||!std::isfinite(lon)||std::abs(lat)>90||std::abs(lon)>180)
+        QVector<qint64> refs; QVector<QPointF> points;
+        detail::unpack(roads.blob(2),refs); detail::unpack(roads.blob(3),points);
+        if(refs.size()<2 || refs.size()!=points.size()) throw std::runtime_error("损坏的道路缓存");
+        bool inside=false;
+        for(const auto& p:points) {
+            if(!std::isfinite(p.x())||!std::isfinite(p.y())||std::abs(p.y())>90||std::abs(p.x())>180)
                 throw std::runtime_error("非法道路坐标");
-            refs.append({r.integer(0),lat,lon});
+            inside=inside||b.contains(p.y(),p.x());
         }
-        if(missing || refs.size()<2) { d.info.warnings.append(QString("道路 %1 引用不完整，已跳过").arg(id)); continue; }
-        OsmxWay way; way.id=id; way.refFirst=quint32(d.wayNodes.size());
+        if(!inside) continue;
+        if(++selected>100000) throw std::runtime_error("区域过大，请缩小工作半径");
+        const auto tags=detail::decodeTags(roads.text(1));
+        OsmxWay way; way.id=roads.integer(0); way.refFirst=quint32(d.wayNodes.size());
         way.refCount=quint32(refs.size()); way.tagFirst=quint32(d.wayTags.size());
-        for(const auto& t:tags) { const auto a=t.toArray();
-            if(a.size()!=2 || !a[0].isString() || !a[1].isString()) throw std::runtime_error("道路标签损坏");
-            d.wayTags.append({intern(a[0].toString()),intern(a[1].toString())}); }
+        for(const auto& t:tags) d.wayTags.append({intern(t.first),intern(t.second)});
         way.tagCount=quint32(tags.size());
         fillRoadAttributes(d.wayTags,way.tagFirst,way.tagCount,d.strings,way.refCount,way.attributes);
-        for(const auto& ref:refs) { auto it=nodes.constFind(ref.id); quint32 n;
-            if(it==nodes.cend()) { n=quint32(d.nodes.size()); nodes.insert(ref.id,n);
-                d.nodes.append({ref.id,ref.lat,ref.lon,0,0}); }
+        for(int i=0;i<refs.size();++i) { auto it=nodes.constFind(refs[i]); quint32 n;
+            if(it==nodes.cend()) { n=quint32(d.nodes.size()); nodes.insert(refs[i],n);
+                d.nodes.append({refs[i],points[i].y(),points[i].x(),0,0}); }
             else n=*it;
             d.wayNodes.append(n);
         }

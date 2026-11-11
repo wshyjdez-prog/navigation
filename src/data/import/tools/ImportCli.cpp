@@ -12,7 +12,10 @@ int main(int argc,char** argv) {
     const auto r=parser.parse(QString::fromLocal8Bit(argv[1]),{},{},{});
     const QJsonObject result{{"ok",r.ok},{"error",r.error},{"cachePath",r.cachePath},
         {"nodes",QString::number(r.stats.nodes)},{"ways",QString::number(r.stats.ways)},
-        {"relations",QString::number(r.stats.relations)},{"warnings",r.warnings.size()}};
+        {"relations",QString::number(r.stats.relations)},
+        {"pois",QString::number(r.stats.pois)},{"roads",QString::number(r.stats.roads)},
+        {"areas",QString::number(r.stats.areas)},{"areasSkipped",QString::number(r.stats.areasSkipped)},
+        {"elapsedMs",QString::number(r.elapsedMs)},{"warnings",r.warnings.size()}};
     std::puts(QJsonDocument(result).toJson(QJsonDocument::Compact).constData());
     return r.ok?0:1;
 }

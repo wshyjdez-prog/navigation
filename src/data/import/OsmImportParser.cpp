@@ -1,10 +1,17 @@
 #include "OsmImportParser.h"
 #include "contracts/ImportedDataset.h"
+#include "FeatureRules.h"
 #include "Sqlite.h"
-#include <osmium/io/any_input.hpp>
+#include <osmium/area/assembler.hpp>
+#include <osmium/area/multipolygon_manager.hpp>
 #include <osmium/handler.hpp>
-#include <osmium/visitor.hpp>
+#include <osmium/handler/node_locations_for_ways.hpp>
+#include <osmium/index/map/sparse_file_array.hpp>
+#include <osmium/index/map/sparse_mem_array.hpp>
+#include <osmium/io/any_input.hpp>
+#include <osmium/tags/tags_filter.hpp>
 #include <osmium/version.hpp>
+#include <osmium/visitor.hpp>
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
@@ -21,82 +28,185 @@
 #include <functional>
 #include <utility>
 
+// Standard OSM import built on libosmium.
+//
+// The source is read twice. Pass 1 only looks at relations so that
+// osmium::area::MultipolygonManager knows which ways belong to multipolygons.
+// Pass 2 streams everything through this handler chain:
+//   Features (validation, statistics, POI nodes)
+//   -> NodeLocationsForWays (attaches coordinates to way node references)
+//   -> Features::way (roads)
+//   -> MultipolygonManager (closed ways and multipolygons become osmium::Area,
+//      rings assembled by osmium::area::Assembler) -> Features::area
+// Only the three feature kinds are stored: POIs, roads and areas. Raw nodes,
+// ways and relations are not kept, so the cache is no longer an OSM mirror.
 namespace p1::data {
 using namespace detail;
 namespace {
 struct Cancelled {};
+enum OsmType { NodeType = 0, WayType = 1, RelationType = 2 };
+
+using PositiveIndex = osmium::index::map::SparseFileArray<osmium::unsigned_object_id_type, osmium::Location>;
+using NegativeIndex = osmium::index::map::SparseMemArray<osmium::unsigned_object_id_type, osmium::Location>;
+using Locations = osmium::handler::NodeLocationsForWays<PositiveIndex, NegativeIndex>;
+using AreaManager = osmium::area::MultipolygonManager<osmium::area::Assembler>;
+
 QString utf8(const char* text) {
     QStringDecoder decoder(QStringDecoder::Utf8);
     QString value = decoder(QByteArrayView(text));
     if (decoder.hasError()) throw std::runtime_error("OSM contains invalid UTF-8");
     return value;
 }
-QString encodeTags(const osmium::TagList& tags) {
-    QJsonArray values;
-    for (const auto& tag : tags) values.append(QJsonArray{utf8(tag.key()),utf8(tag.value())});
-    return QString::fromUtf8(QJsonDocument(values).toJson(QJsonDocument::Compact));
+Tags tagList(const osmium::TagList& tags) {
+    Tags result; result.reserve(int(tags.size()));
+    for (const auto& tag : tags) result.append(qMakePair(utf8(tag.key()), utf8(tag.value())));
+    return result;
 }
-struct Handler : osmium::handler::Handler {
-    Statement nodeInsert, wayInsert, refInsert, relationInsert, memberInsert;
+TagMap tagMap(const Tags& tags) {
+    TagMap result; result.reserve(tags.size());
+    for (const auto& tag : tags) result.insert(tag.first, tag.second);
+    return result;
+}
+// Tags that can make a closed way or multipolygon interesting. The precise
+// decision is taken later by classifyArea()/classifyPoi(); this filter only
+// spares the assembler from building rings nobody will store.
+osmium::TagsFilter areaFilter() {
+    osmium::TagsFilter filter{false};
+    for (const char* key : {"building", "building:part", "landuse", "natural", "waterway", "railway", "aeroway"})
+        filter.add_rule(true, osmium::TagMatcher{key});
+    for (const char* key : kPoiKeys) filter.add_rule(true, osmium::TagMatcher{key});
+    return filter;
+}
+
+struct Features : osmium::handler::Handler {
+    Statement poiInsert, roadInsert, areaInsert;
     app::ImportResult& result;
     std::function<void()> check;
-    Handler(Db& db, app::ImportResult& r, std::function<void()> callback)
-        : nodeInsert(db,"INSERT INTO nodes VALUES(?,?,?,?)"),
-          wayInsert(db,"INSERT INTO ways VALUES(?,?)"),
-          refInsert(db,"INSERT INTO way_nodes VALUES(?,?,?)"),
-          relationInsert(db,"INSERT INTO relations VALUES(?,?)"),
-          memberInsert(db,"INSERT INTO relation_members VALUES(?,?,?,?,?)"),
-          result(r),check(std::move(callback)) {}
+    quint64 missingNodeRefs = 0, roadsSkipped = 0, areasSkipped = 0;
+    osmium::item_type lastType = osmium::item_type::undefined;
+
+    Features(Db& db, app::ImportResult& r, std::function<void()> callback)
+        : poiInsert(db, "INSERT INTO pois(osm_type,osm_id,lat,lon,category,kind,name,tags) VALUES(?,?,?,?,?,?,?,?)"),
+          roadInsert(db, "INSERT INTO roads VALUES(?,?,?,?,?,?,?,?,?,?)"),
+          areaInsert(db, "INSERT INTO areas(osm_type,osm_id,kind,name,min_zoom,min_lon,min_lat,max_lon,max_lat,geometry) "
+                         "VALUES(?,?,?,?,?,?,?,?,?,?)"),
+          result(r), check(std::move(callback)) {}
+
     void object(const osmium::OSMObject& obj) {
         check();
         if (!obj.visible()) throw std::runtime_error("Deleted/history objects are not supported; supply an OSM snapshot");
         if (obj.id() == 0) throw std::runtime_error("OSM object ID must not be zero");
+        // Coordinates are attached while streaming, so nodes must precede ways
+        // and ways must precede relations (the order every OSM tool writes).
+        if (obj.type() != lastType) {
+            if (lastType != osmium::item_type::undefined && obj.type() < lastType)
+                throw std::runtime_error("OSM input must list nodes, then ways, then relations");
+            lastType = obj.type();
+        }
         result.stats.tags += obj.tags().size();
+    }
+    void poi(int type, qint64 id, double lat, double lon, const Tags& tags, const TagMap& map) {
+        const auto kind = classifyPoi(map);
+        if (!kind) return;
+        poiInsert.integer(1, type); poiInsert.integer(2, id); poiInsert.real(3, lat); poiInsert.real(4, lon);
+        poiInsert.text(5, kind->category); poiInsert.text(6, kind->kind); poiInsert.text(7, displayName(map));
+        poiInsert.text(8, encodeTags(tags)); poiInsert.insert();
+        ++result.stats.pois;
     }
     void node(const osmium::Node& n) {
         object(n);
         if (!n.location().valid()) throw std::runtime_error("OSM node has no valid WGS84 location");
-        const double lat=n.location().lat(), lon=n.location().lon();
+        const double lat = n.location().lat(), lon = n.location().lon();
         if (!std::isfinite(lat) || !std::isfinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180)
             throw std::runtime_error("OSM node coordinates are outside WGS84 bounds");
-        nodeInsert.integer(1,n.id()); nodeInsert.real(2,lat); nodeInsert.real(3,lon);
-        nodeInsert.text(4,encodeTags(n.tags())); nodeInsert.insert();
         if (!result.hasBounds) {
-            result.minLat=result.maxLat=lat; result.minLon=result.maxLon=lon; result.hasBounds=true;
+            result.minLat = result.maxLat = lat; result.minLon = result.maxLon = lon; result.hasBounds = true;
         } else {
-            result.minLat=qMin(result.minLat,lat); result.maxLat=qMax(result.maxLat,lat);
-            result.minLon=qMin(result.minLon,lon); result.maxLon=qMax(result.maxLon,lon);
+            result.minLat = qMin(result.minLat, lat); result.maxLat = qMax(result.maxLat, lat);
+            result.minLon = qMin(result.minLon, lon); result.maxLon = qMax(result.maxLon, lon);
         }
         ++result.stats.nodes;
+        if (n.tags().empty()) return;
+        const auto tags = tagList(n.tags());
+        poi(NodeType, n.id(), lat, lon, tags, tagMap(tags));
     }
+    // Runs after NodeLocationsForWays: node references already carry locations.
     void way(const osmium::Way& w) {
         object(w);
-        wayInsert.integer(1,w.id()); wayInsert.text(2,encodeTags(w.tags())); wayInsert.insert();
-        int index=0;
-        for (const auto& node : w.nodes()) {
-            check(); refInsert.integer(1,w.id()); refInsert.integer(2,index++);
-            refInsert.integer(3,node.ref()); refInsert.insert(); ++result.stats.nodeReferences;
+        ++result.stats.ways; result.stats.nodeReferences += w.nodes().size();
+        quint64 missing = 0;
+        for (const auto& ref : w.nodes()) if (!ref.location().valid()) ++missing;
+        missingNodeRefs += missing;
+        const char* highway = w.tags().get_value_by_key("highway");
+        if (!highway || !*highway) return;
+        // A road with a gap is rejected as a whole: no fabricated links.
+        if (missing || w.nodes().size() < 2) { ++roadsSkipped; return; }
+        const auto tags = tagList(w.tags());
+        QVector<qint64> refs; QVector<QPointF> points;
+        refs.reserve(int(w.nodes().size())); points.reserve(int(w.nodes().size()));
+        double minLon = 180, minLat = 90, maxLon = -180, maxLat = -90;
+        for (const auto& ref : w.nodes()) {
+            const double lon = ref.location().lon(), lat = ref.location().lat();
+            refs.append(ref.ref()); points.append({lon, lat});
+            minLon = qMin(minLon, lon); maxLon = qMax(maxLon, lon); minLat = qMin(minLat, lat); maxLat = qMax(maxLat, lat);
         }
-        ++result.stats.ways;
+        roadInsert.integer(1, w.id()); roadInsert.text(2, utf8(highway)); roadInsert.text(3, displayName(tagMap(tags)));
+        roadInsert.text(4, encodeTags(tags));
+        roadInsert.real(5, minLon); roadInsert.real(6, minLat); roadInsert.real(7, maxLon); roadInsert.real(8, maxLat);
+        roadInsert.blob(9, pack(refs)); roadInsert.blob(10, pack(points)); roadInsert.insert();
+        ++result.stats.roads;
     }
     void relation(const osmium::Relation& r) {
         object(r);
-        relationInsert.integer(1,r.id()); relationInsert.text(2,encodeTags(r.tags())); relationInsert.insert();
-        int index=0;
-        for (const auto& member : r.members()) {
-            check();
-            int type=-1;
-            if (member.type()==osmium::item_type::node) type=0;
-            if (member.type()==osmium::item_type::way) type=1;
-            if (member.type()==osmium::item_type::relation) type=2;
-            if (type<0) throw std::runtime_error("Unknown OSM relation member type");
-            memberInsert.integer(1,r.id()); memberInsert.integer(2,index++); memberInsert.integer(3,type);
-            memberInsert.integer(4,member.ref()); memberInsert.text(5,utf8(member.role())); memberInsert.insert();
-            ++result.stats.relationMembers;
+        ++result.stats.relations; result.stats.relationMembers += r.members().size();
+    }
+    // Called with the polygons libosmium assembled. One cache row per outer
+    // ring; its inner rings are the holes the assembler assigned to it.
+    void area(const osmium::Area& a) {
+        check();
+        const auto tags = tagList(a.tags());
+        const auto map = tagMap(tags);
+        const auto theme = classifyArea(map);
+        const int type = a.from_way() ? WayType : RelationType;
+        const auto box = a.envelope();
+        if (a.num_rings().first == 0 || !box.valid()) {   // assembler found no valid ring
+            if (theme) ++areasSkipped;
+            return;
         }
-        ++result.stats.relations;
+        poi(type, a.orig_id(), (box.bottom_left().lat() + box.top_right().lat()) / 2,
+            (box.bottom_left().lon() + box.top_right().lon()) / 2, tags, map);
+        if (!theme) return;
+        auto points = [](const osmium::NodeRefList& ring) {
+            QVector<QPointF> result; result.reserve(int(ring.size()));
+            for (const auto& ref : ring) result.append({ref.lon(), ref.lat()});
+            return result;
+        };
+        for (const auto& outer : a.outer_rings()) {
+            check();
+            const auto ring = points(outer);
+            QVector<QVector<QPointF>> holes;
+            for (const auto& inner : a.inner_rings(outer)) holes.append(points(inner));
+            const auto bounds = outer.envelope();
+            areaInsert.integer(1, type); areaInsert.integer(2, a.orig_id()); areaInsert.integer(3, int(theme->kind));
+            areaInsert.text(4, theme->name); areaInsert.integer(5, theme->minZoom);
+            areaInsert.real(6, bounds.bottom_left().lon()); areaInsert.real(7, bounds.bottom_left().lat());
+            areaInsert.real(8, bounds.top_right().lon()); areaInsert.real(9, bounds.top_right().lat());
+            areaInsert.blob(10, pack(ring, holes)); areaInsert.insert();
+            ++result.stats.areas;
+        }
     }
 };
+// NodeLocationsForWays silently keeps the last location of a repeated node ID.
+// A snapshot must not contain one, so reject it once the index is sorted.
+template <typename Index> void rejectDuplicateNodes(Index& index, const std::function<void()>& check) {
+    index.sort();
+    quint64 count = 0; bool first = true; osmium::unsigned_object_id_type previous = 0;
+    for (const auto& entry : index) {
+        if ((++count & 0xffff) == 0) check();
+        if (!first && entry.first == previous) throw std::runtime_error("OSM input contains a duplicate node ID");
+        previous = entry.first; first = false;
+    }
+}
 QJsonObject summaryJson(const app::ImportResult& r) {
     QJsonArray warnings; for(const auto& w:r.warnings) warnings.append(w);
     return {{"name",r.fileName},{"sourcePath",r.filePath},{"format",r.sourceFormat},
@@ -105,7 +215,10 @@ QJsonObject summaryJson(const app::ImportResult& r) {
         {"elapsedMs",QString::number(r.elapsedMs)},{"nodes",QString::number(r.stats.nodes)},
         {"ways",QString::number(r.stats.ways)},{"relations",QString::number(r.stats.relations)},
         {"tags",QString::number(r.stats.tags)},{"nodeReferences",QString::number(r.stats.nodeReferences)},
-        {"relationMembers",QString::number(r.stats.relationMembers)},{"warnings",warnings},
+        {"relationMembers",QString::number(r.stats.relationMembers)},
+        {"pois",QString::number(r.stats.pois)},{"roads",QString::number(r.stats.roads)},
+        {"areas",QString::number(r.stats.areas)},{"areasSkipped",QString::number(r.stats.areasSkipped)},
+        {"warnings",warnings},
         {"hasBounds",r.hasBounds},{"minLat",r.minLat},{"minLon",r.minLon},
         {"maxLat",r.maxLat},{"maxLon",r.maxLon},{"reader",QString("libosmium ")+LIBOSMIUM_VERSION_STRING}};
 }
@@ -126,7 +239,7 @@ app::ImportResult OsmImportParser::parse(const QString& path, const app::ImportP
     QElapsedTimer timer; timer.start();
     const QFileInfo before(path);
     result.filePath=before.absoluteFilePath(); result.fileName=before.fileName();
-    result.fileSize=before.size(); result.sourceFormat=inputFormat(path); result.formatVersion=1;
+    result.fileSize=before.size(); result.sourceFormat=inputFormat(path); result.formatVersion=2;
     auto checkCancel=[&] { if(cancelled && cancelled()) throw Cancelled{}; };
     auto report=[&](int percent,const QString& stage) { if(progress) progress(percent,stage); };
     auto message=[&](const QString& text) { if(log) log(text); };
@@ -161,43 +274,84 @@ app::ImportResult OsmImportParser::parse(const QString& path, const app::ImportP
             },const_cast<app::ImportCancelCallback*>(&cancelled));
             db.exec("PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA cache_size=-8192; BEGIN IMMEDIATE;"
                 "CREATE TABLE metadata(key TEXT PRIMARY KEY,value TEXT NOT NULL) WITHOUT ROWID;"
-                "CREATE TABLE nodes(id INTEGER PRIMARY KEY,lat REAL NOT NULL,lon REAL NOT NULL,tags TEXT NOT NULL);"
-                "CREATE TABLE ways(id INTEGER PRIMARY KEY,tags TEXT NOT NULL);"
-                "CREATE TABLE way_nodes(way_id INTEGER,seq INTEGER,node_id INTEGER NOT NULL,PRIMARY KEY(way_id,seq)) WITHOUT ROWID;"
-                "CREATE TABLE relations(id INTEGER PRIMARY KEY,tags TEXT NOT NULL);"
-                "CREATE TABLE relation_members(relation_id INTEGER,seq INTEGER,type INTEGER,member_id INTEGER,role TEXT,PRIMARY KEY(relation_id,seq)) WITHOUT ROWID;");
-            message("使用 libosmium " LIBOSMIUM_VERSION_STRING " 流式读取；缓存为单事务 SQLite，失败/取消不发布。");
+                "CREATE TABLE pois(id INTEGER PRIMARY KEY,osm_type INTEGER NOT NULL,osm_id INTEGER NOT NULL,"
+                " lat REAL NOT NULL,lon REAL NOT NULL,category TEXT NOT NULL,kind TEXT NOT NULL,name TEXT NOT NULL,tags TEXT NOT NULL);"
+                "CREATE TABLE roads(id INTEGER PRIMARY KEY,highway TEXT NOT NULL,name TEXT NOT NULL,tags TEXT NOT NULL,"
+                " min_lon REAL NOT NULL,min_lat REAL NOT NULL,max_lon REAL NOT NULL,max_lat REAL NOT NULL,"
+                " refs BLOB NOT NULL,coords BLOB NOT NULL);"
+                "CREATE TABLE areas(id INTEGER PRIMARY KEY,osm_type INTEGER NOT NULL,osm_id INTEGER NOT NULL,"
+                " kind INTEGER NOT NULL,name TEXT NOT NULL,min_zoom INTEGER NOT NULL,"
+                " min_lon REAL NOT NULL,min_lat REAL NOT NULL,max_lon REAL NOT NULL,max_lat REAL NOT NULL,geometry BLOB NOT NULL);");
+            message("使用 libosmium " LIBOSMIUM_VERSION_STRING " 两遍读取：提取 POI、道路与面（面由 libosmium 组装）；"
+                    "缓存为单事务 SQLite，失败/取消不发布。");
             const auto fileBytes=result.filePath.toUtf8(); const auto formatBytes=result.sourceFormat.toUtf8();
-            osmium::io::Reader reader(osmium::io::File(fileBytes.constData(),formatBytes.constData()));
-            const auto header=reader.header();
-            if(header.has_multiple_object_versions()) throw std::runtime_error("OSM history/change files are not supported; supply a snapshot");
-            result.sourceName=QString::fromStdString(header.get("generator"));
-            for(const auto& box:header.boxes()) if(!box.valid()) throw std::runtime_error("Invalid OSM header bounds");
-            quint64 calls=0; QElapsedTimer last; last.start();
-            auto checkpoint=[&] {
-                checkCancel();
-                if(++calls%1000==0 && last.elapsed()>=100) {
-                    report(qMin(85,10+int(reader.offset()*75/result.fileSize)),"解析并保存节点、道路和关系");
-                    last.restart();
-                }
-            };
-            report(10,"解析并保存节点、道路和关系");
+            const osmium::io::File file(fileBytes.constData(),formatBytes.constData());
+
+            // Pass 1: relations only, to learn the multipolygon member ways.
+            report(10,"扫描面关系");
+            AreaManager areas{osmium::area::Assembler::config_type{},areaFilter()};
             {
-                Handler handler(db,result,checkpoint);
-                osmium::apply(reader,handler);
+                osmium::io::Reader reader(file,osmium::osm_entity_bits::relation);
+                const auto header=reader.header();
+                if(header.has_multiple_object_versions()) throw std::runtime_error("OSM history/change files are not supported; supply a snapshot");
+                result.sourceName=QString::fromStdString(header.get("generator"));
+                for(const auto& box:header.boxes()) if(!box.valid()) throw std::runtime_error("Invalid OSM header bounds");
+                while(auto buffer=reader.read()) {
+                    checkCancel(); osmium::apply(buffer,areas);
+                    report(qMin(20,10+int(reader.offset()*10/result.fileSize)),"扫描面关系");
+                }
+                reader.close();
             }
-            reader.close(); checkCancel();
+            areas.prepare_for_lookup();
+            checkCancel();
+
+            // Pass 2: node locations live in a memory-mapped file next to the
+            // cache, so a large extract does not need its nodes in RAM.
+            QFile locationFile(staging.filePath("node-locations.bin"));
+            if(!locationFile.open(QIODevice::ReadWrite)) throw std::runtime_error("Cannot create node location index");
+            PositiveIndex positive(locationFile.handle()); NegativeIndex negative;
+            Locations locations(positive,negative); locations.ignore_errors();
+            report(20,"解析并保存 POI、道路和面");
+            Features features(db,result,checkCancel);
+            {
+                osmium::io::Reader reader(file);
+                quint64 buffers=0; QElapsedTimer last; last.start();
+                auto assembled=areas.handler([&](osmium::memory::Buffer&& buffer) { osmium::apply(buffer,features); });
+                // Features is listed twice on purpose: nodes are validated before
+                // they enter the location index, ways are read after it.
+                struct NodesOnly : osmium::handler::Handler { Features& f; explicit NodesOnly(Features& x):f(x){}
+                    void node(const osmium::Node& n){f.node(n);} } nodes(features);
+                struct WaysAndRelations : osmium::handler::Handler { Features& f; explicit WaysAndRelations(Features& x):f(x){}
+                    void way(const osmium::Way& w){f.way(w);} void relation(const osmium::Relation& r){f.relation(r);} } rest(features);
+                while(auto buffer=reader.read()) {
+                    checkCancel();
+                    osmium::apply(buffer,nodes,locations,rest,assembled);
+                    if(++buffers%8==0 && last.elapsed()>=100) {
+                        report(qMin(88,20+int(reader.offset()*68/result.fileSize)),"解析并保存 POI、道路和面");
+                        last.restart();
+                    }
+                }
+                assembled.flush();
+                reader.close();
+            }
+            checkCancel();
             if(result.stats.nodes+result.stats.ways+result.stats.relations==0)
                 throw std::runtime_error("OSM input contains no nodes, ways or relations");
-            report(90,"核查引用完整性");
-            auto missing=[&](const char* sql,const QString& label) {
-                Statement s(db,sql); if(s.row() && s.integer(0)>0)
-                    result.warnings.append(QString("%1：%2 个引用缺少对象；原始引用已保留，导航可用性尚未验证。").arg(label).arg(s.integer(0)));
-            };
-            missing("SELECT count(*) FROM way_nodes r LEFT JOIN nodes n ON n.id=r.node_id WHERE n.id IS NULL","道路节点");
-            missing("SELECT count(*) FROM relation_members r LEFT JOIN nodes n ON n.id=r.member_id WHERE r.type=0 AND n.id IS NULL","关系节点");
-            missing("SELECT count(*) FROM relation_members r LEFT JOIN ways w ON w.id=r.member_id WHERE r.type=1 AND w.id IS NULL","关系道路");
-            missing("SELECT count(*) FROM relation_members r LEFT JOIN relations x ON x.id=r.member_id WHERE r.type=2 AND x.id IS NULL","关系成员");
+            report(90,"核查数据完整性");
+            rejectDuplicateNodes(positive,checkCancel); rejectDuplicateNodes(negative,checkCancel);
+            quint64 incomplete=0;
+            areas.for_each_incomplete_relation([&](const osmium::relations::RelationHandle&) { ++incomplete; });
+            result.stats.areasSkipped=features.areasSkipped+incomplete;
+            if(features.missingNodeRefs>0)
+                result.warnings.append(QString("道路节点：%1 个引用缺少对象；受影响的 %2 条道路及相关面已跳过，不补造连接。")
+                    .arg(features.missingNodeRefs).arg(features.roadsSkipped));
+            if(incomplete>0)
+                result.warnings.append(QString("面关系：%1 个 multipolygon 的成员不完整，已跳过。").arg(incomplete));
+            if(features.areasSkipped>0)
+                result.warnings.append(QString("面要素：%1 个多边形无法组装为有效环，已跳过。").arg(features.areasSkipped));
+            db.exec("CREATE INDEX roads_bounds ON roads(min_lat,max_lat,min_lon,max_lon);"
+                    "CREATE INDEX pois_position ON pois(lat,lon);"
+                    "CREATE INDEX pois_category ON pois(category);");
             checkCancel();
             const QFileInfo after(result.filePath);
             if(after.size()!=before.size() || after.lastModified()!=before.lastModified())
@@ -205,7 +359,7 @@ app::ImportResult OsmImportParser::parse(const QString& path, const app::ImportP
             result.importedAt=QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
             result.elapsedMs=timer.elapsed();
             Statement meta(db,"INSERT INTO metadata VALUES(?,?)");
-            meta.text(1,"schema"); meta.text(2,"1"); meta.insert();
+            meta.text(1,"schema"); meta.text(2,kCacheSchema); meta.insert();
             meta.text(1,"summary"); meta.text(2,QString::fromUtf8(QJsonDocument(summaryJson(result)).toJson(QJsonDocument::Compact))); meta.insert();
             report(99,"提交导入缓存"); checkCancel(); db.exec("COMMIT;");
         }
@@ -213,7 +367,9 @@ app::ImportResult OsmImportParser::parse(const QString& path, const app::ImportP
         if(!QFile::rename(temporary,finalPath)) throw std::runtime_error("Cannot publish completed cache atomically");
         result.cachePath=finalPath; result.ok=true;
         report(100,"缓存已保存");
-        message(QString("已保存：节点 %1，道路 %2，关系 %3；%4").arg(result.stats.nodes).arg(result.stats.ways).arg(result.stats.relations).arg(finalPath));
+        message(QString("已保存：POI %1，道路 %2，面 %3（源数据节点 %4 / 路 %5 / 关系 %6）；%7")
+            .arg(result.stats.pois).arg(result.stats.roads).arg(result.stats.areas)
+            .arg(result.stats.nodes).arg(result.stats.ways).arg(result.stats.relations).arg(finalPath));
         for(const auto& warning:result.warnings) message(warning);
     } catch(const Cancelled&) {
         result.cancelled=true; result.error="导入已取消；未发布缓存。";

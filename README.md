@@ -6,7 +6,7 @@
 
 ## 第一次作业：应用框架
 
-根目录 `CMakeLists.txt` 是 Qt Creator 工程入口。窗口、页面导航、明暗主题、文件选择占位页、公共组件演示和模块页面替换已实现；详细构建步骤、关键函数与 2/3/4/5 号交接入口见 [基础框架说明](docs/assignment-1-framework.md)。标准 OSM 导入已由 1 号授权装配，支持 PBF、OSM XML、gzip/bzip2 压缩，后台解析并保存 SQLite 缓存，详见 [导入说明](docs/osm-import.md)。
+根目录 `CMakeLists.txt` 是 Qt Creator 工程入口。窗口、页面导航、明暗主题、文件选择占位页、公共组件演示和模块页面替换已实现；详细构建步骤、关键函数与 2/3/4/5 号交接入口见 [基础框架说明](docs/assignment-1-framework.md)。标准 OSM 导入已由 1 号授权装配，支持 PBF、OSM XML、gzip/bzip2 压缩，后台用 libosmium 提取 POI、道路和面并保存 SQLite 缓存（POI 只入库，不在地图上显示），详见 [导入说明](docs/osm-import.md)。
 
 在团队 Ubuntu 虚拟机的工程目录中执行：
 

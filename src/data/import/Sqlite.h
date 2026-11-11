@@ -1,5 +1,6 @@
 #pragma once
 #include <sqlite3.h>
+#include <QByteArray>
 #include <QString>
 #include <stdexcept>
 
@@ -47,6 +48,9 @@ struct Statement {
         const auto bytes = v.toUtf8();
         error(db, sqlite3_bind_text(value, n, bytes.constData(), bytes.size(), SQLITE_TRANSIENT));
     }
+    void blob(int n, const QByteArray& v) {
+        error(db, sqlite3_bind_blob(value, n, v.constData(), int(v.size()), SQLITE_TRANSIENT));
+    }
     bool row() { const int rc = sqlite3_step(value); error(db, rc); return rc == SQLITE_ROW; }
     void insert() {
         const int rc = sqlite3_step(value);
@@ -56,6 +60,10 @@ struct Statement {
     }
     qint64 integer(int n) const { return sqlite3_column_int64(value, n); }
     double real(int n) const { return sqlite3_column_double(value, n); }
+    bool isNull(int n) const { return sqlite3_column_type(value, n) == SQLITE_NULL; }
+    QByteArray blob(int n) const {
+        return QByteArray(static_cast<const char*>(sqlite3_column_blob(value, n)), sqlite3_column_bytes(value, n));
+    }
     QString text(int n) const {
         return QString::fromUtf8(reinterpret_cast<const char*>(sqlite3_column_text(value, n)),
                                  sqlite3_column_bytes(value, n));
