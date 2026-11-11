@@ -15,6 +15,12 @@ struct ImportStats {
     quint64 nodeReferences = 0;
     quint64 relationMembers = 0;
     quint64 tags = 0;
+    // Standard OSM (libosmium) only: features extracted into the cache. POIs
+    // are stored for search/lists and are deliberately not drawn on the map.
+    quint64 pois = 0;
+    quint64 roads = 0;
+    quint64 areas = 0;
+    quint64 areasSkipped = 0;
     // OSMX only: precomputed routing topology shared with 3/5. Zero for other
     // formats, where the consumer derives its own graph.
     quint64 routableWays = 0;

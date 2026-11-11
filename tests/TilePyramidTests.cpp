@@ -2,7 +2,8 @@
 #include "ui/map/MapFrame.h"
 #include "pal/linux/renderer/RoadPainter.h"
 #include "ui/common/Theme.h"
-#include "data/import/Sqlite.h"
+#include "data/import/OsmImportParser.h"
+#include "contracts/ImportedDataset.h"
 #include <QtTest>
 #include <QTemporaryDir>
 #include <QDirIterator>
@@ -11,30 +12,32 @@ class PyramidChecks:public QObject{
  Q_OBJECT
 private slots:
  void areaRingsAndTiles(){
-  QTemporaryDir dir;QVERIFY(dir.isValid());auto path=dir.filePath("areas.sqlite");
-  {data::detail::Db db(path);db.exec(R"SQL(
-   CREATE TABLE nodes(id INTEGER PRIMARY KEY,lon REAL,lat REAL);
-   CREATE TABLE ways(id INTEGER PRIMARY KEY,tags TEXT);
-   CREATE TABLE way_nodes(way_id INTEGER,seq INTEGER,node_id INTEGER);
-   CREATE TABLE relations(id INTEGER PRIMARY KEY,tags TEXT);
-   CREATE TABLE relation_members(relation_id INTEGER,seq INTEGER,type INTEGER,member_id INTEGER,role TEXT);
-   INSERT INTO nodes VALUES(1,114.295,30.585),(2,114.315,30.585),(3,114.315,30.605),(4,114.295,30.605),
-    (5,114.303,30.593),(6,114.307,30.593),(7,114.307,30.597),(8,114.303,30.597),
-    (9,114.295,30.59),(10,114.315,30.59);
-   INSERT INTO ways VALUES(10,'[]'),(11,'[]'),(12,'[]'),(13,'[["building","yes"]]'),
-    (14,'[["landuse","grass"]]'),(15,'[["highway","residential"]]');
-   INSERT INTO way_nodes VALUES(10,0,1),(10,1,2),(10,2,3),(11,0,1),(11,1,4),(11,2,3),
-    (12,0,5),(12,1,6),(12,2,7),(12,3,8),(12,4,5),
-    (13,0,5),(13,1,6),(13,2,7),(13,3,8),(13,4,5),(14,0,1),(14,1,2),
-    (15,0,9),(15,1,10);
-   INSERT INTO relations VALUES(1,'[["type","multipolygon"],["natural","water"]]'),
-    (2,'[["type","multipolygon"],["natural","water"]]');
-   INSERT INTO relation_members VALUES(1,0,1,11,'outer'),(1,1,1,10,'outer'),(1,2,1,12,'inner'),(2,0,1,999,'outer');
-  )SQL");}
-  app::ImportResult entry;entry.sourceFormat="osm";entry.cachePath=path;entry.sourceSha256="areas-v1";entry.datasetId="areas";
+  // Imported through the real libosmium parser: a lake split over two outer
+  // ways with an island, a building on the island, a road, an unclosed
+  // landuse way, a multipolygon with a missing member and a POI on the island.
+  QTemporaryDir dir;QVERIFY(dir.isValid());auto osmFile=dir.filePath("areas.osm");
+  {QFile f(osmFile);QVERIFY(f.open(QIODevice::WriteOnly));f.write(R"(<osm version="0.6">
+   <node id="1" lon="114.295" lat="30.585"/><node id="2" lon="114.315" lat="30.585"/>
+   <node id="3" lon="114.315" lat="30.605"/><node id="4" lon="114.295" lat="30.605"/>
+   <node id="5" lon="114.303" lat="30.593"/><node id="6" lon="114.307" lat="30.593"/>
+   <node id="7" lon="114.307" lat="30.597"/><node id="8" lon="114.303" lat="30.597"/>
+   <node id="9" lon="114.295" lat="30.59"/><node id="10" lon="114.315" lat="30.59"/>
+   <node id="20" lon="114.305" lat="30.595"><tag k="amenity" v="restaurant"/><tag k="name" v="岛上餐厅"/></node>
+   <way id="10"><nd ref="1"/><nd ref="2"/><nd ref="3"/></way>
+   <way id="11"><nd ref="1"/><nd ref="4"/><nd ref="3"/></way>
+   <way id="12"><nd ref="5"/><nd ref="6"/><nd ref="7"/><nd ref="8"/><nd ref="5"/></way>
+   <way id="13"><nd ref="5"/><nd ref="6"/><nd ref="7"/><nd ref="8"/><nd ref="5"/><tag k="building" v="yes"/></way>
+   <way id="14"><nd ref="1"/><nd ref="2"/><tag k="landuse" v="grass"/></way>
+   <way id="15"><nd ref="9"/><nd ref="10"/><tag k="highway" v="residential"/></way>
+   <relation id="1"><member type="way" ref="11" role="outer"/><member type="way" ref="10" role="outer"/>
+    <member type="way" ref="12" role="inner"/><tag k="type" v="multipolygon"/><tag k="natural" v="water"/></relation>
+   <relation id="2"><member type="way" ref="999" role="outer"/><tag k="type" v="multipolygon"/><tag k="natural" v="water"/></relation>
+  </osm>)");}
+  const auto entry=data::OsmImportParser(dir.filePath("cache")).parse(osmFile,{},{},{});QVERIFY2(entry.ok,qPrintable(entry.error));
+  QCOMPARE(entry.stats.pois,quint64(1));QCOMPARE(data::ImportedDataset(entry.cachePath).findPois("餐厅").size(),1);
   QVector<data::MapArea> areas;auto token=std::make_shared<std::atomic_bool>(false);
   auto stats=data::visitMapAreas(entry,{},[&](const auto&a){areas.append(a);},token);
-  QCOMPARE(stats.emitted,quint64(2));QCOMPARE(stats.skipped,quint64(2));QCOMPARE(areas[0].kind,data::MapAreaKind::Water);QCOMPARE(areas[0].holes.size(),1);
+  QCOMPARE(stats.emitted,quint64(2));QCOMPARE(stats.skipped,quint64(1));QCOMPARE(areas[0].kind,data::MapAreaKind::Water);QCOMPARE(areas[0].holes.size(),1);
   QCOMPARE(areas[1].kind,data::MapAreaKind::Building);
   data::OsmxDataset::Data source;source.info.datasetId="area-osmx";source.strings={"building","yes"};
   source.nodes={{1,30.59,114.3,0,0},{2,30.59,114.31,0,0},{3,30.6,114.31,0,0},{4,30.6,114.3,0,0}};
@@ -48,6 +51,8 @@ private slots:
   auto center=ui::mapProject({114.305,30.595});QRectF view(center-QPointF(2000,2000),QSizeF(4000,4000));
   auto pixel=[&](const QImage& image,QPointF geo){auto p=ui::mapProject(geo);return image.pixelColor(qRound((p.x()-view.left())/view.width()*image.width()),qRound((view.bottom()-p.y())/view.height()*image.height()));};
   pyramid.request(view,{512,512},false);QTRY_VERIFY_WITH_TIMEOUT(frames.size()>=2,15000);auto light=qvariant_cast<QImage>(frames.last()[0]);
+  // The POI at the island centre is stored but never drawn: plain land here,
+  // and plain building colour once the building level is visible.
   QCOMPARE(pixel(light,{114.305,30.595}),ui::mapColors(false).land);QCOMPARE(pixel(light,{114.30,30.595}),ui::mapColors(false).water);
   // A subpixel road is antialiased; its centre must brighten the water below.
   QVERIFY(pixel(light,{114.30,30.59}).red()>ui::mapColors(false).water.red()+20);

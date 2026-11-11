@@ -21,6 +21,7 @@
 | 15 | 3 | Codex 桌面应用 | 具体模型及应用版本未记录 | 桌面对话、代码/测试编写、审核修复及用户 Ubuntu 结果记录 | Boost.Graph A*、Qt RoutePlanner 开发与双模式验收 |
 | 16 | 3 | Codex 桌面应用 | 具体模型及应用版本未记录 | 桌面对话、外部源码核查、Qt 适配/修复、验收及 main 同步记录 | FMM/HMM 独立运行、Qt MapMatcher 与独立五项 CTest 验收 |
 | 17 | 1 | Codex 桌面应用 | 具体模型及应用版本未提供/未记录 | 桌面对话、本地合并装配、Ubuntu构建/测试/Wayland验证与Git上传 | 第二次作业五人源码整合、共同回归及安装 |
+| 18 | 1 | Claude Code（云端会话） | 模型及应用版本未记录 | 云端对话、仓库代码编辑、云端容器内构建与 CTest（非统一虚拟机） | 标准 OSM 导入改为 libosmium 提取 POI/道路/面，POI 不上图 |
 
 ## 1. AI使用详情
 
@@ -1284,3 +1285,29 @@ AI回答：
 是否采用，以及原因：已完成正式源码装配和Ubuntu验证，用户已授权提交上传；采用原因待用户自己填写。合并与接口边界见INT-20261103-1-team-merge-01。
 
 对本组的实际价值：五人交付纳入同一工程，标准OSM导入保留，OSMX导入/缓存重开与真实A*桥、FMM调用层、Mock地图渲染共建回归通过；122源码指纹一致，Linux安装、Wayland截图与原始证据可复核。保留原记录ID解决日志编号冲突。真实OSMX样例缺失跳过1项，真实FMM官方样例未注册；完整算法调用页、监控与生产数据链仍未贯通，Navit性能缺口保留，不把功能模块回归当作完整作业完成。说明及证据见docs/assignment-2-team-integration.md、docs/verification/assignment2-team/。
+
+### 对话 18：标准 OSM 导入改为 libosmium 提取 POI、道路和面
+
+对话编号：18（组员 1；记录 ID：20261111-member1-osm-feature-import-01）
+
+日期：2026-11-11（Asia/Shanghai）。
+
+场景：1 号授权跨模块修改 2 号数据导入模块，让标准 OSM 导入直接产出 POI、道路、面，POI 不在地图上显示。
+
+工具：Claude Code（云端会话）；模型及应用版本未记录。
+
+提示词：
+
+```text
+使用开源代码 libosmium替换现在项目中的数据导入模块，使项目能解析osm数据中的POI、道路数据和面数据，POI数据不显示在地图上。
+```
+
+AI回答：
+
+> 标准 OSM 导入已改为用 libosmium 在导入时直接提取 POI、道路和面：面的外环/内洞由 libosmium 的 multipolygon 组装器生成，POI 只写入缓存、可按范围/类别/名称查询，地图不绘制。云端容器内根 CTest 19/19 通过；统一虚拟机复验、真实 PBF 和 Navit 对标未做。
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：代码与文档已提交到分支 `claude/nice-brahmagupta-rrnz67`；范围按用户所选“重写 OSM 导入，保留 OSMX”。采用原因待用户自己填写。方案由用户直接指定，未做多方案对比，见 DEC-20261111-1-osm-feature-import-01。
+
+对本组的实际价值：导入缓存从原始 OSM 镜像变为 POI/道路/面三类要素（schema 2），面组装改用 libosmium；`ImportedDataset` 新增 `pois()`/`findPois()`，`roads()` 与 `MapGeometry.h` 接口不变，OSMX 不变。限制：旧缓存需重新导入；输入须按节点→路→关系排序；验证环境为云端容器，不是统一虚拟机；Navit 对标受阻未测（NAVIT-20261111-1-osm-feature-import-01）。说明见 docs/osm-import.md。
