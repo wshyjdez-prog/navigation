@@ -26,12 +26,16 @@ add_library(p1_ui STATIC
     src/ui/map/MapDemoWidget.h
     src/ui/map/MapPage.cpp
     src/ui/map/MapView.cpp
+    src/ui/map/AreaLabels.cpp
+    src/ui/map/AreaLabels.h
     src/ui/map/TilePyramid.cpp
     src/ui/map/TilePyramid.h
     src/ui/map/MapPage.h
     src/ui/map/MapRegionLoader.cpp
     src/ui/map/MapRegionLoader.h
     src/app/NavigationWorkflow.cpp
+    src/app/RoutingProfile.cpp
+    src/app/RoutingProfile.h
     src/app/NavigationWorkflow.h
     src/app/MainWindow.cpp)
 target_include_directories(p1_ui PUBLIC src)
@@ -80,6 +84,6 @@ if(BUILD_TESTING)
     set_tests_properties(tile-pyramid PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
     qt_add_executable(p1-business-tests tests/BusinessTests.cpp)
     target_link_libraries(p1-business-tests PRIVATE p1_ui Qt6::Test)
-    add_test(NAME business-workflow COMMAND p1-business-tests regionalRoads routeAndCancel uiPipeline automaticMapRegions panZoomKeepsVisibleMapBeforeWorkerReturns newestMapRegionWins malformedTrajectory)
+    add_test(NAME business-workflow COMMAND p1-business-tests regionalRoads routeAndCancel uiPipeline automaticMapRegions clarityMenu drivingModeExcludesNonCarRoads routeModeMenu poiSearchGoHere planningExpandsAreaWhenRouteLeavesIt longRouteUsesTieredNetwork panZoomKeepsVisibleMapBeforeWorkerReturns newestMapRegionWins malformedTrajectory)
     set_tests_properties(business-workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

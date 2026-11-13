@@ -1,6 +1,10 @@
 #include "app/MainWindow.h"
 #include "app/ImportPage.h"
 #include "app/NavigationWorkflow.h"
+#include "app/RoutingProfile.h"
+#include "data/import/PoiSearch.h"
+#include <QLineEdit>
+#include <QLabel>
 #include "data/import/OsmImportParser.h"
 #include "contracts/ImportedDataset.h"
 #include "algorithms/core/BoostAStar.h"
@@ -8,6 +12,7 @@
 #include "ui/map/MapRegionLoader.h"
 #include "ui/map/TilePyramid.h"
 #include <QtTest>
+#include <QDirIterator>
 #include <QTemporaryDir>
 #include <QFile>
 #include <QLabel>
@@ -69,7 +74,7 @@ private slots:
         import->selectFile(source_);import->startImport();QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,15000);QVERIFY2(done[0][1].toBool(),qPrintable(flow->status()));
         QCOMPARE(window.currentPageId(),QString("map"));auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");QTRY_VERIFY_WITH_TIMEOUT(canvas->property("realDataset").toBool(),10000);
         auto* map=window.findChild<QWidget*>("mapPage");QVERIFY(!map->findChild<QDoubleSpinBox*>());
-        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1,10000);
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1&&canvas->property("tilesComplete").toBool(),10000);
         auto choose=[&](bool start,QPointF geo) {
             const auto point=mapPixel(canvas,*flow->state().network,geo);
             QContextMenuEvent event(QContextMenuEvent::Mouse,point,canvas->mapToGlobal(point));QApplication::sendEvent(canvas,&event);
@@ -91,15 +96,15 @@ private slots:
         ui::Theme theme;theme.apply(*qApp);app::MainWindow window(theme,nullptr,dir_->filePath("cache"));window.show();window.setCurrentPage("map");
         auto* flow=window.findChild<app::NavigationWorkflow*>();QSignalSpy done(flow,&app::NavigationWorkflow::completed);
         flow->load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
-        auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1,10000);
+        auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1&&canvas->property("tilesComplete").toBool(),10000);
         flow->plan({114.305,30.593},{114.307,30.593});QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);
         const auto originalRoute=flow->state().route;const auto originalStart=flow->startPoint();
         const double x=(ui::mapProject({115.5005,31.5005}).x()-ui::mapProject({canvas->property("centerLongitude").toDouble(),canvas->property("centerLatitude").toDouble()}).x())/canvas->property("viewWidthMetres").toDouble();
         const double y=(ui::mapProject({115.5005,31.5005}).y()-ui::mapProject({canvas->property("centerLongitude").toDouble(),canvas->property("centerLatitude").toDouble()}).y())/canvas->property("viewHeightMetres").toDouble();
         const auto revision=canvas->property("regionRevision").toULongLong();
         QVERIFY(QMetaObject::invokeMethod(canvas,"panned",Q_ARG(QPointF,QPointF(x,y))));
-        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>revision,10000);
-        QCOMPARE(canvas->property("roadCount").toUInt(),quint32(1));
+        // Progressive frames come first; the newly requested view settles on complete.
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>revision&&canvas->property("tilesComplete").toBool()&&canvas->property("roadCount").toUInt()==1,10000);
         QVERIFY(std::abs(canvas->property("centerLongitude").toDouble()-115.5005)<.00001);
         QCOMPARE(flow->state().route,originalRoute);QVERIFY(flow->startPoint()==originalStart);
         // Planning on roads discovered by browsing loads the endpoints' region.
@@ -108,16 +113,216 @@ private slots:
         QVERIFY(flow->state().route.front().x()>115.49);
         const auto after=canvas->property("regionRevision").toULongLong();
         QVERIFY(QMetaObject::invokeMethod(canvas,"panned",Q_ARG(QPointF,QPointF(20,0))));
-        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>after,10000);
-        QCOMPARE(canvas->property("roadCount").toUInt(),quint32(0));
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>after&&canvas->property("tilesComplete").toBool()&&canvas->property("roadCount").toUInt()==0,10000);
         QVERIFY(canvas->property("tileCount").toInt()>0);
+    }
+    void clarityMenu(){
+        ui::Theme theme;theme.apply(*qApp);app::MainWindow window(theme,nullptr,dir_->filePath("cache"));window.show();window.setCurrentPage("map");
+        auto* flow=window.findChild<app::NavigationWorkflow*>();QSignalSpy done(flow,&app::NavigationWorkflow::completed);
+        flow->load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
+        auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1&&canvas->property("tilesComplete").toBool(),10000);
+        auto* high=window.findChild<QAction*>("mapClarityHigh");auto* medium=window.findChild<QAction*>("mapClarityMedium");auto* low=window.findChild<QAction*>("mapClarityLow");
+        QVERIFY(high&&medium&&low);QVERIFY(low->isChecked()&&!high->isChecked()&&!medium->isChecked());
+        QCOMPARE(window.findChild<QMenu*>("mapClarityMenu")->title(),QString("地图清晰度"));
+        const auto zoom=canvas->property("tileZoom").toInt();const auto revision=canvas->property("regionRevision").toULongLong();
+        high->trigger();QVERIFY(high->isChecked()&&!low->isChecked());
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>revision&&canvas->property("tilesComplete").toBool(),10000);
+        QCOMPARE(canvas->property("tileZoom").toInt(),zoom);
+        QDirIterator it(dir_->filePath("cache"),{"*.png"},QDir::Files,QDirIterator::Subdirectories);bool dense=false;
+        while(it.hasNext())if(it.next().contains("-d512/"))dense=true;
+        QVERIFY(dense);
+    }
+    void drivingModeExcludesNonCarRoads(){
+        // A--B: footway 96 m; A-E-B: residential with motorcar=no ~100 m;
+        // A-C-D-B: residential detour ~318 m. General takes the footway,
+        // driving must take the detour (Navit car profile semantics).
+        const QByteArray osm=R"(<osm version="0.6">
+<node id="1" lat="30.5900" lon="114.3000"/><node id="2" lat="30.5900" lon="114.3010"/>
+<node id="5" lat="30.5899" lon="114.3005"/>
+<node id="6" lat="30.5910" lon="114.3000"/><node id="7" lat="30.5910" lon="114.3010"/>
+<node id="8" lat="30.5920" lon="114.3000"/><node id="9" lat="30.5920" lon="114.3010"/>
+<way id="20"><nd ref="1"/><nd ref="2"/><tag k="highway" v="footway"/></way>
+<way id="21"><nd ref="1"/><nd ref="5"/><nd ref="2"/><tag k="highway" v="residential"/><tag k="motorcar" v="no"/></way>
+<way id="22"><nd ref="1"/><nd ref="6"/><nd ref="7"/><nd ref="2"/><tag k="highway" v="residential"/></way>
+<way id="30"><nd ref="6"/><nd ref="8"/><tag k="highway" v="track"/><tag k="tracktype" v="grade5"/></way>
+<way id="31"><nd ref="7"/><nd ref="9"/><tag k="highway" v="track"/><tag k="tracktype" v="grade2"/></way>
+<way id="32"><nd ref="8"/><nd ref="9"/><tag k="highway" v="pedestrian"/></way>
+<way id="33"><nd ref="8"/><nd ref="6"/><tag k="highway" v="living_street"/><tag k="vehicle" v="destination"/></way>
+<way id="34"><nd ref="9"/><nd ref="7"/><tag k="highway" v="service"/><tag k="access" v="no"/><tag k="motorcar" v="yes"/></way>
+<way id="35"><nd ref="8"/><nd ref="7"/><tag k="highway" v="living_street"/></way>
+<way id="36"><nd ref="6"/><nd ref="9"/><tag k="highway" v="steps"/></way></osm>)";
+        const auto file=dir_->filePath("driving.osm");write(file,osm);
+        const auto entry=data::OsmImportParser(dir_->filePath("driving-cache")).parse(file,{},{},{});QVERIFY2(entry.ok,qPrintable(entry.error));
+        const auto ds=data::ImportedDataset(entry.cachePath).roads({30.58,114.29,30.60,114.31,true});
+        auto allowed=[&](qint64 id){return app::carAllowed(*ds,*ds->wayIndex(id));};
+        QVERIFY(!allowed(20));QVERIFY(!allowed(21));QVERIFY(allowed(22));QVERIFY(!allowed(30));QVERIFY(allowed(31));
+        QVERIFY(!allowed(32));QVERIFY(!allowed(33));QVERIFY(allowed(35));QVERIFY(!allowed(36));
+        // access=no already makes the way non-routable at import, so a later motorcar=yes cannot add it back.
+        QCOMPARE(allowed(34),ds->wayAt(*ds->wayIndex(34)).attributes.isRoutable());
+        app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);
+        flow.load(entry,30.5905,114.3005,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+        QCOMPARE(flow.routeMode(),app::RouteMode::General);
+        flow.plan({114.3000,30.5900},{114.3010,30.5900});QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+        const double general=flow.state().distanceM;QVERIFY2(general>90&&general<100,qPrintable(QString::number(general)));
+        flow.setRouteMode(app::RouteMode::Driving);QCOMPARE(flow.routeMode(),app::RouteMode::Driving);
+        flow.plan({114.3000,30.5900},{114.3010,30.5900});QTRY_COMPARE_WITH_TIMEOUT(done.count(),3,10000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+        const double driving=flow.state().distanceM;QVERIFY2(driving>300&&driving<340,qPrintable(QString::number(driving)));
+        QVERIFY(flow.status().contains("行车模式"));
+        bool detour=false;for(auto p:flow.state().route)if(std::abs(p.y()-30.5910)<1e-6)detour=true;QVERIFY(detour);
+        // An endpoint only on the footway's middle snaps to the nearest car-road node.
+        flow.plan({114.30005,30.59},{114.3010,30.5910});QTRY_COMPARE_WITH_TIMEOUT(done.count(),4,10000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+        QCOMPARE(flow.state().route.front(),QPointF(114.3000,30.5900));
+    }
+    void routeModeMenu(){
+        ui::Theme theme;theme.apply(*qApp);app::MainWindow window(theme,nullptr,dir_->filePath("cache"));window.show();window.setCurrentPage("map");
+        auto* flow=window.findChild<app::NavigationWorkflow*>();QSignalSpy done(flow,&app::NavigationWorkflow::completed);
+        flow->load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
+        QCOMPARE(window.findChild<QMenu*>("mapRouteModeMenu")->title(),QString("路线模式"));
+        auto* general=window.findChild<QAction*>("routeModeGeneral");auto* driving=window.findChild<QAction*>("routeModeDriving");QVERIFY(general&&driving);
+        QCOMPARE(general->text(),QString("一般模式"));QCOMPARE(driving->text(),QString("行车模式"));
+        QVERIFY(general->isChecked()&&!driving->isChecked());
+        flow->setEndpoint(true,{114.305,30.593});flow->setEndpoint(false,{114.307,30.593});
+        driving->trigger();QVERIFY(driving->isChecked()&&!general->isChecked());QCOMPARE(flow->routeMode(),app::RouteMode::Driving);
+        // Switching with both endpoints set re-plans under the new mode.
+        QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow->status()));QVERIFY(flow->status().contains("行车模式"));
+        general->trigger();QCOMPARE(flow->routeMode(),app::RouteMode::General);QTRY_COMPARE_WITH_TIMEOUT(done.count(),3,10000);QVERIFY(flow->status().contains("一般模式"));
+    }
+    void poiSearchGoHere(){
+        // Roads of the shared fixture plus 25 POIs "测试超市i" spaced 0.0001° east along 30.5932.
+        // POI nodes go before the first way: the importer requires nodes, ways, relations order.
+        QByteArray nodes;
+        for(int i=0;i<25;++i)nodes+=QString("<node id=\"%1\" lat=\"30.5932\" lon=\"%2\"><tag k=\"shop\" v=\"supermarket\"/><tag k=\"name\" v=\"测试超市%3\"/></node>").arg(900+i).arg(114.305+i*0.0001,0,'f',7).arg(i).toUtf8();
+        nodes+="<node id=\"990\" lat=\"30.5935\" lon=\"114.3055\"><tag k=\"amenity\" v=\"cafe\"/><tag k=\"name\" v=\"其他咖啡\"/></node>";
+        QByteArray osm=fixture();osm.insert(osm.indexOf("<way"),nodes);
+        const auto file=dir_->filePath("poi.osm");write(file,osm);
+        const auto entry=data::OsmImportParser(dir_->filePath("poi-cache")).parse(file,{},{},{});QVERIFY2(entry.ok,qPrintable(entry.error));
+        ui::Theme theme;theme.apply(*qApp);app::MainWindow window(theme,nullptr,dir_->filePath("poi-cache"));window.resize(1200,800);window.show();window.setCurrentPage("map");
+        auto* flow=window.findChild<app::NavigationWorkflow*>();QSignalSpy done(flow,&app::NavigationWorkflow::completed);
+        flow->load(entry,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
+        auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");auto* map=window.findChild<QWidget*>("mapPage");
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1&&canvas->property("tilesComplete").toBool(),10000);
+        auto* button=window.findChild<QPushButton*>("poiSearchButton");auto* bar=window.findChild<QWidget*>("poiSearchBar");auto* input=window.findChild<QLineEdit*>("poiSearchInput");
+        QVERIFY(button&&bar&&input);QVERIFY(button->isVisible()&&!bar->isVisible());
+        QVERIFY(button->mapTo(map,QPoint(0,0)).x()>map->width()/2&&button->mapTo(map,QPoint(0,0)).y()<80); // top-right
+        button->click();QVERIFY(!bar->isVisible());QVERIFY(canvas->property("mapNotice").toString().contains("起点"));
+        const QPointF start(114.305,30.5925);flow->setEndpoint(true,start);
+        button->click();QVERIFY(bar->isVisible()&&!button->isVisible());
+        const auto barCentre=bar->mapTo(map,QPoint(bar->width()/2,0));QVERIFY(std::abs(barCentre.x()-map->width()/2)<40);QVERIFY(barCentre.y()<80);
+        QSignalSpy results(map,SIGNAL(poiResultsReady()));
+        input->setText("超市");QMetaObject::invokeMethod(input,"returnPressed");
+        QTRY_COMPARE_WITH_TIMEOUT(results.count(),1,10000);QCOMPARE(canvas->property("poiCount").toInt(),20);
+        QVERIFY(canvas->property("mapNotice").toString().contains("最近的 20"));
+        const auto expected=data::searchNearestPoisByScan(entry.cachePath,"超市",start.y(),start.x(),20);QCOMPARE(expected.size(),20);
+        QCOMPARE(expected.last().poi.name,QString("测试超市19"));
+        QTest::qWait(600); // view fitted to the results; let the frame settle
+        const auto target=QPointF(expected.last().poi.longitude,expected.last().poi.latitude);
+        const auto at=mapPixel(canvas,*flow->state().network,target);
+        QVERIFY(QMetaObject::invokeMethod(canvas,"clicked",Q_ARG(QPointF,QPointF(double(at.x())/canvas->width(),double(at.y())/canvas->height()))));
+        auto* info=window.findChild<QLabel*>("poiInfo");QVERIFY(info&&info->isVisible());QVERIFY(info->text().contains("测试超市19"));
+        const auto captures=qEnvironmentVariable("P1_BUSINESS_CAPTURE_DIR");
+        if(!captures.isEmpty()){QVERIFY(QDir().mkpath(captures));QVERIFY(window.grab().save(QDir(captures).filePath("poi-search-info.png")));}
+        {   // The westernmost result lies inside the 800 px offscreen screen: the menu opens beside it.
+            const auto west=mapPixel(canvas,*flow->state().network,{expected.first().poi.longitude,expected.first().poi.latitude});
+            QVERIFY(canvas->mapToGlobal(west).x()<600);
+            QVERIFY(QMetaObject::invokeMethod(canvas,"menuRequested",Q_ARG(QPoint,west)));
+            QMenu* first=nullptr;QTRY_VERIFY_WITH_TIMEOUT((first=window.findChild<QMenu*>("poiMenu"))&&first->isVisible(),3000);
+            QVERIFY2(QLineF(first->pos(),canvas->mapToGlobal(west)).length()<30,qPrintable(QString("%1,%2").arg(first->pos().x()).arg(first->pos().y())));
+            first->close();QTRY_VERIFY_WITH_TIMEOUT(!window.findChild<QMenu*>("poiMenu"),3000);
+        }
+        QVERIFY(QMetaObject::invokeMethod(canvas,"menuRequested",Q_ARG(QPoint,at)));
+        QMenu* menu=nullptr;QTRY_VERIFY_WITH_TIMEOUT((menu=window.findChild<QMenu*>("poiMenu"))&&menu->isVisible(),3000);
+        auto* go=menu->findChild<QAction*>("poiGoHere");QVERIFY(go);QCOMPARE(go->text(),QString("到这去"));
+        // Opens next to the point. Qt keeps popups on screen, so only check when
+        // the point lies well inside the (800 px wide) offscreen test screen.
+        if(menu->screen()->geometry().adjusted(0,0,-menu->width(),-menu->height()).contains(canvas->mapToGlobal(at)))
+            QVERIFY(QLineF(menu->pos(),canvas->mapToGlobal(at)).length()<60);
+        go->trigger();menu->close();
+        QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow->status()));
+        QCOMPARE(*flow->endPoint(),target);QVERIFY(flow->state().route.size()>=2);
+        // Dashed connector from the picked start to the snapped road node.
+        QCOMPARE(flow->state().route.front(),QPointF(114.305,30.593));
+        QTRY_COMPARE_WITH_TIMEOUT(canvas->property("routeCount").toInt(),1,5000);QTest::qWait(300);
+        const auto image=canvas->grab().toImage();const auto a=mapPixel(canvas,*flow->state().network,start),b=mapPixel(canvas,*flow->state().network,flow->state().route.front());
+        const auto route=ui::mapColors(false).route;int dash=0;
+        for(int k=20;k<=80;++k){const auto p=QLineF(a,b).pointAt(k/100.).toPoint();const auto c=image.pixelColor(p);
+            if(std::abs(c.red()-route.red())+std::abs(c.green()-route.green())+std::abs(c.blue()-route.blue())<90)++dash;}
+        QVERIFY2(dash>5&&dash<55,qPrintable(QString::number(dash))); // both inked and gapped: dashed
+        if(!captures.isEmpty())QVERIFY(window.grab().save(QDir(captures).filePath("poi-search-route.png")));
+        QWidget* close=window.findChild<QWidget*>("poiSearchClose");QMetaObject::invokeMethod(close,"click");
+        QVERIFY(!bar->isVisible()&&button->isVisible());QCOMPARE(canvas->property("poiCount").toInt(),0);
+    }
+    void planningExpandsAreaWhenRouteLeavesIt(){
+        // A and B (~960 m apart) connect only via a detour 1.5 km north: the
+        // northern way lies wholly outside the 1 km planning margin (ways that
+        // cross the margin are loaded whole). D-E is an isolated road east of B.
+        const QByteArray osm=R"(<osm version="0.6">
+<node id="1" lat="30.5000" lon="114.3000"/><node id="2" lat="30.5000" lon="114.3100"/>
+<node id="3" lat="30.5135" lon="114.3000"/><node id="4" lat="30.5135" lon="114.3100"/>
+<node id="5" lat="30.5000" lon="114.3200"/><node id="6" lat="30.5000" lon="114.3220"/>
+<way id="1"><nd ref="1"/><nd ref="3"/><tag k="highway" v="residential"/></way>
+<way id="2"><nd ref="3"/><nd ref="4"/><tag k="highway" v="residential"/></way>
+<way id="3"><nd ref="4"/><nd ref="2"/><tag k="highway" v="residential"/></way>
+<way id="4"><nd ref="5"/><nd ref="6"/><tag k="highway" v="residential"/></way></osm>)";
+        const auto file=dir_->filePath("detour.osm");write(file,osm);
+        const auto entry=data::OsmImportParser(dir_->filePath("detour-cache")).parse(file,{},{},{});QVERIFY2(entry.ok,qPrintable(entry.error));
+        app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);
+        flow.load(entry,30.5,114.3,0.2);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+        {   // The old fixed 1 km margin alone has no path.
+            const double dy=1000./111195.08,dx=dy/std::cos(30.5*std::acos(-1.)/180);
+            auto ds=data::ImportedDataset(entry.cachePath).roads({30.5-dy,114.30-dx,30.5+dy,114.31+dx,true});auto n=app::NavigationWorkflow::buildNetwork(ds);
+            QCOMPARE(algorithms::findRoute(n->graph,algorithms::model::NodeId(*ds->nearestNode(30.5,114.30,10)+1),algorithms::model::NodeId(*ds->nearestNode(30.5,114.31,10)+1)).status,algorithms::RouteStatus::Unreachable);
+        }
+        flow.plan({114.30,30.5},{114.31,30.5});QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);
+        QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+        QVERIFY(flow.state().distanceM>3900&&flow.state().distanceM<4100);
+        QVERIFY2(flow.status().contains("自动扩大到起终点外 2 km"),qPrintable(flow.status()));
+        bool north=false;for(auto p:flow.state().route)if(p.y()>30.513)north=true;QVERIFY(north);
+        flow.plan({114.30,30.5},{114.32,30.5});QTRY_COMPARE_WITH_TIMEOUT(done.count(),3,10000);
+        QVERIFY(!done.last()[1].toBool());
+        QVERIFY2(flow.status().contains("无法规划")&&flow.status().contains("8 km 仍不连通"),qPrintable(flow.status()));
+    }
+    void longRouteUsesTieredNetwork(){
+        // 0.7° of longitude (~67 km): over the full-detail limit. A-B link via a
+        // motorway; C-D only via residential ways whose middle lies outside every tier.
+        const QByteArray osm=R"(<osm version="0.6">
+<node id="1" lat="30.5000" lon="114.0000"/><node id="2" lat="30.5000" lon="114.0100"/>
+<node id="3" lat="30.5000" lon="114.3500"/><node id="4" lat="30.5000" lon="114.6900"/><node id="5" lat="30.5000" lon="114.7000"/>
+<node id="11" lat="30.7000" lon="114.0000"/><node id="12" lat="30.7000" lon="114.0100"/>
+<node id="13" lat="30.7000" lon="114.2000"/><node id="14" lat="30.7000" lon="114.5000"/>
+<node id="15" lat="30.7000" lon="114.6900"/><node id="16" lat="30.7000" lon="114.7000"/>
+<way id="1"><nd ref="1"/><nd ref="2"/><tag k="highway" v="residential"/></way>
+<way id="2"><nd ref="2"/><nd ref="3"/><nd ref="4"/><tag k="highway" v="motorway"/><tag k="oneway" v="no"/></way>
+<way id="3"><nd ref="4"/><nd ref="5"/><tag k="highway" v="residential"/></way>
+<way id="11"><nd ref="11"/><nd ref="12"/><nd ref="13"/><tag k="highway" v="residential"/></way>
+<way id="12"><nd ref="13"/><nd ref="14"/><tag k="highway" v="residential"/></way>
+<way id="13"><nd ref="14"/><nd ref="15"/><nd ref="16"/><tag k="highway" v="residential"/></way></osm>)";
+        const auto file=dir_->filePath("long.osm");write(file,osm);
+        const auto entry=data::OsmImportParser(dir_->filePath("long-cache")).parse(file,{},{},{});QVERIFY2(entry.ok,qPrintable(entry.error));
+        QVERIFY_EXCEPTION_THROWN(data::ImportedDataset(entry.cachePath).roads({30.49,113.99,30.51,114.71,true}),std::invalid_argument);
+        app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);
+        flow.load(entry,30.5,114.0,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+        for(auto mode:{app::RouteMode::General,app::RouteMode::Driving}){
+            flow.setRouteMode(mode);const int before=done.count();
+            flow.plan({114.0,30.5},{114.7,30.5});QTRY_COMPARE_WITH_TIMEOUT(done.count(),before+1,20000);
+            QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));QVERIFY2(flow.status().contains("分级加载"),qPrintable(flow.status()));
+            QVERIFY(flow.state().distanceM>66000&&flow.state().distanceM<69000);
+        }
+        flow.setRouteMode(app::RouteMode::General);const int before=done.count();
+        flow.plan({114.0,30.7},{114.7,30.7});QTRY_COMPARE_WITH_TIMEOUT(done.count(),before+1,20000);
+        QVERIFY(!done.last()[1].toBool());
+        QVERIFY2(flow.status().contains("无法规划")&&flow.status().contains("已尝试分级路网"),qPrintable(flow.status()));
+        // Layered query: filtered layers have no area cap; an all-roads layer still does.
+        data::ImportedDataset cache(entry.cachePath);
+        QCOMPARE(cache.roadsLayered({{{30.4,113.9,30.8,114.8,true},{"motorway"}}})->wayCount(),quint32(1));
+        QVERIFY_EXCEPTION_THROWN(cache.roadsLayered({{{30.4,113.9,30.8,114.8,true},{}}}),std::invalid_argument);
     }
     void panZoomKeepsVisibleMapBeforeWorkerReturns(){
         ui::Theme theme;theme.apply(*qApp);app::MainWindow window(theme,nullptr,dir_->filePath("cache"));window.show();window.setCurrentPage("map");
         auto* flow=window.findChild<app::NavigationWorkflow*>();QSignalSpy done(flow,&app::NavigationWorkflow::completed);
         flow->load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
         auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");auto* map=window.findChild<QWidget*>("mapPage");
-        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1,10000);
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1&&canvas->property("tilesComplete").toBool(),10000);
         const auto point=mapPixel(canvas,*flow->state().network,{114.306,30.593});
         const auto center=QPointF(canvas->width()/2.,canvas->height()/2.);
         const auto original=canvas->grab().toImage();QSignalSpy published(map,SIGNAL(framePublished()));

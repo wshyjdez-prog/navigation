@@ -16,6 +16,8 @@ struct Colors {
 struct MapColors {
     QColor land, road, roadEdge, majorRoad, label, route, track;
     QColor landuse, green, water, building, buildingEdge;
+    QColor waterLabel, labelHalo; // area names: water text, halo behind all area names
+    QColor poi, poiSelected;      // POI search pins and their name labels
 };
 // Cartographic colors are independent of the purple application chrome.
 MapColors mapColors(bool dark);

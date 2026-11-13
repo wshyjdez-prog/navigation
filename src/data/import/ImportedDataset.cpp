@@ -53,6 +53,7 @@ app::ImportResult ImportedDataset::summary() const {
     r.stats.roads = j["roads"].toString().toULongLong();
     r.stats.areas = j["areas"].toString().toULongLong();
     r.stats.areasSkipped = j["areasSkipped"].toString().toULongLong();
+    r.stats.poisMerged = j["poisMerged"].toString().toULongLong();
     r.hasBounds = j["hasBounds"].toBool();
     r.minLat = j["minLat"].toDouble(); r.minLon = j["minLon"].toDouble();
     r.maxLat = j["maxLat"].toDouble(); r.maxLon = j["maxLon"].toDouble();

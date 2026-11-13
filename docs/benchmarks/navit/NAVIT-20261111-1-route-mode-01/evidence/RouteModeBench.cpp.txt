@@ -1,0 +1,35 @@
+// Temporary benchmark: general vs driving route mode. Usage: CACHE RADIUS_KM PAIRS SEED
+#include "app/NavigationWorkflow.h"
+#include "app/RoutingProfile.h"
+#include "contracts/ImportedDataset.h"
+#include "algorithms/core/BoostAStar.h"
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QRandomGenerator>
+#include <cmath>
+#include <cstdio>
+using namespace p1;
+int main(int argc,char** argv){
+    QCoreApplication app(argc,argv);if(argc<5)return 2;
+    const double r=std::atof(argv[2]);const int pairs=std::atoi(argv[3]);QRandomGenerator rng(quint32(std::atoi(argv[4])));
+    const double lat=30.593,lon=114.305,dy=r*1000/111195.08,dx=dy/std::cos(lat*std::acos(-1.)/180);
+    QElapsedTimer t;t.start();
+    auto ds=data::ImportedDataset(QString::fromLocal8Bit(argv[1])).roads({lat-dy,lon-dx,lat+dy,lon+dx,true});const double loadMs=t.nsecsElapsed()/1e6;
+    t.restart();auto n=app::NavigationWorkflow::buildNetwork(ds);const double buildMs=t.nsecsElapsed()/1e6;
+    std::printf("network,ways,%u,nodes,%u,edges,%zu,loadMs,%.1f,buildMs,%.1f\n",ds->wayCount(),ds->nodeCount(),n->graph.edges.size(),loadMs,buildMs);
+    std::vector<double> carMs;algorithms::model::GraphData car;
+    for(int i=0;i<10;++i){t.restart();car=app::NavigationWorkflow::drivingGraph(*n);carMs.push_back(t.nsecsElapsed()/1e6);}
+    std::sort(carMs.begin(),carMs.end());
+    std::printf("driving-graph,edges,%zu,medianMs,%.2f,maxMs,%.2f\n",car.edges.size(),carMs[5],carMs.back());
+    std::vector<char> carWay(ds->wayCount());for(quint32 w=0;w<ds->wayCount();++w)carWay[w]=app::carAllowed(*ds,w);
+    std::vector<quint32> carNodes;{std::vector<char> o(ds->nodeCount()),in(ds->nodeCount());for(const auto&e:car.edges){o[e.from.value-1]=1;in[e.to.value-1]=1;}for(quint32 i=0;i<ds->nodeCount();++i)if(o[i]&&in[i])carNodes.push_back(i);}
+    std::printf("pair,generalStatus,generalMs,generalM,generalNonCarEdges,generalNonCarM,drivingStatus,drivingMs,drivingM\n");
+    for(int p=0;p<pairs;++p){
+        const auto a=carNodes[rng.bounded(quint32(carNodes.size()))],b=carNodes[rng.bounded(quint32(carNodes.size()))];
+        const auto g=algorithms::findRoute(n->graph,algorithms::model::NodeId(a+1),algorithms::model::NodeId(b+1));
+        int nonCar=0;double nonCarM=0;for(const auto& id:g.edges){const auto& e=ds->edgeAt(quint32(id.value-1));if(!carWay[e.way]){++nonCar;nonCarM+=e.lengthMeters;}}
+        const auto d=algorithms::findRoute(car,algorithms::model::NodeId(a+1),algorithms::model::NodeId(b+1));
+        std::printf("%d,%d,%.2f,%.1f,%d,%.1f,%d,%.2f,%.1f\n",p,int(g.status),g.elapsed_ms,g.total_distance_m,nonCar,nonCarM,int(d.status),d.elapsed_ms,d.total_distance_m);
+    }
+    return 0;
+}

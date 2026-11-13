@@ -2,6 +2,8 @@
 
 最后更新：2026-11-11（Asia/Shanghai）。组员：1、2、3、4、5。
 
+当前面名称增量（2026-11-11，1 号；影响 5 号渲染）：地图面图层显示名称，随 XYZ 金字塔分级出现。名称在建索引时取面内最远点，严格避让后写入瓦片，跨瓦片无缝。按 `DEC-20261111-1-area-labels-01` 对 A 瓦片内烘焙和 B 帧级叠加做了实测，组员 1 最终选 A，B 已清理。统一基线虚拟机根 CTest 19/19；湖北真实数据下热帧约 2–20 ms，索引因名称增加约 1.6 s。Navit 渲染对标受阻未测（`NAVIT-20261111-1-area-labels-01`），整体保持进行中。同日修正道路名：道路名并入同一套严格避让，相距 < 256 px 的同名标注只显示一个。同日修复拖动/缩放时的边缘空白：按 `DEC-20261111-1-edge-loading-01` 比较了 A 外扩帧+渐进+粗底图与 B 后台预取环，组员 1 选 A，B 已清理（见下方边缘加载记录）。同日新增地图菜单“地图清晰度 高/中/低”（瓦片密度 2×/1.5×/1×，默认低，见下方清晰度记录）。同日新增“路线模式：一般/行车”，行车模式按 Navit 0.5.7 car 配置排除人行道等非机动车道路（`DEC-20261111-1-route-mode-01`，影响 3/4 号）。同日起跨城远距离路线改用仿 Navit 的分级路网（`DEC-20261111-1-long-route-01`，本次忽略对比）。同日新增兴趣点搜索（右上角按钮、最近 20 个、点击看信息、右键“到这去”）与起终点吸附虚线；POI 名称索引按 `DEC-20261111-1-poi-index-01` 比较三种组合后选 B 内存单字倒排（影响 2 号）。同日补充：导入后对同名且相距 ≤ 100 m 的 POI 合并为一点（`DEC-20261111-1-poi-dedup-01`，湖北合并 3,023 个，旧缓存在搜索时套用同一规则），结果改为紫色定位针并显示名称前 5 个字。旧金字塔缓存升级为 `xyz-v4-labels2` / `raster-style5-labels`，会自动重建。详见下方 2026-11-11 面名称记录。
+
 当前导入增量（2026-11-11，1 号授权跨模块修改，主责 2 号）：标准 OSM 导入改为 libosmium 要素导入，导入时直接提取 **POI、道路、面** 写入 schema 2 缓存（`pois` / `roads` / `areas`），面的外环/内洞由 `osmium::area::Assembler` 组装，取代标准 OSM 路径上的手写拼接；**POI 只入库、可按矩形/类别/名称查询，不在地图上显示**。`ImportedDataset` 删除原始节点/路/关系读取，新增 `pois()` / `findPois()`，`roads()` 与 `MapGeometry.h` 接口不变；OSMX 入口不变。旧 schema 1 缓存需重新导入。云端容器（Ubuntu 24.04.5 / Qt 6.4.2 / GCC 13.3.0，非统一虚拟机）根 CTest 19/19 通过；**统一虚拟机复验、湖北真实 PBF 与桌面检查未做，Navit 对标受阻未测**，状态保持进行中。详见 [导入说明](docs/osm-import.md)、`DEC-20261111-1-osm-feature-import-01`、`NAVIT-20261111-1-osm-feature-import-01`、AI 日志 18。下文“标准OSM缓存”的面拼接描述以本段为准。
 
 当前面要素增量：`MapGeometry.h` / `MapAreas.cpp` 提供标准OSM缓存与OSMX的闭合面、multipolygon外环/内洞流，供 `TilePyramid` 写入独立面RTree后绘制水域、绿地、土地利用、建筑；沿用既有异步执行、XYZ及LRU方案，派生缓存升级为 `xyz-v2-areas1` / `raster-style3`，不改路由图与源缓存。1号授权装配，2号维护数据契约、5号维护绘制。Windows Qt6.4.2预检已通过面拼接、内洞、道路覆盖、取消及主题像素测试；统一Ubuntu Release构建、根CTest 19/19（13.73 s）及启动检查通过，新版已安装并打开于 install-map-areas1；全省实际面数据视觉复核与同源Navit性能补测尚未完成，整体保持进行中。未支持海岸线开放链构面、嵌套relation成员和任意自交多边形修复；缺失/不闭合引用跳过，派生metadata保存 emitted/skipped 数量。用户要求本次不新增日志记录。
@@ -171,7 +173,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | 数据导入/StorageAdapter/离线包 | 2（1 号整合） | 进行中 | 标准 OSM/PBF 与 OSMX 均进入根工程，Ubuntu 导入/缓存/重开测试通过；真实 OSMX 样例本次缺失跳过，完整存储及 G7/X07 离线包仍待办。**2026-11-11**：标准 OSM 改为 libosmium 提取 POI/道路/面（schema 2，POI 不上图），云端容器根 CTest 19/19；统一虚拟机复验、真实 PBF、Navit 对标（NAVIT-20261111-1-osm-feature-import-01）未完成，旧缓存需重新导入，见 docs/osm-import.md |
 | C++ A*/HMM/性能页 | 3（1/4 号整合） | 进行中 | 算法源码已合并，真实 A* 与4号桥共建回归通过；FMM 适配层已编译/调度测试，当前 VM 真实 FMM 未复验。算法页/监控/生产转换仍待完成 |
 | LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；main（`9cc04b1`）Linux 复验通过（ctest 7/7）。**第二次作业对接层已交付（2026-11-01）**：`AsyncPlannerBridge`（QThread+Worker 线程化对接，落实契约"计算不阻塞 UI"）、`StubRoutePlanner`（确定性桩，延迟/失败/取消可注入）、`RecordingController`（验证桩）、`p1-planner-demo` 与 7 例集成测试；虚拟机实测 configure/build 零警告、全量 ctest **9/9**（新增 navigation-integration、navigation-planner-demo）。接口选择见 DEC-20261101-4-planner-bridge-interface-01（契约先行，3 号真实 A*/HMM 实现既定 `RoutePlanner` 接口即插即换）、DEC-20261101-4-async-model-01（本次忽略）。Navit 对标受阻未测（NAVIT-20261101-4-planner-bridge-01）。导航状态机、偏航/重算去重、GeoClue2、权限与 X06 联调未完成（第 3 次作业） |
-| LinuxRenderer/地图/仪表盘 | 5（1 号整合复验） | 进行中 | 异步 Qt 渲染与 MapPage 在统一 Ubuntu 测试和真实 Wayland 首帧/截图通过；输入仍为 Mock，真实数据、仪表盘及 OpenGL ES 未验收 |
+| LinuxRenderer/地图/仪表盘 | 5（1 号整合复验） | 进行中 | 异步 Qt 渲染与 MapPage 在统一 Ubuntu 测试和真实 Wayland 首帧/截图通过；输入仍为 Mock，真实数据、仪表盘及 OpenGL ES 未验收。**2026-11-11**：金字塔瓦片增加分级面名称（方案 A，DEC-20261111-1-area-labels-01），根 CTest 19/19；Navit 渲染对标受阻（NAVIT-20261111-1-area-labels-01）；同日修复拖动/缩放边缘空白（方案 A 外扩帧+渐进+粗底图，DEC-20261111-1-edge-loading-01）；新增地图清晰度高/中/低（NAVIT-20261111-1-map-clarity-01） |
 | LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 未开始 | 本地 TTS/ASR、FFI、中文与麦克风权限 |
 | Linux 发布与最终材料 | 全员，1 汇总 | 未开始 | 逐次收集运行证据、G6 报告和 3–5 分钟视频 |
 
@@ -420,3 +422,68 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 - 未实现/未验证：统一 Ubuntu 虚拟机复验；湖北真实 PBF 的耗时、内存与面质量；POI 搜索界面；按瓦片的 POI 空间索引；Navit 对标。
 - 下一步：2 号/1 号在统一虚拟机复验并重新导入真实数据；需要 POI 搜索页面时由 1 号基于 `findPois()` 实现；补 Navit 同源对标。
 - 记录：`DEC-20261111-1-osm-feature-import-01`、`NAVIT-20261111-1-osm-feature-import-01`、AI 日志 18。
+
+### 2026-11-11：地图面名称分级显示
+
+- 负责人：1（本对话确认编号）；影响 5 号的瓦片绘制，2 号的数据契约不变。状态：**进行中**。功能、回归和本组性能已完成；Navit 渲染对标受阻。
+- 能力：水域/绿地/土地利用/建筑中有名称的面，在地图上按层级显示名称；名称落在面内，相互避让，跨瓦片无缝，明暗主题都适配。
+- 代码/入口：`src/ui/map/AreaLabels.{h,cpp}`（标注点、层级、索引表、严格避让、绘制）；`src/ui/map/TilePyramid.cpp`（建索引时写入 `area_labels`/`label_bounds`，`generate()` 中烘焙名称）；`src/ui/common/Theme.{h,cpp}` 新增 `waterLabel`、`labelHalo`；测试在 `tests/TilePyramidTests.cpp`。
+- 数据约定：读取 `MapArea::name`（`name:zh` 优先）与 `minZoom`。标注点为 Web Mercator 米，出现层级 = max(种类层级, 标注点到边界 ≥ 10 px 的首级)，建筑 ≥ 16，>18 级的不入库。派生缓存升级为 `xyz-v3-labels1` / `raster-style4-labels`，旧缓存自动重建，源缓存与路由图不受影响。
+- 方案：`DEC-20261111-1-area-labels-01`。试验组合 A 瓦片内烘焙、B 帧级叠加；最终选 A，B 及试验开关、基准程序已删除，对比数据留存。
+- 测试：统一基线（Ubuntu 24.04.5 / Qt 6.4.2 / GCC 13.3.0 / CMake 3.28.3，Release）根 CTest 19/19，金字塔 11 用例（新增面内锚点、层级、严格避让与查询窗口无关、分级与跨瓦片接缝 4 项）；offscreen 启动检查通过。湖北 PBF（SHA256 `da2b0200…0297ab`）实测：冷帧 142–1435 ms（瓦片生成主导），热帧中位 2.3–19.4 ms，峰值 RSS 208–239 MiB；名称标注点提取使索引构建增加约 1.6 s（17,751 个名称）。
+- 道路名修正（同日，组员 1 要求“使距离近的相同道路名称合为一个”）：道路名改为建索引时在每段道路一半长度处取标注点（表 `map_labels`，含 `road` 列），与面名称一起严格避让；同名标注点相距 < 256 px 只保留优先级最高者（道路长者优先），删除原先按瓦片逐段绘制、最多 4 个的道路名。缓存升级为 `xyz-v4-labels2` / `raster-style5-labels`。金字塔测试 13/13（新增同名合并单元测试与“三段同名道路只显示一次”集成测试），根 CTest 19/19。湖北数据：索引 + 首帧 6944 → 7416 ms；武汉中心 z15 冷帧中位 370 → 501 ms（候选更多、查询范围扩到 339 px），热帧不变（约 3 ms），显示名称 34 → 52（含道路名）。
+- 未实现/限制：每个面只有一个标注点，超大面（如丹江口水库）在高层级视野内可能看不到名称；道路名为水平文字，不沿道路方向排布；几何瓦片接缝处的细线早已存在，本次未处理；真实 Wayland 桌面人工目测未做；Navit 渲染对标未测。
+- 下一步：1 号补 Navit 同视野渲染对标；需要时将道路名改为沿线排布；5 号复核样式。
+- 记录：`DEC-20261111-1-area-labels-01`、`NAVIT-20261111-1-area-labels-01`、AI 日志 19。
+
+### 2026-11-11：拖动/缩放时的边缘空白修复
+
+- 负责人：1；影响 5 号地图显示。状态：**进行中**。功能、回归和本组性能已完成；真实桌面人工目测与 Navit 对标未完成。
+- 原因：请求只覆盖可见范围；未缓存的瓦片要全部生成完才发布；缩小时除 8–10 级外没有粗略底图。
+- 方案：`DEC-20261111-1-edge-loading-01`，试验 A 外扩帧+渐进+粗底图、B 后台预取环+渐进；组员 1 选 A，B 的预取分支、策略枚举、环境开关和可变请求延迟已删除。
+- 代码：`src/ui/map/TilePyramid.{h,cpp}` 的 `frame()`：四周外扩 256 px；缺失瓦片先生成 z-2 粗略瓦片，再按离中心距离生成；每 100 ms 渐进发布。`PyramidStats` 新增 `blank`（可见区内无图瓦片数）与 `complete`（请求的最终帧）；`frameReady` 的 view 为图像实际覆盖范围（大于请求）。`MapView.cpp` 新增画布属性 `tilesComplete`。请求延迟保持 180 ms。
+- 测试：新增 `panEdgesAreCovered`（平移 40% 与缩小 1.25 倍后，首帧可见区无空白瓦片、四角为面图层颜色）；已有金字塔/业务测试改为等待完成帧，并按帧的实际覆盖范围裁取。金字塔 14/14，根 CTest 19/19。
+- 湖北实测（武汉中心 1280×800，冷缓存，3 轮 × z13/z15，见 `NAVIT-20261111-1-edge-loading-01`）：平移时首帧空白中位 0%（最大 10%），空白消失中位 21–25 ms；缩小 2 倍时首帧空白 0% / 11%，空白消失 52 / 376 ms；完全绘完的代价：平移 131–251 ms、缩小 1.5–2.3 s，峰值 RSS 253.8 MiB。
+- 限制：比原先多生成约一圈瓦片，CPU 与磁盘缓存占用增加；z15 大幅缩小时首帧仍有约 11% 空白，需等粗略瓦片生成；画布在拖动的一瞬间仍只平移上一张视野大小的帧，外扩内容要等约 30 ms 的重绘。
+- 下一步：在真实 Wayland 桌面目测拖动/缩放；补 Navit 同场景对比。
+- 记录：`DEC-20261111-1-edge-loading-01`、`NAVIT-20261111-1-edge-loading-01`、AI 日志 20。
+
+### 2026-11-11：地图清晰度 高/中/低
+
+- 负责人：1；影响 5 号地图显示。状态：**进行中**。功能、回归和本组性能已完成；真实桌面目测与 Navit 绘制耗时对比未完成。
+- 原因：层级按 `floor` 选取，256 px 瓦片在屏幕上放大 1–2 倍，合成时又没开平滑缩放，所以发糊。实测显示器为 2560×1440、缩放 1。
+- 实现：`TilePyramid` 新增 `MapClarity{Low,Medium,High}`、`setClarity()`、`clarityDensity()`。瓦片按密度 1/1.5/2 栅格化（256/384/512 px），绘制坐标仍在 256 逻辑空间，文字和线宽在屏幕上的大小不变；缓存键为 `raster-style5-labels-d<像素>`，三档分开存放，几何索引共用。切换时重建后端并立即重请求当前视野。底图合成开启 `SmoothPixmapTransform`，因此“低”档放大时由最近邻改为平滑插值，与之前略有不同。`MapView.cpp` 的地图菜单新增“地图清晰度”子菜单（`mapClarityHigh/Medium/Low`，互斥单选），默认低；设置只在本次运行内保持，没有写入用户偏好，偏好持久化应走 2 号的 StorageAdapter。
+- 方案流程：只增加既有金字塔的分辨率参数，算法选择不变；三档由用户指定，未按第 7 节开多方案试验。
+- 测试：`clarityRendersDenserTiles`（切到高后 PNG 为 512 px、层级不变、名称在屏幕上的宽度与低档相差 ≤ 25%）；业务测试 `clarityMenu`（三项互斥、默认低、选高后完成重绘并生成 512 px 瓦片）。金字塔 15/15，根 CTest 19/19。
+- 湖北实测（`NAVIT-20261111-1-map-clarity-01`）：冷绘完 z13 低/中/高 = 2.0 / 2.7 / 3.3 s，z15 = 1.2 / 1.7 / 2.1 s；热帧均为 10–15 ms；单视野 PNG 体积约 1 : 1.7 : 2.5；峰值 RSS 96 / 129 / 145 MiB。截图中高档文字与边线明显更锐利。
+- 限制：设置不跨重启保存；高档首次加载更慢、磁盘缓存更大（2 GiB 上限不变，三档共用）；没有定量清晰度指标；没有处理 HiDPI（devicePixelRatio > 1）的屏幕。
+- 下一步：在真实桌面目测三档；需要时由 2 号提供偏好存储接口后保存选择；补 Navit 对比。
+- 记录：`NAVIT-20261111-1-map-clarity-01`、AI 日志 21。
+
+### 2026-11-11：路线模式（一般模式 / 行车模式）
+
+- 负责人：1（用户授权的跨模块修改）；路径规划主责 3、导航 4，**需提示 3、4 号评审**。状态：**进行中**。功能与自动化测试完成；组员 1 确认不补做第 7 节方案对比（原文“不用，就这样”）；Navit 规划耗时对比受阻。
+- 能力：地图菜单“路线模式”。一般模式为原行为；行车模式参照 Navit 0.5.7 car 车辆配置，只用机动车可通行的道路规划。
+- 代码/入口：`src/app/RoutingProfile.{h,cpp}`（`RouteMode`、`carAllowed()`）；`NavigationWorkflow::setRouteMode()/routeMode()/drivingGraph()` 与 `plan()` 中的行车分支（子图 + 车行道吸附）；`MapView.cpp` 菜单 `mapRouteModeMenu` / `routeModeGeneral` / `routeModeDriving`。A* 与 `RoutePlanner` 契约未改，FMM 匹配仍用全网。
+- 规则：允许 motorway…tertiary（含 link）、unclassified、residential、living_street、service、track（grade4/5、ground/grass 除外）、ferry；排除 pedestrian、footway、path、cycleway、steps、bridleway、construction 及其他类型；`motorcar/motor_vehicle/vehicle` 取 no/private/agricultural/forestry/delivery/destination 时排除。逐项对照见 `NAVIT-20261111-1-route-mode-01`。
+- 测试：`drivingModeExcludesNonCarRoads`、`routeModeMenu`；根 CTest 19/19。
+- 湖北实测（武汉中心 3 km，40 对随机起终点）：一般模式 35 条成功路线中 19 条经过非机动车道路（中位 180 m）；行车模式全部避开，距离中位 1.001 倍、最大 1.352 倍；A* 中位 3.49 → 2.43 ms，构建子图约 1.1 ms。
+- 限制：没有速度剖面，仍按最短距离；`access=no` 的道路在导入层已不可规划，所以 specific yes 的覆盖不起作用；`highway=road` 不参与规划；模式不跨重启保存。
+- 规划区域自动扩大（同日修复，组员 1 要求“修复”）：原先标准 OSM 规划只加载起终点外框 + 1 km 的道路，路线需要绕出该范围时报“无法规划：no directed path”。`NavigationWorkflow::plan()` 在 A* 不可达时按 2 → 4 → 8 km 扩大区域重试，直到超过 `buildNetwork` 的规模上限；成功时状态注明扩大到几 km，仍失败时注明“已扩大到 8 km 仍不连通”。A*、吸附与路线模式规则不变，OSMX 全量数据不受影响。测试 `planningExpandsAreaWhenRouteLeavesIt`；根 CTest 19/19。湖北复测：武汉 40 对随机起终点中原先会报“无法规划”的 6 对全部成功，扩大后的规划中位 116 ms（未扩大 50 ms）；见 `NAVIT-20261111-1-route-mode-01`“规划区域自动扩大”一节。剩余失败为选点 500 m 内无路，以及一般模式下吸附到没有出边的节点（行车模式的吸附会跳过这类节点）。
+- 远距离规划（同日，`DEC-20261111-1-long-route-01`，组员 1 选“忽略对比，只做 A”）：跨城路线（如武汉→黄州 53.5 km）原先因全量路网超出 0.3°×0.5° / 25 万节点限制而报“工作区域无效或过大”。现在全量不可用或扩大后仍不连通时，仿 Navit `route_depth` 改用分级路网：两端 3 km 全部道路、15 km 内三级路以上、走廊内主干道（超过 100 km 只留高速/国道级）。新增 `ImportedDataset::roadsLayered()`（影响 2 号接口，新增不改旧接口），分级上限为 100 万节点 / 200 万引用；`buildNetwork` 新增上限参数（默认不变）。测试 `longRouteUsesTieredNetwork`；根 CTest 19/19。湖北实测：武昌到黄州/鄂州/孝感/咸宁/荆州/襄阳/宜昌/十堰（53–406 km）两种模式 16/16 成功，0.33–0.74 s，峰值 RSS 281 MiB；分级与全量路线长度比中位 1.0004，但个别可达 2.33 倍（终点只能经 3 km 外小路到达时）。见 `NAVIT-20261111-1-long-route-01`。
+- 下一步：2、3、4 号评审；补 Navit 同起终点规划对比；可考虑让一般模式吸附也跳过没有出边/入边的节点；分级路线偏长时，可考虑把“全部道路”半径随路网密度自适应。
+- 记录：`DEC-20261111-1-route-mode-01`、`NAVIT-20261111-1-route-mode-01`、AI 日志 22。
+
+### 2026-11-11：兴趣点搜索、“到这去”与吸附虚线
+
+- 负责人：1（用户授权的跨模块修改）；POI 数据与导入缓存主责 2，**需提示 2 号评审**；路线规划沿用既有接口（3、4 号不受影响）。状态：**进行中**。功能、自动化测试与本组性能完成；真实桌面人工操作与 Navit 搜索耗时未完成。
+- 能力：右上角搜索按钮（需先有起点）→ 顶部居中搜索栏 → 回车显示离起点最近的 ≤20 个兴趣点（紫色定位针 + 名称前 5 个字，名称互不遮挡）；单击看信息，右键“到这去”设为终点并自动规划；起终点到吸附道路节点画虚线。只有标准 OSM 导入有 POI，OSMX 数据集会提示没有兴趣点数据。
+- 代码：`src/data/import/PoiSearch.{h,cpp}`、`PoiSearchCommon.h`、`PoiSearchMemory.cpp`（`searchNearestPois()`：首次搜索时建内存单字倒排，按缓存文件版本在进程内复用；不修改导入缓存）；`src/ui/map/MapView.cpp`（`poiSearchButton/Bar/Input/Close`、`poiInfo`、`poiMenu`/`poiGoHere`；POI 用渲染器 `MarkerKind::PointOfInterest`；虚线在渲染后叠加，并从 A/B 标记边缘起画）。
+- 方案：`DEC-20261111-1-poi-index-01`，试验 A FTS5 / B 内存倒排 / C R 树扩圈，选 B，A/C 已清理。
+- 同名临近 POI 合并（同日补充，`DEC-20261111-1-poi-dedup-01`）：`src/data/import/PoiDedup.{h,cpp}`，在导入事务内删除同名且距已保留点 ≤ 100 m 的 POI（每簇保留最小 id），写入 `ImportStats::poisMerged`、摘要、警告和 metadata `poi_dedup_m`；`ImportTypes.h` 新增 `poisMerged` 字段（影响 2 号）。旧缓存不重写，`searchNearestPois` 与扫描参考实现在内存中套用同一规则。湖北：合并 3,023 个（36,875 → 33,852），康魅路停车场由 4 个点合为 1 个；重新导入 5.56–5.69 s（n=3，此前单次 5.54 s），峰值 RSS 313–317 MiB。测试 `poiDuplicatesMerged`（链式规则、无名不合并、统计与警告、旧缓存回退与扫描一致）。
+- 图标：`MapView.cpp` 的 `poiPinPath()` / `poiShortName()`；`MapColors` 新增 `poi`、`poiSelected`；点击区域为针头与针尖；POI 不再交给渲染器的圆点 marker。
+- 测试：`p1-import-tests` 的 `poiDuplicatesMerged`、`poiIndexMatchesFullScan`（1500 个种子 POI，9 个查询 × 2 个 limit 与全表扫描逐 id 一致；只建一次索引；取消；`findPois` 仍可用）；业务测试 `poiSearchGoHere`（按钮位置、无起点提示、搜索栏居中、20 个且与扫描一致、单击信息框、右键菜单在点旁、“到这去”自动规划、虚线像素有实有空、关闭清空）。根 CTest 19/19。
+- 湖北实测（`NAVIT-20261111-1-poi-index-01`）：B 的所有查询中位 0.003–0.31 ms（全表扫描约 5 ms），首次建索引 11–14 ms，峰值 RSS 16.6 MiB。
+- 限制：索引不落盘，每次启动后首次搜索重建；“名称包含”不做分词与拼音；面状 POI（路/多边形）的位置是外包框中心，凹形时可能落在面外；起终点吸附仍是最近节点（不是最近道路上的投影点），虚线连到该节点；没在真实桌面人工操作过；offscreen 测试屏宽 800 px，菜单位置只在屏内的点上验证。
+- 下一步：2 号评审 POI 接口；真实桌面目测；补 Navit 搜索对比。
+- 记录：`DEC-20261111-1-poi-index-01`、`NAVIT-20261111-1-poi-index-01`、AI 日志 23。

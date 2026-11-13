@@ -1,0 +1,4 @@
+	Command being timed: "build/p1-clarity-bench /tmp/claude-1000/-home-abt-navigation/e1572a5a-0f48-4f9a-86d2-3a1999b04dee/scratchpad/hubei-cache/e95c93f7-ad1e-4f77-a1a8-37d686300772.sqlite /tmp/claude-1000/-home-abt-navigation/e1572a5a-0f48-4f9a-86d2-3a1999b04dee/scratchpad/tiles-road low 3 /tmp/claude-1000/-home-abt-navigation/4f8ad6b1-9dcc-43d8-bbce-b082e4874969/scratchpad/shots"
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:11.48
+	Maximum resident set size (kbytes): 97932
+	Exit status: 0

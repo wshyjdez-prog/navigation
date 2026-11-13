@@ -1,0 +1,27 @@
+// Temporary check: regional planning with automatic expansion (same flow as the map).
+#include "app/NavigationWorkflow.h"
+#include "contracts/ImportedDataset.h"
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QRandomGenerator>
+#include <QSignalSpy>
+#include <QTimer>
+#include <cmath>
+#include <cstdio>
+using namespace p1;
+static void waitDone(QSignalSpy& s,int n){QEventLoop l;QTimer t;QObject::connect(&t,&QTimer::timeout,&l,[&]{if(s.count()>=n)l.quit();});t.start(5);QTimer::singleShot(300000,&l,&QEventLoop::quit);l.exec();}
+int main(int argc,char** argv){
+    QCoreApplication app(argc,argv);const auto entry=data::ImportedDataset(argv[1]).summary();QRandomGenerator rng(20261111);
+    struct Pair{double slat,slon,elat,elon;};std::vector<Pair> pairs{{30.42856,114.36319,30.42856,114.44141}};
+    while(pairs.size()<41){const double slat=30.45+rng.generateDouble()*0.2,slon=114.20+rng.generateDouble()*0.25,d=3000+rng.generateDouble()*7000,a=rng.generateDouble()*2*M_PI;
+        pairs.push_back({slat,slon,slat+d*std::cos(a)/111195.08,slon+d*std::sin(a)/(111195.08*std::cos(slat*M_PI/180))});}
+    std::printf("idx,mode,ok,expanded,ms,status\n");
+    for(size_t i=0;i<pairs.size();++i)for(bool driving:{false,true}){const auto& p=pairs[i];
+        app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);flow.load(entry,p.slat,p.slon,1);waitDone(done,1);
+        flow.setRouteMode(driving?app::RouteMode::Driving:app::RouteMode::General);
+        QElapsedTimer t;t.start();flow.plan({p.slon,p.slat},{p.elon,p.elat});waitDone(done,2);const double ms=t.nsecsElapsed()/1e6;
+        const auto st=flow.status();int km=0;for(int k:{2,4,8})if(st.contains(QString("外 %1 km").arg(k)))km=k;
+        std::printf("%zu,%s,%d,%d,%.1f,%s\n",i,driving?"driving":"general",int(done.last()[1].toBool()),km,ms,qPrintable(QString(st).replace(',',';').left(140)));std::fflush(stdout);
+    }
+}

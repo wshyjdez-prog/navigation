@@ -22,6 +22,13 @@
 | 16 | 3 | Codex 桌面应用 | 具体模型及应用版本未记录 | 桌面对话、外部源码核查、Qt 适配/修复、验收及 main 同步记录 | FMM/HMM 独立运行、Qt MapMatcher 与独立五项 CTest 验收 |
 | 17 | 1 | Codex 桌面应用 | 具体模型及应用版本未提供/未记录 | 桌面对话、本地合并装配、Ubuntu构建/测试/Wayland验证与Git上传 | 第二次作业五人源码整合、共同回归及安装 |
 | 18 | 1 | Claude Code（云端会话） | 模型及应用版本未记录 | 云端对话、仓库代码编辑、云端容器内构建与 CTest（非统一虚拟机） | 标准 OSM 导入改为 libosmium 提取 POI/道路/面，POI 不上图 |
+| 19 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、统一基线虚拟机内构建/CTest、湖北数据 A/B 实测与 Navit 能力核查 | 地图面名称分级显示（方案 A 瓦片内烘焙） |
+| 20 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、统一基线虚拟机内构建/CTest、湖北数据 A/B 实测 | 地图拖动/缩放边缘空白修复（方案 A 外扩帧+渐进+粗底图） |
+| 21 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、统一基线虚拟机内构建/CTest、湖北数据三档实测 | 地图菜单新增清晰度高/中/低（瓦片渲染密度） |
+| 22 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、读取本机 Navit 配置与 Navit v0.5.7 源码、本机代码编辑、统一基线虚拟机内构建/CTest、湖北数据实测 | 路线模式（一般/行车），行车模式参照 Navit car 配置 |
+| 23 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、统一基线虚拟机内构建/CTest、湖北数据三种索引实测 | 兴趣点索引与搜索、“到这去”自动规划、起终点吸附虚线；同名临近 POI 合并与紫色定位针 |
+| 24 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、用临时程序在湖北数据上复现诊断、本机代码编辑、统一基线虚拟机内构建/CTest | 修复“无法规划”：规划区域不可达时自动扩大重试 |
+| 25 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、截图诊断、本机代码编辑、统一基线虚拟机内构建/CTest、湖北远距离实测 | 跨城远距离规划：仿 Navit route_depth 的分级路网 |
 
 ## 1. AI使用详情
 
@@ -1311,3 +1318,208 @@ AI回答：
 是否采用，以及原因：代码与文档已提交到分支 `claude/nice-brahmagupta-rrnz67`；范围按用户所选“重写 OSM 导入，保留 OSMX”。采用原因待用户自己填写。方案由用户直接指定，未做多方案对比，见 DEC-20261111-1-osm-feature-import-01。
 
 对本组的实际价值：导入缓存从原始 OSM 镜像变为 POI/道路/面三类要素（schema 2），面组装改用 libosmium；`ImportedDataset` 新增 `pois()`/`findPois()`，`roads()` 与 `MapGeometry.h` 接口不变，OSMX 不变。限制：旧缓存需重新导入；输入须按节点→路→关系排序；验证环境为云端容器，不是统一虚拟机；Navit 对标受阻未测（NAVIT-20261111-1-osm-feature-import-01）。说明见 docs/osm-import.md。
+
+### 对话 19：地图面名称分级显示
+
+对话编号：19（组员 1；记录 ID：20261111-member1-area-labels-01）
+
+日期：2026-11-11（Asia/Shanghai）。
+
+场景：1 号在金字塔地图上增加面图层名称显示，名称随多级瓦片分级出现；按 AGENTS 第 7 节对 A/B 两种组合做了实测，最终选 A。随后修正道路名同名重叠。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+我是组员1，在地图显示中添加面图层的名称显示，注意显示要对应多级瓦片从而分级显示
+```
+
+```text
+现在有一个问题，特别是道路的名称显示时会有相同名字重叠在一起的现象，修正，使距离近的相同道路名称合为一个
+```
+
+AI回答：
+
+> 面的名称在导入数据里本来就有（标准 OSM 缓存和 OSMX 都带 name/name:zh），只是瓦片索引建表时没把名称存进去，所以不需要改 2 号的数据契约。面标注怎么放置、怎么分级，属于 AGENTS.md 第 7 节里的渲染算法抉择，需要你先选定试验组合。
+
+> 湖北数据实测结果：两种方案正确性都通过（根 CTest 19/19），冷加载耗时相近。热帧（名称密集的 z13/z15）A 约 4–5 ms，B 约 63–85 ms；B 显示的名称多 20–40%；峰值内存 A 208 MiB、B 190 MiB。
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已采用 A（瓦片内烘焙），代码已落在本机工作区（非 Git 工作区，未提交）；B 已按记录清理。选择原文与依据见 DEC-20261111-1-area-labels-01；采用原因待用户自己填写。
+
+对本组的实际价值：新增 `src/ui/map/AreaLabels.{h,cpp}`，金字塔建索引时为有名称的面求面内标注点和出现层级，生成瓦片时严格避让后写入名称，跨瓦片无缝；新增 4 个测试，根 CTest 19/19。湖北真实数据下热帧 2–20 ms，索引增加约 1.6 s。同日修正道路名：道路名并入同一套严格避让，同名标注点相距 < 256 px 时只显示一个，删除原逐瓦片道路名；新增 2 个测试（金字塔 13/13）；武汉 z15 冷帧 370 → 501 ms，热帧不变。限制：超大面只有一个标注点；道路名为水平文字；Navit 渲染对标受阻（NAVIT-20261111-1-area-labels-01）。设计规则见 design.md v1.2。
+
+### 对话 20：地图拖动/缩放时的边缘空白修复
+
+对话编号：20（组员 1；记录 ID：20261111-member1-edge-loading-01）
+
+日期：2026-11-11（Asia/Shanghai）。
+
+场景：1 号要求修复地图拖动、缩放时边缘未加载造成的空白瓦片；按 AGENTS 第 7 节对 A/B 两种组合实测后选 A。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+现在滑动地图、缩放地图时会存在边缘未加载而导致的空白瓦片现象，修复这个现象。
+```
+
+AI回答：
+
+> Found the cause. There are three overlapping problems:
+
+> In short: A has far fewer visible blanks, especially on zoom-out, but finishes later and uses more memory because it generates more tiles. B finishes fast after a pan, but zoom-out stays mostly blank for a long time.
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已采用 A，代码在本机工作区（非 Git 工作区，未提交）；B 已按记录清理。选择原文见 DEC-20261111-1-edge-loading-01；采用原因待用户自己填写。
+
+对本组的实际价值：`TilePyramid::frame()` 改为四周外扩 256 px、先生成 z-2 粗略瓦片、中心优先并每 100 ms 渐进发布；新增 `blank`/`complete` 统计与 `panEdgesAreCovered` 测试，根 CTest 19/19。湖北实测：平移空白消失中位约 20 ms，缩小时首帧空白 0–11%（原逻辑下需等全部瓦片生成）。代价：完成时间更长（缩小 1.5–2.3 s），峰值 RSS 约 254 MiB。Navit 同场景对比受阻（NAVIT-20261111-1-edge-loading-01）。
+
+### 对话 21：地图清晰度高/中/低
+
+对话编号：21（组员 1；记录 ID：20261111-member1-map-clarity-01）
+
+日期：2026-11-11（Asia/Shanghai）。
+
+场景：1 号要求在地图菜单增加清晰度高/中/低三个选项，现状作为“低”，并实现“中”和“高”。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+现在的地图显示的清晰度比较低，在地图导航视图的菜单选项框中增加调节清晰度高中低的三个选项，现在的状态为清晰度低，再增加清晰度高与中的选项并实现。
+```
+
+AI回答：
+
+> Cause confirmed. Your screen is 2560×1440 at scale factor 1. The map uses the level `z = floor(...)`, so each 256 px tile is drawn on screen **enlarged by 1× to 2×**, and the compositing step doesn't enable smooth scaling either, which is why it looks blurry.
+
+> Implementation: clarity = **tile rendering density**. 低 renders each tile at 256 px (as now), 中 at 384 px (1.5×), 高 at 512 px (2×).
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已实现于本机工作区（非 Git 工作区，未提交）；采用原因待用户自己填写。
+
+对本组的实际价值：`TilePyramid` 支持按 1×/1.5×/2× 密度栅格化瓦片，菜单“地图清晰度”可切换，默认低；新增 2 个测试，根 CTest 19/19。湖北实测：高档冷加载约为低档的 1.6–1.75 倍，热帧不变（10–15 ms），截图明显更锐利。限制：设置不跨重启保存，没有处理 HiDPI；Navit 对比不适用或受阻（NAVIT-20261111-1-map-clarity-01）。
+
+### 对话 22：路线模式（一般模式 / 行车模式）
+
+对话编号：22（组员 1；记录 ID：20261111-member1-route-mode-01）
+
+日期：2026-11-11（Asia/Shanghai）。
+
+场景：1 号要求在地图菜单增加一般/行车模式，行车模式参照 Navit 的道路选择，不把人行道等纳入路线计算；跨模块影响 3、4 号。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+为体现对标navit，在菜单中再次新增一个选项：一般模式/行车模式，一般模式就是现在这种模式，行车模式就是在路线规划时不将人行道等道路划入计算内，参考navit的道路选择。
+```
+
+AI回答：
+
+> Navit 0.5.7's car profile (`navit.xml` line 223) only lists motor-vehicle road types: street_0–4, living_street, street_service, track_gravelled/unpaved/paved, highway, ramp, roundabout, ferry, and so on. Pedestrian streets, footways, cycleways, steps and path are not in it.
+
+> **19 of the 35** successful 一般模式 routes passed over footways or other non-motorway roads (median 180 m of such road per route).
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已实现于本机工作区（非 Git 工作区，未提交）；采用原因待用户自己填写。方案由用户指定，未做第 7 节多方案对比，见 DEC-20261111-1-route-mode-01。
+
+对本组的实际价值：新增 `RoutingProfile`，行车模式在 A* 输入图中排除非机动车道路（逐项对照 Navit 0.5.7 car 配置与 maptool），菜单可切换并自动重新规划；新增 2 个测试，根 CTest 19/19。湖北实测：一般模式 19/35 条路线借用人行道等，行车模式全部避开。限制：无速度剖面；Navit 规划耗时对比受阻（NAVIT-20261111-1-route-mode-01）；需 3、4 号评审。
+
+### 对话 23：兴趣点搜索、“到这去”与吸附虚线
+
+对话编号：23（组员 1；记录 ID：20261111-member1-poi-search-01）
+
+日期：2026-11-11（Asia/Shanghai）。
+
+场景：1 号要求为兴趣点建索引，并在地图上加搜索、点信息、“到这去”自动规划，以及起终点到吸附点的虚线；索引按 AGENTS 第 7 节比较三种组合后选 B。跨模块影响 2 号。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+如果没有索引就对兴趣点建立索引，在地图视图的右上角添加一个小的搜索按钮，使用搜索按钮前要先确定起点，点击后会展开到屏幕上方的中间，在输入框内输入以搜索兴趣点，敲定回车后将符合要求的兴趣点以点图标的形式展示在地图上，若符合条件的兴趣点超过20个就筛选离起点最近的20个点展示。可以点击显示的点来查看简单信息，右键显示的点在点的周围显示“到这去”的选项，点击这个选项就将这个点设为终点，自动调用路径规划展示路径。最后增加一项：将起点/终点到地图匹配在道路上的点用虚线连接起来。
+```
+
+```text
+现在出现了一个问题，就是同一个POI显示了4次，在数据导入模块后新增一个检查机制，对于POI，如果名称相同且距离太近就视为一个点。对于POI的符号展示，改为图片中的那种样式，颜色改为紫色，名称不要显示1、2、3等，显示点名称的前几个字。
+```
+
+AI回答：
+
+> Building the POI index (name lookup + nearest 20 to the start point) falls under "空间索引" (spatial index), which AGENTS.md section 7 explicitly lists as a key algorithm, so I need you to pick the trial combinations first.
+
+> The three combinations are measured (Hubei: 36,875 POIs, 18,669 named; start point at Wuhan centre; 12 queries × 20 repeats). **All three return results identical to the full scan for every query**
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已采用 B（内存单字倒排），代码在本机工作区（非 Git 工作区，未提交）；A、C 已按记录清理。选择原文见 DEC-20261111-1-poi-index-01；采用原因待用户自己填写。
+
+对本组的实际价值：新增 `searchNearestPois()`（首次搜索时建内存倒排，不改导入缓存），地图有右上角搜索按钮、顶部搜索栏、最近 20 个编号点、信息框、右键“到这去”自动规划和起终点吸附虚线；新增单元与业务测试，根 CTest 19/19。湖北实测查询 0.003–0.31 ms（全表扫描约 5 ms）。同日补充：导入后同名且相距 ≤ 100 m 的 POI 合并为一点（湖北合并 3,023 个，旧缓存在搜索时合并，DEC-20261111-1-poi-dedup-01），结果改为紫色定位针并显示名称前 5 个字，名称互不遮挡。限制：索引每次启动重建；不支持分词与拼音；Navit 搜索耗时对比受阻（NAVIT-20261111-1-poi-index-01）；需 2 号评审。
+
+### 对话 24：修复“无法规划”（规划区域自动扩大）
+
+对话编号：24（组员 1；记录 ID：20261111-member1-plan-area-expansion-01）
+
+日期：2026-11-11（Asia/Shanghai）。
+
+场景：1 号询问“无法规划”的原因（该问答按用户要求不记录），确认原因后要求修复。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+修复
+```
+
+AI回答：
+
+> I'll fix it in `NavigationWorkflow::plan()`: if A* returns "unreachable", automatically expand the planning area step by step (endpoint bounding box plus 2 km → 4 km → 8 km on each side) and retry.
+
+> **40 random start/end pairs (3–10 km), both modes**: **6 pairs would have reported "无法规划" before (15%); all are now rescued** (5 by expanding to 2 km, 1 by expanding to 8 km). **No "无法规划" remains.**
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已实现于本机工作区（非 Git 工作区，未提交）；采用原因待用户自己填写。
+
+对本组的实际价值：标准 OSM 规划在路线需绕出“起终点外框 + 1 km”时不再失败；新增测试 `planningExpandsAreaWhenRouteLeavesIt`，根 CTest 19/19。湖北复测：40 对随机起终点中原先会失败的 6 对全部成功，扩大后的规划中位 116 ms。限制：选点 500 m 内无路或吸附到孤立节点时仍会失败；路网规模上限不变；需 3、4 号评审。
+
+### 对话 25：跨城远距离规划（仿 Navit 分级路网）
+
+对话编号：25（组员 1；记录 ID：20261111-member1-long-route-01）
+
+日期：2026-11-11（Asia/Shanghai）。
+
+场景：1 号发来地图截图（武汉武昌 → 黄州商场），状态栏显示“工作区域无效或过大”；AI 说明原因并展示候选，组员 1 选择忽略对比、只做 A。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+（本条仅发送了一张截图，没有文字。截图为地图：A 在武汉武昌，B 为黄州商场，左下状态栏显示“…无效或过大，请选择半径 0.2–10 km 的区域（保留上次成功结果）”。）
+```
+
+AI回答：
+
+> In your screenshot, A is in central Wuhan and B (黄州商场) is in Huangzhou, about 55–60 km apart in a straight line, so the longitude span is about 0.6°. **The very first load exceeds the limit**, and the "automatic expansion" I just added never gets a chance to run.
+
+> All 16 cases now succeed (8 destinations × both modes)
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已实现于本机工作区（非 Git 工作区，未提交）；组员 1 选择“忽略对比，只做 A”，见 DEC-20261111-1-long-route-01；采用原因待用户自己填写。
+
+对本组的实际价值：跨城与省内远距离路线可以规划（湖北 53–406 km 16/16 成功，0.33–0.74 s）；新增 `roadsLayered()` 接口与测试 `longRouteUsesTieredNetwork`，根 CTest 19/19。限制：中段只走主干道，个别路线比全量最短长（实测最大 2.33 倍）；Navit 对比受阻（NAVIT-20261111-1-long-route-01）；需 2、3、4 号评审。
+

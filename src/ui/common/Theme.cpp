@@ -8,8 +8,8 @@
 
 namespace p1::ui {
 MapColors mapColors(bool dark) {
-    return dark ? MapColors{"#242729","#596065","#353B3F","#737B80","#D4D9DD","#67A9FF","#A7B0B7","#303234","#293D32","#263F50","#42464A","#51575C"}
-                : MapColors{"#F2F3F4","#FFFFFF","#D2D5D8","#E1E4E7","#5C636A","#2879E8","#7C858E","#ECEAE5","#DAE8D2","#BBDCEB","#E0DDD8","#C8C5C0"};
+    return dark ? MapColors{"#242729","#596065","#353B3F","#737B80","#D4D9DD","#67A9FF","#A7B0B7","#303234","#293D32","#263F50","#42464A","#51575C",QColor("#9CCBEA"),QColor(36,39,41,220),QColor("#B09CDE"),QColor("#D7CAFC")}
+                : MapColors{"#F2F3F4","#FFFFFF","#D2D5D8","#E1E4E7","#5C636A","#2879E8","#7C858E","#ECEAE5","#DAE8D2","#BBDCEB","#E0DDD8","#C8C5C0",QColor("#2A5B7C"),QColor(242,243,244,220),QColor("#4335BC"),QColor("#2E228E")};
 }
 Theme::Theme(QObject* parent) : QObject(parent) {}
 

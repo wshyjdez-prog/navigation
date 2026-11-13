@@ -22,6 +22,7 @@
 2. 第一遍只读关系，让 `MultipolygonManager` 记下 multipolygon 的成员路（10–20%）。
 3. 第二遍读全部对象（20–88%），处理链为：节点校验与 POI → `NodeLocationsForWays` → 道路 → 面组装回调。节点坐标索引正 ID 用 `SparseFileArray`（暂存目录内的内存映射文件，不占常驻内存），负 ID（编辑器本地对象）用 `SparseMemArray`。
 4. 排序后扫描坐标索引拒绝重复节点 ID；统计缺失引用、不完整 multipolygon、无法成环的面并写成警告。
+4a. **POI 去重检查（2026-11-11，`DEC-20261111-1-poi-dedup-01`，1 号授权）**：在同一事务内，同名（去首尾空白后完全相同、非空）且与已保留 POI 相距 ≤ 100 m 的 POI 视为同一点并删除，每簇保留 id 最小者；无名 POI 不合并。合并数写入 `ImportStats::poisMerged`、摘要 `poisMerged` 和警告，并写入 metadata `poi_dedup_m=100`。没有该标记的旧缓存不重写，搜索时在内存中套用同一规则（`src/data/import/PoiDedup.{h,cpp}`）。湖北 PBF 合并 3,023 个（36,875 → 33,852）。
 5. 建普通 B-tree 索引 `roads(min_lat,max_lat,min_lon,max_lon)`、`pois(lat,lon)`、`pois(category)`，单事务提交后原子重命名发布。取消或出错不发布。
 
 ### 缓存 schema 2（私有，消费者只走公共契约）

@@ -1,0 +1,3 @@
+223:		<vehicleprofile name="car" route_depth="4:25%,8:40000,18:10000" flags="0x4000000" flags_forward_mask="0x4040002" flags_reverse_mask="0x4040001" route_mode="0" static_speed="5" static_distance="25">
+276:		<vehicleprofile name="car_pedantic" route_depth="18:25%,18:40000" flags="0x4000000" flags_forward_mask="0x4000002" flags_reverse_mask="0x4000001" route_mode="0" static_speed="5" static_distance="25">
+293:		<vehicleprofile name="bike" route_depth="18:25%,18:40000" flags="0x40000000" flags_forward_mask="0x40000002" flags_reverse_mask="0x40000001" route_mode="0" static_speed="5" static_distance="25">
