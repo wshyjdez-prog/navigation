@@ -1,5 +1,7 @@
 #pragma once
 #include "app/ImportTypes.h"
+#include "data/osmx/OsmxTypes.h"
+#include <QStringList>
 #include <QPair>
 #include <QVector>
 #include <optional>
@@ -13,7 +15,6 @@
 // adapter, not in the importer/UI. Areas are read through MapGeometry.h.
 namespace p1::data {
 class OsmxDataset;
-struct OsmxBounds;
 using Tags = QVector<QPair<QString, QString>>;
 // A point of interest. osmType: 0 node, 1 way, 2 relation; for ways and
 // multipolygons the position is the centre of the polygon's bounding box.
@@ -40,7 +41,18 @@ public:
     // Browsing may opt into an empty snapshot; routing keeps empty-area errors.
     std::shared_ptr<const OsmxDataset> roads(const OsmxBounds& bounds,
         const std::shared_ptr<std::atomic_bool>& cancelled = {}, bool allowEmpty = false) const;
+    // Tiered snapshot for long routes (Navit route_depth style): the union of
+    // several layers, each keeping whole ways with a node in its rectangle and,
+    // when `highways` is non-empty, only those OSM highway values. A layer with
+    // every road is still limited to 0.3°x0.5°; filtered layers have no area
+    // cap. The union is limited to 1M nodes / 2M node references / 400k ways
+    // (plain roads(): 250k / 500k / 100k).
+    struct RoadLayer { OsmxBounds bounds; QStringList highways; };
+    std::shared_ptr<const OsmxDataset> roadsLayered(const QVector<RoadLayer>& layers,
+        const std::shared_ptr<std::atomic_bool>& cancelled = {}) const;
 private:
+    std::shared_ptr<const OsmxDataset> load(const QVector<RoadLayer>& layers,
+        const std::shared_ptr<std::atomic_bool>& cancelled, bool allowEmpty, int maxNodes, int maxRefs, int maxWays) const;
     QString path_;
 };
 QString defaultImportCacheDirectory();

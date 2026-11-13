@@ -2,6 +2,7 @@
 #include "app/ImportTypes.h"
 #include "data/osmx/OsmxDataset.h"
 #include "algorithms/model/Types.h"
+#include "app/RoutingProfile.h"
 #include <QObject>
 #include <QPointF>
 #include <QThreadPool>
@@ -36,6 +37,11 @@ public:
     ~NavigationWorkflow() override;
     void load(const ImportResult&, double lat, double lon, double radiusKm);
     void plan(QPointF start, QPointF end);
+    // Applies to the next plan(); matching keeps the full network.
+    void setRouteMode(RouteMode mode);
+    RouteMode routeMode() const { return routeMode_; }
+    // Car-only subgraph (same node/edge ids) used by RouteMode::Driving.
+    static algorithms::model::GraphData drivingGraph(const RoadNetwork& network);
     void match(const QString& csvPath);
     void cancel();
     void beginMapPick(bool start);
@@ -52,8 +58,10 @@ public:
     QString runtimeStatus() const;
     const WorkflowResult& state() const { return state_; }
     const WorkflowResult& lastResult() const { return lastResult_; }
+    // Size limits: 250k nodes / 500k edges for regional networks; the tiered
+    // long-route network passes higher limits.
     static std::shared_ptr<const RoadNetwork> buildNetwork(std::shared_ptr<const data::OsmxDataset>,
-        const std::shared_ptr<std::atomic_bool>& cancel={});
+        const std::shared_ptr<std::atomic_bool>& cancel={}, quint32 maxNodes=250000, int maxEdges=500000);
 signals:
     void changed();
     void completed(const QString& kind, bool success);
@@ -72,5 +80,6 @@ private:
     std::optional<ImportResult> activeDataset_, pendingDataset_;
     std::optional<QPointF> startPoint_, endPoint_;
     quint64 datasetRevision_=0;
+    RouteMode routeMode_=RouteMode::General;
 };
 }

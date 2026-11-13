@@ -1,4 +1,5 @@
 #include "OsmImportParser.h"
+#include "PoiDedup.h"
 #include "contracts/ImportedDataset.h"
 #include "FeatureRules.h"
 #include "Sqlite.h"
@@ -217,7 +218,7 @@ QJsonObject summaryJson(const app::ImportResult& r) {
         {"tags",QString::number(r.stats.tags)},{"nodeReferences",QString::number(r.stats.nodeReferences)},
         {"relationMembers",QString::number(r.stats.relationMembers)},
         {"pois",QString::number(r.stats.pois)},{"roads",QString::number(r.stats.roads)},
-        {"areas",QString::number(r.stats.areas)},{"areasSkipped",QString::number(r.stats.areasSkipped)},
+        {"areas",QString::number(r.stats.areas)},{"areasSkipped",QString::number(r.stats.areasSkipped)},{"poisMerged",QString::number(r.stats.poisMerged)},
         {"warnings",warnings},
         {"hasBounds",r.hasBounds},{"minLat",r.minLat},{"minLon",r.minLon},
         {"maxLat",r.maxLat},{"maxLon",r.maxLon},{"reader",QString("libosmium ")+LIBOSMIUM_VERSION_STRING}};
@@ -349,6 +350,13 @@ app::ImportResult OsmImportParser::parse(const QString& path, const app::ImportP
                 result.warnings.append(QString("面关系：%1 个 multipolygon 的成员不完整，已跳过。").arg(incomplete));
             if(features.areasSkipped>0)
                 result.warnings.append(QString("面要素：%1 个多边形无法组装为有效环，已跳过。").arg(features.areasSkipped));
+            // Post-import check: one OSM place is often mapped several times
+            // (e.g. a stop's platform on both kerbs). Same name within 100 m -> one POI.
+            report(92,"检查同名临近 POI");
+            result.stats.poisMerged=removeDuplicatePois(db,checkCancel);
+            result.stats.pois-=result.stats.poisMerged;
+            if(result.stats.poisMerged>0)
+                result.warnings.append(QString("POI：%1 个与同名 POI 相距不超过 %2 m，已合并为一个点。").arg(result.stats.poisMerged).arg(kPoiDuplicateMeters));
             db.exec("CREATE INDEX roads_bounds ON roads(min_lat,max_lat,min_lon,max_lon);"
                     "CREATE INDEX pois_position ON pois(lat,lon);"
                     "CREATE INDEX pois_category ON pois(category);");

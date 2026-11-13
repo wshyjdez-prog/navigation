@@ -21,6 +21,8 @@ struct ImportStats {
     quint64 roads = 0;
     quint64 areas = 0;
     quint64 areasSkipped = 0;
+    // POIs merged by the post-import check: same name within 100 m.
+    quint64 poisMerged = 0;
     // OSMX only: precomputed routing topology shared with 3/5. Zero for other
     // formats, where the consumer derives its own graph.
     quint64 routableWays = 0;

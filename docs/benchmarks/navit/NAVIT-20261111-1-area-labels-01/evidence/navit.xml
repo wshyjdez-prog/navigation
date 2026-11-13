@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns:xi="http://www.w3.org/2001/XInclude">
+<debug name="profile" level="debug"/>
+<plugins><plugin path="$NAVIT_LIBDIR/*/${NAVIT_LIBPREFIX}lib*.so" ondemand="yes"/></plugins>
+<navit center="114.395 30.555" zoom="64" tracking="0" orientation="0" recent_dest="0" drag_bitmap="0">
+  <graphics type="gtk_drawing_area" w="1280" h="800"/>
+  <gui type="internal" enabled="yes" fullscreen="0"/>
+  <mapset enabled="yes"><map type="binfile" enabled="yes" data="/tmp/claude-1000/-home-abt-navigation/e1572a5a-0f48-4f9a-86d2-3a1999b04dee/scratchpad/navit-map/hubei.bin"/></mapset>
+  <xi:include href="/home/abt/navit/share/navit/navit_layout_car.xml"/>
+</navit>
+</config>

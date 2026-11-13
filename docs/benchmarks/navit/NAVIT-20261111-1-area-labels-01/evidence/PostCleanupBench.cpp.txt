@@ -1,0 +1,86 @@
+// Trial benchmark for DEC-20261111-1-area-labels-01 (not part of CTest).
+// Usage: p1-area-label-bench CACHE.sqlite TILE_ROOT baked|overlay [SAMPLES]
+// Prints CSV: mode,scenario,zoom,phase,sample,ms,labels,tiles
+#include "ui/map/TilePyramid.h"
+#include "ui/map/AreaLabels.h"
+#include "contracts/ImportedDataset.h"
+#include "data/import/Sqlite.h"
+#include <QApplication>
+#include <QDirIterator>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QTimer>
+#include <cmath>
+#include <cstdio>
+using namespace p1;
+namespace {
+constexpr double world=40075016.68557849;
+struct Scenario { const char* name; double lon, lat; };
+QString geometryPath(const QString& root) {
+    QDirIterator it(root,{"geometry.sqlite"},QDir::Files,QDirIterator::Subdirectories);
+    return it.hasNext()?it.next():QString();
+}
+void removeRasters(const QString& root) {
+    QDirIterator it(root,{"raster-style*"},QDir::Dirs,QDirIterator::Subdirectories);QStringList dirs;
+    while(it.hasNext())dirs<<it.next();
+    for(const auto& d:dirs)QDir(d).removeRecursively();
+}
+// Count names a baked frame shows: strict placement on the level's global grid.
+int strictCount(const QString& geometry,QRectF view,QSize size,int z) {
+    data::detail::Db db(geometry,true);const double res=world/(256*std::ldexp(1.,z));
+    const double m=ui::areaLabelQueryMarginPixels()*res;
+    QVector<ui::AreaLabelCandidate> candidates;
+    for(auto& l:ui::queryAreaLabels(db,view.adjusted(-m,-m,m,m),z))
+        candidates.append({l,QPointF(std::round((l.anchor.x()+world/2)/res),std::round((world/2-l.anchor.y())/res))});
+    const QRectF pixels((view.left()+world/2)/res,(world/2-view.bottom())/res,view.width()/res,view.height()/res);
+    int n=0;for(const auto& p:ui::placeAreaLabels(candidates))if(p.box.intersects(pixels))++n;
+    Q_UNUSED(size);return n;
+}
+}
+int main(int argc,char** argv) {
+    QApplication app(argc,argv);
+    if(argc<4){std::fprintf(stderr,"Usage: p1-area-label-bench CACHE.sqlite TILE_ROOT baked|overlay [SAMPLES]\n");return 2;}
+    const auto entry=data::ImportedDataset(QString::fromLocal8Bit(argv[1])).summary();
+    const QString root=QString::fromLocal8Bit(argv[2]);const bool overlay=QString(argv[3])=="overlay";
+    const int samples=argc>4?std::atoi(argv[4]):5;
+    const QSize size(1280,800);
+    const Scenario scenarios[]={{"wuhan-centre",114.305,30.593},{"east-lake",114.395,30.555},{"danjiangkou",111.52,32.68}};
+    auto viewFor=[&](const Scenario& s,int z){const auto c=ui::mapProject({s.lon,s.lat});const double w=world*size.width()/(256*std::ldexp(1.,z))*0.75;const double h=w*size.height()/size.width();return QRectF(c.x()-w/2,c.y()-h/2,w,h);};
+    // Runs one request and waits for its completed (second) frame.
+    auto run=[&](ui::TilePyramid& pyramid,QRectF view,ui::PyramidStats& stats)->double{
+        QEventLoop loop;int frames=0;QElapsedTimer timer;double ms=-1;
+        auto c=QObject::connect(&pyramid,&ui::TilePyramid::frameReady,&loop,[&](QImage,QRectF v,ui::PyramidStats st){if(v!=view)return;if(++frames==2){ms=timer.nsecsElapsed()/1e6;stats=st;loop.quit();}});
+        QTimer::singleShot(600000,&loop,&QEventLoop::quit);timer.start();pyramid.request(view,size,false);loop.exec();QObject::disconnect(c);return ms;};
+    const char* label=overlay?"overlay":"baked";
+    if(qEnvironmentVariableIsSet("P1_BENCH_EXTRACT")) {
+        // Incremental index cost of names: same area stream with and without anchors.
+        for(int pass=0;pass<3;++pass)for(bool anchors:{false,true}) {
+            QElapsedTimer t;t.start();qint64 n=0;
+            data::visitMapAreas(entry,{},[&](const data::MapArea& a){QVector<QPointF> outer;QVector<QVector<QPointF>> holes;for(auto g:a.outer)outer.append(ui::mapProject(g));for(const auto& r:a.holes){QVector<QPointF> h;for(auto g:r)h.append(ui::mapProject(g));holes.append(h);}
+                if(anchors&&ui::makeAreaLabel(a.kind,a.minZoom,a.name,outer,holes))++n;},{});
+            std::printf("extract,%s,0,pass,%d,%.1f,%lld,0\n",anchors?"areas+anchors":"areas-only",pass,t.nsecsElapsed()/1e6,(long long)n);std::fflush(stdout);
+        }
+        return 0;
+    }
+    const QString save=qEnvironmentVariable("P1_BENCH_SAVE");
+    {   // Index build (shared by both modes) + first frame, on an empty root.
+        ui::TilePyramid pyramid(nullptr,root);pyramid.setDataset(entry,{});ui::PyramidStats st;
+        const double ms=run(pyramid,viewFor(scenarios[0],11),st);
+        std::printf("%s,index+first,11,cold,0,%.1f,%d,%d\n",label,ms,0,st.tiles);std::fflush(stdout);
+    }
+    const auto geometry=geometryPath(root);
+    for(const auto& s:scenarios)for(int z:{9,11,13,15,17}) {
+        const auto view=viewFor(s,z);
+        for(int i=0;i<samples;++i) {
+            removeRasters(root);ui::TilePyramid pyramid(nullptr,root);pyramid.setDataset(entry,{});ui::PyramidStats st;
+            const double cold=run(pyramid,view,st);
+            const int labels=strictCount(geometry,view,size,st.zoom);
+            std::printf("%s,%s,%d,cold,%d,%.1f,%d,%d\n",label,s.name,st.zoom,i,cold,labels,st.tiles);
+            if(!save.isEmpty()&&i==0){QEventLoop loop;QImage shot;auto c=QObject::connect(&pyramid,&ui::TilePyramid::frameReady,&loop,[&](QImage im,QRectF v,ui::PyramidStats){if(v==view){shot=im;}});
+                ui::PyramidStats w;run(pyramid,view,w);QObject::disconnect(c);QDir().mkpath(save);shot.save(QString("%1/%2-%3-z%4.png").arg(save,label,s.name).arg(w.zoom));}
+            for(int j=0;j<2;++j){ui::PyramidStats w;const double warm=run(pyramid,view,w);std::printf("%s,%s,%d,warm,%d,%.1f,%d,%d\n",label,s.name,w.zoom,i*2+j,warm,labels,w.tiles);}
+            std::fflush(stdout);
+        }
+    }
+    return 0;
+}

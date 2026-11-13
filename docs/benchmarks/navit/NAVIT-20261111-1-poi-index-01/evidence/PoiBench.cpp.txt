@@ -1,0 +1,27 @@
+// Temporary benchmark: POI index candidates. Usage: CACHE_COPY fts|memory|rtree REPEATS
+#include "data/import/PoiSearch.h"
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QFileInfo>
+#include <algorithm>
+#include <cstdio>
+using namespace p1::data;
+int main(int argc,char** argv){
+    QCoreApplication app(argc,argv);if(argc<4)return 2;
+    const QString path=QString::fromLocal8Bit(argv[1]);const QString name=argv[2];const int repeats=std::atoi(argv[3]);
+    const auto kind=name=="memory"?PoiIndexKind::MemoryInverted:name=="rtree"?PoiIndexKind::RTreeRings:PoiIndexKind::Fts5Trigram;
+    const double lat=30.593,lon=114.305;const auto before=QFileInfo(path).size();
+    const QStringList queries{"店","超市","银行","医院","餐厅","大学","武汉大学","中国工商银行","麦当劳","加油站","肯德基","不存在的名字xyz"};
+    {PoiSearchStats st;QElapsedTimer t;t.start();searchNearestPois(path,kind,"超市",lat,lon,20,&st);
+     std::printf("%s,build,%d,%.1f,%.1f,%lld\n",qPrintable(name),int(st.builtIndex),st.buildMs,t.nsecsElapsed()/1e6,(long long)(QFileInfo(path).size()-before));}
+    for(const auto& q:queries){
+        const auto want=searchNearestPoisByScan(path,q,lat,lon,20);std::vector<double> ms;quint64 cand=0;bool same=true;int n=0;
+        for(int r=0;r<repeats;++r){PoiSearchStats st;QElapsedTimer t;t.start();const auto got=searchNearestPois(path,kind,q,lat,lon,20,&st);ms.push_back(t.nsecsElapsed()/1e6);cand=st.candidates;n=got.size();
+            if(got.size()!=want.size())same=false;else for(int i=0;i<got.size();++i)if(got[i].id!=want[i].id)same=false;}
+        std::sort(ms.begin(),ms.end());
+        std::printf("%s,query,%s,%d,%.3f,%.3f,%llu,%d\n",qPrintable(name),qPrintable(q),n,ms[ms.size()/2],ms[std::min(ms.size()-1,size_t(0.95*(ms.size()-1)+0.5))],(unsigned long long)cand,int(same));
+    }
+    std::vector<double> scan;for(int r=0;r<repeats;++r){QElapsedTimer t;t.start();searchNearestPoisByScan(path,"超市",lat,lon,20);scan.push_back(t.nsecsElapsed()/1e6);}
+    std::sort(scan.begin(),scan.end());std::printf("%s,scan-baseline,超市,%.3f\n",qPrintable(name),scan[scan.size()/2]);
+    return 0;
+}

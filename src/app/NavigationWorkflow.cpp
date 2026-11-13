@@ -45,6 +45,18 @@ quint32 snap(const RoadNetwork& n,QPointF geo,bool origin) {
     if(!routable || (origin&&n.roads->outgoingEdgeCount(*index)==0)) throw std::runtime_error("选点不能作为当前方向的路网端点，请重选");
     return *index;
 }
+// Driving snap: nearest node (500 m) that a car can leave (origin) or reach.
+quint32 snapDriving(const RoadNetwork& n,const algorithms::model::GraphData& g,QPointF geo,bool origin) {
+    if(!std::isfinite(geo.x())||!std::isfinite(geo.y())||std::abs(geo.x())>180||std::abs(geo.y())>90)
+        throw std::runtime_error("起终点必须是有效 WGS84 经纬度");
+    std::vector<char> usable(n.roads->nodeCount(),0);
+    for(const auto& e:g.edges) usable[size_t((origin?e.from:e.to).value-1)]=1;
+    double best=500;std::optional<quint32> found;
+    for(quint32 i=0;i<n.roads->nodeCount();++i){if(!usable[i])continue;const auto& node=n.roads->nodeAt(i);
+        const double d=data::osmxDistanceMeters(geo.y(),geo.x(),node.lat,node.lon);if(d<=best){best=d;found=i;}}
+    if(!found) throw std::runtime_error("行车模式：选点 500 m 内没有机动车可通行道路，请靠近车行道重选");
+    return *found;
+}
 QString backend(const QString& name) {
     const auto env=qEnvironmentVariable(name=="fmm" ? "P1_FMM_EXECUTABLE":"P1_UBODT_EXECUTABLE");
     if(!env.isEmpty()) return env;
@@ -111,9 +123,9 @@ void generateUbodt(const QString& executable,const QString& stem,const QString& 
 QPointF RoadNetwork::project(QPointF g) const { return {(g.x()-lon0)*metresLon,(g.y()-lat0)*metresLat}; }
 QPointF RoadNetwork::unproject(QPointF m) const { return {lon0+m.x()/metresLon,lat0+m.y()/metresLat}; }
 std::shared_ptr<const RoadNetwork> NavigationWorkflow::buildNetwork(std::shared_ptr<const data::OsmxDataset> roads,
-    const std::shared_ptr<std::atomic_bool>& cancel) {
+    const std::shared_ptr<std::atomic_bool>& cancel, quint32 maxNodes, int maxEdges) {
     if(!roads || roads->edges().isEmpty() || !roads->bounds().valid) throw std::runtime_error("数据集没有可规划的有向边");
-    if(roads->nodeCount()>250000||roads->edges().size()>500000) throw std::runtime_error("路网过大，请使用区域加载");
+    if(roads->nodeCount()>maxNodes||roads->edges().size()>maxEdges) throw std::runtime_error("路网过大，请使用区域加载");
     auto n=std::make_shared<RoadNetwork>(); n->roads=std::move(roads);
     n->lat0=n->roads->bounds().centerLat(); n->lon0=n->roads->bounds().centerLon();
     n->metresLat=data::kOsmxEarthRadiusMeters*std::acos(-1.0)/180;
@@ -151,6 +163,20 @@ std::shared_ptr<const RoadNetwork> NavigationWorkflow::buildNetwork(std::shared_
     }
     if(n->graph.edges.empty()) throw std::runtime_error("路网没有有效的非零长度边");
     return n;
+}
+algorithms::model::GraphData NavigationWorkflow::drivingGraph(const RoadNetwork& n) {
+    algorithms::model::GraphData g;g.metadata=n.graph.metadata;g.nodes=n.graph.nodes;
+    std::vector<signed char> allowed(n.roads->wayCount(),-1);
+    for(const auto& e:n.graph.edges) {
+        const auto way=n.roads->edgeAt(quint32(e.id.value-1)).way;
+        if(allowed[way]<0) allowed[way]=carAllowed(*n.roads,way)?1:0;
+        if(allowed[way]) g.edges.push_back(e);
+    }
+    return g;
+}
+void NavigationWorkflow::setRouteMode(RouteMode mode) {
+    if(mode==routeMode_) return;
+    routeMode_=mode;status_=QString("已切换为%1").arg(routeModeName(mode));emit changed();
 }
 NavigationWorkflow::NavigationWorkflow(QObject* p):QObject(p) { pool_.setMaxThreadCount(2); }
 QString NavigationWorkflow::runtimeStatus() const {
@@ -239,7 +265,8 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
     startPoint_=start;endPoint_=end;
     const auto entry=activeDataset_;
     const auto loadedArea=state_.loadedArea;
-    run("A* 规划",[n,entry,start,end,loadedArea](auto c) mutable {
+    const auto mode=routeMode_;
+    run("A* 规划",[n,entry,start,end,loadedArea,mode](auto c) mutable {
         if(!n) throw std::runtime_error("请先加载路网");
         if(!std::isfinite(start.x())||!std::isfinite(start.y())||!std::isfinite(end.x())||!std::isfinite(end.y())||
             std::abs(start.x())>180||std::abs(end.x())>180||std::abs(start.y())>85||std::abs(end.y())>85)
@@ -247,25 +274,87 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
         auto area=loadedArea;
         const auto& bounds=area.valid?area:n->roads->bounds();
         auto contains=[&](QPointF p){return p.x()>=bounds.minLon&&p.x()<=bounds.maxLon&&p.y()>=bounds.minLat&&p.y()<=bounds.maxLat;};
-        if(entry&&entry->sourceFormat!="osmx"&&(!contains(start)||!contains(end))) {
+        const bool regional=entry&&entry->sourceFormat!="osmx";
+        // Endpoint rectangle plus `margin` metres on every side.
+        auto around=[&](double margin)->data::OsmxBounds{
+            const double dy=margin/111195.08,dx=dy/std::cos((start.y()+end.y())*.5*std::acos(-1.)/180.);
+            return {std::max(-85.,std::min(start.y(),end.y())-dy),std::max(-180.,std::min(start.x(),end.x())-dx),
+                    std::min(85.,std::max(start.y(),end.y())+dy),std::min(180.,std::max(start.x(),end.x())+dx),true};};
+        // Long routes exceed the full-detail limits (0.3°x0.5° / 250k nodes);
+        // they fall back to the tiered network below instead of failing here.
+        QString detailedLimit;
+        if(regional&&(!contains(start)||!contains(end))) {
             // Reuse the approved regional adapter; map panning never cancels a
             // route calculation. Query both endpoints with room for nearby links.
-            const double dy=1000./111195.08,dx=dy/std::cos((start.y()+end.y())*.5*std::acos(-1.)/180.);
-            area={
-                std::max(-85.,std::min(start.y(),end.y())-dy),std::max(-180.,std::min(start.x(),end.x())-dx),
-                std::min(85.,std::max(start.y(),end.y())+dy),std::min(180.,std::max(start.x(),end.x())+dx),true};
-            n=buildNetwork(data::ImportedDataset(entry->cachePath).roads(area,c),c);
+            area=around(1000);
+            try { n=buildNetwork(data::ImportedDataset(entry->cachePath).roads(area,c),c); }
+            catch(const std::exception& e) { if(c&&c->load()) throw; detailedLimit=QString::fromUtf8(e.what()); n.reset(); }
         }
-        const auto a=snap(*n,start,true),b=snap(*n,end,false);
-        const auto path=algorithms::findRoute(n->graph,algorithms::model::NodeId(a+1),algorithms::model::NodeId(b+1),c);
-        if(path.status!=algorithms::RouteStatus::Success) throw std::runtime_error(("无法规划："+path.message).c_str());
+        const bool driving=mode==RouteMode::Driving;
+        auto attempt=[&](const RoadNetwork& net,quint32& a,quint32& b){
+            const auto car=driving?drivingGraph(net):algorithms::model::GraphData{};
+            if(driving&&car.edges.empty()) throw std::runtime_error("行车模式：当前工作区域没有机动车可通行道路");
+            const auto& graph=driving?car:net.graph;
+            a=driving?snapDriving(net,car,start,true):snap(net,start,true);
+            b=driving?snapDriving(net,car,end,false):snap(net,end,false);
+            return algorithms::findRoute(graph,algorithms::model::NodeId(a+1),algorithms::model::NodeId(b+1),c);};
+        quint32 a=0,b=0;algorithms::RoutePath path;
+        if(n) path=attempt(*n,a,b); else path.status=algorithms::RouteStatus::Unreachable;
+        // A route may have to leave the loaded rectangle (round a lake, to a
+        // bridge, through a one-way system). When no directed path exists, the
+        // standard-OSM area grows 2 -> 4 -> 8 km beyond the endpoints and A*
+        // runs again, until the network size limit of buildNetwork is reached.
+        double expandedTo=0;QString stopped;
+        for(double margin:{2000.,4000.,8000.}) {
+            if(!regional||!n||path.status!=algorithms::RouteStatus::Unreachable) break;
+            check(c);const auto wider=around(margin);
+            std::shared_ptr<const RoadNetwork> bigger;
+            try { bigger=buildNetwork(data::ImportedDataset(entry->cachePath).roads(wider,c),c); }
+            catch(const std::exception& e) { if(c&&c->load()) throw; stopped=QString::fromUtf8(e.what()); break; }
+            n=bigger;area=wider;expandedTo=margin;path=attempt(*n,a,b);
+        }
+        // Tiered fallback (DEC-20261111-1-long-route-01, after Navit's car
+        // route_depth "4:25%,8:40000,18:10000"): every road within 3 km of each
+        // endpoint, motorway..tertiary within 15 km, and in the endpoint box
+        // grown by 25% of the distance (>= 5 km) motorway..primary, or only
+        // motorway/trunk beyond 100 km. Same A*, same snapping and route mode.
+        bool tiered=false;
+        if(regional&&path.status==algorithms::RouteStatus::Unreachable) {
+            check(c);
+            auto box=[&](QPointF p,double m)->data::OsmxBounds{const double dy=m/111195.08,dx=dy/std::cos(p.y()*std::acos(-1.)/180.);
+                return {std::max(-85.,p.y()-dy),std::max(-180.,p.x()-dx),std::min(85.,p.y()+dy),std::min(180.,p.x()+dx),true};};
+            const double distance=data::osmxDistanceMeters(start.y(),start.x(),end.y(),end.x());
+            const QStringList local{"motorway","motorway_link","trunk","trunk_link","primary","primary_link","secondary","secondary_link","tertiary","tertiary_link"};
+            QStringList corridor{"motorway","motorway_link","trunk","trunk_link"};
+            if(distance<=100000) corridor<<"primary"<<"primary_link";
+            const QVector<data::ImportedDataset::RoadLayer> layers{{box(start,3000),{}},{box(end,3000),{}},
+                {box(start,15000),local},{box(end,15000),local},{around(std::max(5000.,distance*.25)),corridor}};
+            std::shared_ptr<const RoadNetwork> tieredNet;
+            try { tieredNet=buildNetwork(data::ImportedDataset(entry->cachePath).roadsLayered(layers,c),c,1000000,2000000); }
+            catch(const std::exception& e) { if(c&&c->load()) throw; stopped=QString("分级路网也无法加载：")+QString::fromUtf8(e.what()); }
+            if(tieredNet) {
+                quint32 ta=0,tb=0;const auto tpath=attempt(*tieredNet,ta,tb);
+                if(tpath.status==algorithms::RouteStatus::Success) {n=tieredNet;area=box(start,3000);path=tpath;tiered=true;}
+                else if(path.message.empty()) path=tpath;
+            }
+        }
+        if(path.status!=algorithms::RouteStatus::Success) {
+            QString detail=QString::fromStdString(path.message.empty()?std::string("no directed path between the supplied nodes"):path.message);
+            if(!detailedLimit.isEmpty()) detail+=QString("（两点间全量路网超出限制：%1；已尝试分级路网）").arg(detailedLimit);
+            if(expandedTo>0) detail+=QString("（规划区域已自动扩大到起终点外 %1 km 仍不连通%2）").arg(expandedTo/1000).arg(stopped.isEmpty()?QString():"，"+stopped);
+            else if(!stopped.isEmpty()) detail+=QString("（无法继续扩大规划区域：%1）").arg(stopped);
+            throw std::runtime_error(("无法规划："+detail).toStdString());
+        }
         if(path.geometry.size()<2) throw std::runtime_error("起终点吸附到同一节点，请拉开距离");
         WorkflowResult r; r.ok=true; r.network=n; r.loadedArea=area;r.distanceM=path.total_distance_m; r.algorithmMs=path.elapsed_ms; r.count=int(path.edges.size());
         for(const auto& p:path.geometry) {
             const auto geo=n->unproject({p.x_m,p.y_m});
             if(r.route.isEmpty() || r.route.last()!=geo) r.route.append(geo);
         }
-        r.message=QString("A* 路线 %1 m · %2 条边；两端 500 m 内吸附，遵循单行线/通行限制").arg(r.distanceM,0,'f',1).arg(r.count);
+        r.message=QString("%1 · A* 路线 %2 m · %3 条边；两端 500 m 内吸附，遵循单行线/通行限制%4").arg(routeModeName(mode)).arg(r.distanceM,0,'f',1).arg(r.count)
+            .arg(driving?"，不含人行道/步道/台阶等非机动车道路（参照 Navit 车辆配置）":"");
+        if(tiered) r.message+=QString("；远距离：按 Navit route_depth 方式分级加载（两端 3 km 全部道路、15 km 内三级路以上、走廊内主干道），中段只走主干道，可能不是严格最短");
+        else if(expandedTo>0) r.message+=QString("；路线需绕出原区域，规划区域已自动扩大到起终点外 %1 km").arg(expandedTo/1000);
         return r;
     });
 }

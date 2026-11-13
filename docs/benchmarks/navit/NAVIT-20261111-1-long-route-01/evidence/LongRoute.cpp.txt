@@ -1,0 +1,25 @@
+// Temporary check: long routes with the tiered fallback (same flow as the map).
+#include "app/NavigationWorkflow.h"
+#include "contracts/ImportedDataset.h"
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QSignalSpy>
+#include <QTimer>
+#include <cstdio>
+using namespace p1;
+static void waitDone(QSignalSpy& s,int n){QEventLoop l;QTimer t;QObject::connect(&t,&QTimer::timeout,&l,[&]{if(s.count()>=n)l.quit();});t.start(5);QTimer::singleShot(600000,&l,&QEventLoop::quit);l.exec();}
+int main(int argc,char** argv){
+    QCoreApplication app(argc,argv);const auto entry=data::ImportedDataset(argv[1]).summary();
+    struct Case{const char* name;double lat,lon;};const Case from{"武汉武昌",30.5530,114.3200};
+    const Case to[]={{"黄州商场",30.4499096,114.8652227},{"鄂州",30.3910,114.8950},{"孝感",30.9240,113.9170},{"咸宁",29.8410,114.3220},
+                     {"襄阳",32.0090,112.1220},{"荆州",30.3350,112.2400},{"宜昌",30.6920,111.2860},{"十堰",32.6290,110.7980}};
+    std::printf("dest,mode,ok,straightKm,routeKm,ms,edges,status\n");
+    for(const auto& d:to)for(bool driving:{false,true}){
+        app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);flow.load(entry,from.lat,from.lon,1);waitDone(done,1);
+        flow.setRouteMode(driving?app::RouteMode::Driving:app::RouteMode::General);
+        QElapsedTimer t;t.start();flow.plan({from.lon,from.lat},{d.lon,d.lat});waitDone(done,2);const double ms=t.nsecsElapsed()/1e6;
+        const bool ok=done.last()[1].toBool();
+        std::printf("%s,%s,%d,%.1f,%.1f,%.0f,%d,%s\n",d.name,driving?"行车":"一般",int(ok),data::osmxDistanceMeters(from.lat,from.lon,d.lat,d.lon)/1000,ok?flow.state().distanceM/1000:0.,ms,ok?flow.lastResult().count:0,qPrintable(flow.status().replace(',',';').left(120)));std::fflush(stdout);
+    }
+}

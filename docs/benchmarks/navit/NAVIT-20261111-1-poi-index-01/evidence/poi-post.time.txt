@@ -1,0 +1,4 @@
+	Command being timed: "build/p1-poi-bench /tmp/claude-1000/-home-abt-navigation/a65887cd-5fba-4340-a164-ee0adb6b1293/scratchpad/poi-post.sqlite memory 20"
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.23
+	Maximum resident set size (kbytes): 16984
+	Exit status: 0

@@ -1,0 +1,35 @@
+// Temporary check: tiered vs full-detail route length where both fit.
+#include "app/NavigationWorkflow.h"
+#include "contracts/ImportedDataset.h"
+#include "algorithms/core/BoostAStar.h"
+#include <QRandomGenerator>
+#include <QElapsedTimer>
+#include <cmath>
+#include <cstdio>
+using namespace p1;
+int main(int,char** argv){
+    data::ImportedDataset cache(argv[1]);QRandomGenerator rng(20261112);
+    auto box=[](double lat,double lon,double m)->data::OsmxBounds{const double dy=m/111195.08,dx=dy/std::cos(lat*M_PI/180);return {lat-dy,lon-dx,lat+dy,lon+dx,true};};
+    const QStringList local{"motorway","motorway_link","trunk","trunk_link","primary","primary_link","secondary","secondary_link","tertiary","tertiary_link"};
+    std::printf("pair,km,fullM,tieredM,ratio,fullMs,tieredMs,fullNodes,tieredNodes\n");int done=0;
+    while(done<30){
+        const double slat=30.45+rng.generateDouble()*0.2,slon=114.20+rng.generateDouble()*0.25,d=15000+rng.generateDouble()*15000,a=rng.generateDouble()*2*M_PI;
+        const double elat=slat+d*std::cos(a)/111195.08,elon=slon+d*std::sin(a)/(111195.08*std::cos(slat*M_PI/180));
+        auto route=[&](std::shared_ptr<const app::RoadNetwork> n,double& ms)->double{QElapsedTimer t;t.start();
+            auto sa=n->roads->nearestNode(slat,slon,500),sb=n->roads->nearestNode(elat,elon,500);if(!sa||!sb)return -1;
+            auto r=algorithms::findRoute(n->graph,algorithms::model::NodeId(*sa+1),algorithms::model::NodeId(*sb+1));ms=t.nsecsElapsed()/1e6;
+            return r.status==algorithms::RouteStatus::Success?r.total_distance_m:-1;};
+        try{
+            const double m=4000,dy=m/111195.08,dx=dy/std::cos(slat*M_PI/180);
+            QElapsedTimer t;t.start();
+            auto full=app::NavigationWorkflow::buildNetwork(cache.roads({std::min(slat,elat)-dy,std::min(slon,elon)-dx,std::max(slat,elat)+dy,std::max(slon,elon)+dx,true}));double fb=t.nsecsElapsed()/1e6;
+            const double pad=std::max(5000.,d*.25),py=pad/111195.08,px=py/std::cos(slat*M_PI/180);
+            t.restart();
+            auto tier=app::NavigationWorkflow::buildNetwork(cache.roadsLayered({{box(slat,slon,3000),{}},{box(elat,elon,3000),{}},{box(slat,slon,15000),local},{box(elat,elon,15000),local},
+                {{std::min(slat,elat)-py,std::min(slon,elon)-px,std::max(slat,elat)+py,std::max(slon,elon)+px,true},{"motorway","motorway_link","trunk","trunk_link","primary","primary_link"}}}),{},1000000,2000000);double tb=t.nsecsElapsed()/1e6;
+            double fms=0,tms=0;const double f=route(full,fms),g=route(tier,tms);
+            if(f<0||g<0) continue;
+            std::printf("%d,%.1f,%.0f,%.0f,%.4f,%.1f,%.1f,%u,%u\n",done++,d/1000,f,g,g/f,fb+fms,tb+tms,full->roads->nodeCount(),tier->roads->nodeCount());
+        }catch(const std::exception& e){continue;}
+    }
+}

@@ -23,6 +23,12 @@
 | `DEC-20261101-4-async-model-01` | 规划对接异步执行模型 / 4 | 本次忽略（单方案，未做 2–3 种试验对比） | QThread+Worker / QtConcurrent / 忽略 三选项展示 | QThread+Worker（`AsyncPlannerBridge` 内部 QThread，functor 队列投递 + QueuedConnection 回流）；契约注释 ① 预设该模式 | project.md 第二次作业 4 号行；ai_log 对话 13；Navit：NAVIT-20261101-4-planner-bridge-01 |
 | `DEC-20261101-5-renderer-01` | LinuxRenderer 渲染路径 / 5 | 本次取消界面比较 | 已撤回 A+B 试验入口 | 正式页面固定使用 A 缓存底图；B 仅保留为开发期正确性对照 | project.md 2026-11-01 记录；ai_log 对话 13；NAVIT-20261101-5-renderer-01 |
 | 暂无（其他） | — | 尚未开展 | — | — | — |
+| `DEC-20261111-1-area-labels-01` | 地图面名称标注（分级瓦片）/ 1 | 已完成（Navit 渲染对标受阻待补） | A 瓦片内烘焙（严格避让）、B 帧级屏幕叠加（贪心避让） | A 瓦片内烘焙；B 已清理 | project.md 2026-11-11 面名称记录；ai_log 对话 19；NAVIT-20261111-1-area-labels-01 |
+| `DEC-20261111-1-edge-loading-01` | 地图拖动/缩放边缘加载 / 1 | 已完成（Navit 对标受阻待补） | A 外扩帧+渐进+粗底图、B 后台预取环+渐进 | A；B 已清理 | project.md 2026-11-11 边缘空白记录；ai_log 对话 20；NAVIT-20261111-1-edge-loading-01 |
+| `DEC-20261111-1-route-mode-01` | 路线模式（一般/行车）道路选择 / 1 授权，主责 3、4 | 已确认（用户指定单方案，明确不补做对比；Navit 耗时待补） | 不适用 | 参照 Navit 0.5.7 car 配置的硬过滤 | project.md 2026-11-11 路线模式记录；ai_log 对话 22；NAVIT-20261111-1-route-mode-01 |
+| `DEC-20261111-1-poi-index-01` | 兴趣点名称索引与最近 20 个 / 1 授权，主责 2 | 已完成（Navit 对标受阻待补） | A FTS5 trigram、B 内存单字倒排、C R 树扩圈 | B；A、C 已清理 | project.md 2026-11-11 兴趣点搜索记录；ai_log 对话 23；NAVIT-20261111-1-poi-index-01 |
+| `DEC-20261111-1-poi-dedup-01` | 导入后同名临近 POI 合并 / 1 授权，主责 2 | 用户指定单方案（规则由用户给出）；未做 2–3 种试验对比 | 不适用 | 同名 + ≤100 m 贪心合并（id 序，保留最小 id） | project.md 2026-11-11 兴趣点搜索记录；ai_log 对话 23；NAVIT-20261111-1-poi-index-01 |
+| `DEC-20261111-1-long-route-01` | 远距离路线规划的路网加载 / 1 授权，主责 2（接口）、3/4（规划） | 本次忽略（单方案 A） | A 仿 Navit 分级加载 / B 放宽上限 / C 全省主干网常驻 / 忽略 四选项展示 | A：全量超限时改用分级路网 | project.md 2026-11-11 远距离规划记录；ai_log 对话 25；NAVIT-20261111-1-long-route-01 |
 | `DEC-20261101-3-open-source-01` | A*/HMM 来源与 Qt 适配 / 3 | 本次忽略多方案比较；独立验收通过，Navit 待测 | Boost.Graph A*、固定 FMM HMM | h=0 有向图、外部 CLI 与有限窗口，公共契约不变 | project.md 三号汇总；ai_log：A* 对话 12，FMM/HMM 对话 13（原 ID 保留） |
 | `DEC-20261111-1-osm-feature-import-01` | 标准 OSM 要素导入（POI/道路/面）/ 1 授权，主责 2 | 用户指定单方案；未做 2–3 种试验对比，也未选择“忽略”，待用户确认是否补做 | 不适用 | libosmium 两遍读取 + Assembler 组面 + SQLite schema 2 | project.md 2026-11-11 记录；ai_log 对话 18；NAVIT-20261111-1-osm-feature-import-01 |
 
@@ -331,3 +337,210 @@ Windows Qt 6.12 Release 预检中 A 相对 B 的中位耗时低约 3.0%，P95 �
 - 新增/修改文件：新增 `src/data/import/FeatureRules.h`；修改 `OsmImportParser.cpp`、`ImportedDataset.cpp`、`ImportedRoads.cpp`、`MapGeometry.cpp`、`MapAreas.cpp`、`Sqlite.h`、`tools/ImportCli.cpp`、`tests/ImportTests.cpp`、`include/contracts/ImportedDataset.h`、`src/app/ImportTypes.h`、`src/app/ImportPage.{h,cpp}`、`tests/TilePyramidTests.cpp`。无未选候选代码，无清理项；`MapAreas.cpp` 的手写拼接仅保留给 OSMX。
 - 验证：云端容器 Ubuntu 24.04.5 / Qt 6.4.2 / GCC 13.3.0 / CMake 3.28.3 / libosmium 2.20.0，Release。修改前根 CTest 19/19，修改后 19/19；导入专项 19 用例通过。**非统一虚拟机**；统一环境复验、真实 PBF 与性能未测，不提供性能结论。
 - Navit：`NAVIT-20261111-1-osm-feature-import-01`，受阻未测。AI 日志：18。状态：功能实现完成、目标环境待复验；方案对比是否补做待用户确认。
+
+### DEC-20261111-1-area-labels-01：地图面名称标注与分级显示
+
+#### 1. 背景与约束
+
+- 2026-11-11，组员 1（本对话确认“我是组员1”）。状态：**已完成**（确认、清理、复验均完成；Navit 渲染对标受阻待补）。
+- 目标：在地图面图层（水域/绿地/土地利用/建筑）上显示名称，随 XYZ 0–18 级金字塔分级出现；名称必须落在面内，跨瓦片时不能被截断或错位，不阻塞 UI。
+- 基线：`/home/abt/navigation` 不是 Git 工作区，无提交哈希；改动前根 CTest 19/19。已有决策：金字塔为 1 号集成的方案 C（project.md），导入沿用 `DEC-20261111-1-osm-feature-import-01`。面名称已经在数据契约 `MapArea::name`（`name:zh` 优先）中提供，2 号的契约不需要改。影响：5 号的渲染（瓦片绘制顺序与样式）。不涉及跨组接口。
+- 环境：统一基线版本（Ubuntu 24.04.5 / Qt 6.4.2 / GCC 13.3.0 / CMake 3.28.3），Release，8 vCPU / 9.7 GiB 虚拟机。
+
+#### 2. 全部候选与第一次选择
+
+| 组合 | 内容 | 预期利弊（非实测） | 是否入选 |
+| --- | --- | --- | --- |
+| A 瓦片内烘焙 | 共用：建索引时用 polylabel 求面内最远点（clearance），出现层级 = max(种类最小层级, clearance≥10 px 的首个层级)，建筑另设下限 16 级；点 R-tree。A：生成瓦片时查瓦片外扩 2 个最大名称宽度的范围，锚点吸附到该级全局像素网格，严格避让后写入 PNG | 运行时零额外开销；严格规则保证跨瓦片一致，但比贪心少显示一些名称；父级占位瓦片里的文字会被放大 | 入选（AI 推荐） |
+| B 帧级屏幕叠加 | 共用部分同 A；瓦片只画几何，每次合成帧时按当前层级查视野内的锚点，在屏幕范围贪心避让后叠加；保留的底图不含文字 | 无接缝、无重复，文字清晰；每帧多一次查询和绘制 | 入选（AI 推荐） |
+| C 预计算全局分级 | 建索引时按每级网格全局去重，算出可见层级区间后烘焙 | 各级一致，但建索引更慢、规则更复杂 | 未入选 |
+| 忽略 | 仅本次跳过对比 | — | 未选 |
+
+- 选择原文（AskUserQuestion 回答）：`A 瓦片内烘焙（推荐）,B 帧级屏幕叠加（推荐）`。确认人：组员 1，2026-11-11。
+
+#### 3. 实现范围与实测方法
+
+- 共用：`src/ui/map/AreaLabels.{h,cpp}`（标注点、层级、索引表 `area_labels`/`label_bounds`、两种避让、绘制）；`MapColors` 新增 `waterLabel`、`labelHalo`；索引命名空间升级为 `xyz-v3-labels1`。
+- A 专属：`TilePyramid.cpp` 中 `generate()` 的 Baked 分支；栅格样式 `raster-style4-labels`。
+- B 专属：`TilePyramid.cpp` 中 `frame()` 合成后的 Overlay 分支；`PyramidStats::labels`（仅 B 填写）；栅格样式 `raster-style4-plain`。
+- 试验开关：`AreaLabelMode`、`areaLabelModeFromEnvironment()`（`P1_AREA_LABEL_MODE`）、`MapView.cpp` 构造参数。
+- 试验程序：`tests/AreaLabelBench.cpp`，CMake 目标 `p1-area-label-bench`，不进 CTest。
+- 测试：`tests/TilePyramidTests.cpp` 新增 4 个用例（面内锚点、层级规则、严格避让与窗口无关、A/B 分级与跨瓦片接缝）。
+- 数据、方法与原始数据：见 `NAVIT-20261111-1-area-labels-01`。
+
+#### 4. 实测指标与契合度
+
+| 组合 | 正确性 | 热帧中位（名称密集 z13/z15） | 冷帧中位 | 峰值 RSS | 显示名称数（武汉 z13 / 东湖 z13） |
+| --- | --- | --- | --- | --- | --- |
+| A | 12/12 金字塔用例；根 CTest 19/19；接缝用例通过 | 3.8–4.8 ms | 与 B 相差 ≤ ±9%（瓦片生成主导） | 208.1 MiB | 24 / 29 |
+| B | 同上 | 63.0–85.2 ms | 同左 | 190.1 MiB | 34 / 42 |
+
+| 组合 | 回归 | 必需改动 | 线程/资源 | 契合度 |
+| --- | --- | --- | --- | --- |
+| A | 19/19 | 只在瓦片生成内部改动；缓存按样式隔离 | 在已有的单线程金字塔工作线程上运行 | 高：沿用“瓦片可缓存、路线实时叠加”的设计 |
+| B | 19/19 | 合成路径多一次 SQLite 查询，并要保持底图不含文字 | 同一工作线程；每次请求两次合成都要重新避让 | 中：每帧开销随名称密度上升，拖动结束后的刷新变慢 |
+
+- 两者共有的限制：只有一个锚点，超大面（如丹江口水库）在高层级视野内可能看不到名称；既有道路名按瓦片绘制、没有避让，会与面名称重叠；几何层瓦片接缝处可见细线（改动前就存在）。
+- 共用的标注点提取让湖北索引构建增加约 1.6 s（17,751 个名称）。
+- AI 推荐：**A**。热帧开销低一个数量级，与缓存金字塔一致；B 的名称数量优势可以以后通过放宽 A 的严格规则来部分弥补。
+- Navit：0.5.7 具备面名称能力；渲染耗时受阻未测，见报告。
+- 展示日期：2026-11-11。
+
+#### 5. 最终确认
+
+- 选定：**A 瓦片内烘焙**。组员 1，2026-11-11，选择原文（AskUserQuestion 回答）：`A 瓦片内烘焙（推荐）`。
+- 理由（依据实测）：热帧开销比 B 低一个数量级，与可缓存的金字塔设计一致；正确性要求都满足。代价是名称数比 B 少 20–40%。
+- 正式入口：`TilePyramid` 生成瓦片时调用 `queryAreaLabels` → `placeAreaLabels`（严格）→ `paintAreaLabels`；样式 `raster-style4-labels`，索引 `xyz-v3-labels1`。
+
+#### 6. 清理与复验
+
+- 保留：`src/ui/map/AreaLabels.{h,cpp}`（去掉 Greedy 与模式参数）、`TilePyramid` 的烘焙路径、`MapColors` 新增颜色、4 个新测试（接缝用例改为单模式）。
+- 删除：`AreaLabelMode` 枚举与 `areaLabelModeFromEnvironment()`（`P1_AREA_LABEL_MODE`）、`TilePyramid` 构造参数与成员、`TileBackend::labelMode`、`frame()` 中的 Overlay 分支、`raster-style4-plain` 键、`PyramidStats::labels`、`LabelCollision`（含 Greedy 分支）、`MapView.cpp` 构造参数、`tests/AreaLabelBench.cpp` 与 CMake 目标 `p1-area-label-bench`。基准源码作为方法存档放到报告目录 `evidence/AreaLabelBench.cpp.txt`，当前代码已无法编译它，不再参与构建。
+- 归属核对：只改动了本轮新增的代码和 1 号整合的 `TilePyramid`/`MapView`/`Theme`；没有改动其他成员的文件。
+- 残留检查：`grep` 在 `src`/`tests`/`CMakeLists.txt` 中查 `Overlay|Greedy|LabelCollision|AreaLabelMode|P1_AREA_LABEL_MODE|area-label-bench|raster-style4-plain`，只剩渲染器原有的 `drawNavigationOverlay` 等无关命中。
+- 复验：重新构建无错误、无警告；根 CTest 19/19；金字塔 11/11；offscreen 启动检查通过（运行 5 s 后才被 timeout 结束）。用临时目标在同一湖北数据上重测 A（n=5 冷 / 10 热），名称数与试验完全一致；热帧中位相差 ≤ 1.5 ms（丹江口 z9 为 +2.9 ms），峰值 RSS 239.4 MiB（试验时 208.1 MiB，差异未定位，如实记录）。临时目标测完已从 CMakeLists 删除，数据为 `evidence/bench-postclean.csv`。
+- 当前项目只保留选定的 A 实现。project.md 已更新；AI 日志 19。仓库不是 Git 工作区，无提交。
+
+#### 7. 后续修正（沿用方案 A，不新开试验）
+
+- 2026-11-11，组员 1 原文：`现在有一个问题，特别是道路的名称显示时会有相同名字重叠在一起的现象，修正，使距离近的相同道路名称合为一个`。
+- 判断：这是对已确认方案 A 的缺陷修正，沿用同一种“建索引时取标注点 + 瓦片内严格避让”的机制，算法选择不变，因此按第 7.1 节不新开多方案试验。
+- 改动：道路名并入 `map_labels`（每段道路一半长度处的标注点，长度作优先级，≥15 级）；严格规则新增“同名且标注点相距 < 256 px 时，优先级低者不显示”；查询外扩改为 83 + max(166, 256) = 339 px，保证跨瓦片仍一致；删除原逐瓦片道路名绘制。缓存升级为 `xyz-v4-labels2` / `raster-style5-labels`。
+- 复验：金字塔 13/13、根 CTest 19/19；湖北实测见 `NAVIT-20261111-1-area-labels-01` 第“道路名修正”节。
+
+### DEC-20261111-1-edge-loading-01：地图拖动/缩放时的边缘加载
+
+#### 1. 背景与约束
+
+- 2026-11-11，组员 1（同一对话已确认编号）。状态：**已完成**（确认、清理、复验均完成；Navit 对标受阻待补）。
+- 问题原文：`现在滑动地图、缩放地图时会存在边缘未加载而导致的空白瓦片现象，修复这个现象。`
+- 原因：`MapView` 停顿 180 ms 后只按可见范围请求；`TilePyramid::frame()` 只在全部缺失瓦片生成后才发布第二帧；除 8–10 级预生成外，缩小时没有粗略底图。
+- 基线：非 Git 工作区；当时根 CTest 19/19；关联旧决策为金字塔方案 C（project.md）和 `DEC-20261111-1-area-labels-01`（瓦片内名称）。不涉及跨组接口。
+
+#### 2. 全部候选与第一次选择
+
+| 组合 | 内容 | 预期利弊（非实测） | 是否入选 |
+| --- | --- | --- | --- |
+| A 外扩帧+渐进+粗底图 | 帧四周各外扩 256 px；缺失瓦片先生成 z-2 粗略瓦片；中心优先生成，每 100 ms 发布 | 拖动中的空白最少；每帧处理的瓦片更多 | 入选（AI 推荐） |
+| B 后台预取环+渐进 | 帧与视野同大；完成后预取当前级外一圈、z-1 全视野、z+1 中心；请求延迟 180→60 ms；同样渐进发布 | 下一帧多半命中缓存；拖动中的边缘仍会短暂空白 | 入选（AI 推荐） |
+| C 仅外扩帧 | 只外扩请求范围 | 改动最小；缩小和大量未生成时仍空白 | 未入选 |
+| 忽略 | 仅本次跳过对比 | — | 未选 |
+
+- 选择原文：`A 外扩帧+渐进+粗底图（推荐）,B 后台预取环+渐进（推荐）`。确认人：组员 1，2026-11-11。
+
+#### 3. 实现范围与实测方法
+
+- 共用：`frame()` 中心优先生成、每 100 ms 渐进发布、最终帧 `complete`；`PyramidStats::blank`；`frameReady` 的 view 改为图像实际覆盖范围；`MapView` 的 `tilesComplete` 属性；测试改为等待完成帧。
+- A 专属：外扩 256 px；z-2 粗略瓦片。
+- B 专属：预取一圈 / z-1 / z+1；请求延迟 60 ms。
+- 试验开关：`EdgeStrategy`、`edgeStrategyFromEnvironment()`（`P1_EDGE_STRATEGY`）、`requestDelayMs()`、构造参数，以及测试 `panEdgesAreCovered` 的数据行。
+- 试验程序：临时 CMake 目标 `p1-edge-bench`（源码在 scratch 目录，存档为报告 `evidence/EdgeBench.cpp.txt`），测完即删除。
+- 方法与数据：见 `NAVIT-20261111-1-edge-loading-01`。
+
+#### 4. 实测指标与契合度
+
+| 组合 | 正确性 | 平移空白消失中位 | 缩小首帧空白 / 空白消失中位 | 完成中位（平移 / 缩小） | 峰值 RSS |
+| --- | --- | --- | --- | --- | --- |
+| A | 金字塔 15/15（含两种策略）、根 CTest 19/19、业务测试在两种策略下均通过 | 19–21 ms | 0% / 51 ms（z13）；11% / 387 ms（z15） | 132–244 ms / 1.5–2.3 s | 253.1 MiB |
+| B | 同上 | 5–7 ms | 70% / 853 ms（z13）；73% / 524 ms（z15） | 6–9 ms / 0.5–0.9 s | 234.4 MiB |
+
+- 契合度：两者都只改动 `TilePyramid` 内部与一个画布属性，契合度高。A 让 `frameReady` 的图像大于请求范围，MapView 的重投影原本就支持，不需要改动。B 改变了请求延迟，与 design.md 的“约 180 ms”不一致。
+- AI 推荐：**A**。用户反馈的问题是“可见空白”，A 在平移和缩小时首帧空白都最少；完成更慢属于后台成本，画面仍逐步变清晰。
+- Navit：受阻未测，见报告。
+
+#### 5. 最终确认
+
+- 选定：**A 外扩帧+渐进+粗底图**。组员 1，2026-11-11，原文：`A 外扩帧+渐进+粗底图（推荐）`。
+- 理由：空白最少（实测）；代价是更多瓦片生成与约 19 MiB 的额外峰值内存。
+
+#### 6. 清理与复验
+
+- 删除：`EdgeStrategy`、`edgeStrategyFromEnvironment()`、`P1_EDGE_STRATEGY`、`requestDelayMs()`、`TilePyramid` 的构造参数与 `edges_`、`frame()` 的 Prefetch 分支、`MapView` 的策略参数（请求延迟恢复为常量 180 ms）、测试的 prefetch 数据行与等待；临时目标 `p1-edge-bench` 已从 CMakeLists 移除。
+- 保留：外扩、粗底图、渐进发布、`blank`/`complete`、`tilesComplete`、`panEdgesAreCovered`（单策略）。
+- 残留检查：`grep EdgeStrategy|Prefetch|prefetch|P1_EDGE_STRATEGY|requestDelayMs` 只剩 OSMX 中无关的 `edges_`。
+- 复验：构建无警告；根 CTest 19/19；金字塔 14/14；同数据重测 A，结果与试验一致（见报告“清理后复测”）。
+- 当前项目只保留 A。AI 日志 20；未提交（非 Git 工作区）。
+
+### DEC-20261111-1-route-mode-01：路线模式（一般模式 / 行车模式）
+
+- 负责人/日期：1（同一对话已确认编号）/ 2026-11-11。跨模块：路径规划主责 3，导航 4；本次只在 `NavigationWorkflow` 中过滤 A* 输入图的边，不改 A* 算法与公共契约。
+- 用户原文：`为体现对标navit，在菜单中再次新增一个选项：一般模式/行车模式，一般模式就是现在这种模式，行车模式就是在路线规划时不将人行道等道路划入计算内，参考navit的道路选择。`
+- 与第 7 节的关系：方案由用户直接指定（按 Navit 的道路选择硬性排除），AI 没有提供 2–3 种候选组合（例如用代价惩罚代替排除、基于速度剖面的时间最短等），用户也没有选择“忽略”。因此不标“本次忽略”，如实记为“用户指定单方案、未对比”；是否补做对比待用户确认。
+- 正式方案：`src/app/RoutingProfile.{h,cpp}` 的 `carAllowed()`，规则逐项对照 Navit 0.5.7 `navit.xml` car 配置与 `maptool/osm.c`（对照表见 `NAVIT-20261111-1-route-mode-01`）。`NavigationWorkflow::drivingGraph()` 生成同 ID 的行车子图；行车模式吸附到 500 m 内可驶出/驶入的节点。地图菜单“路线模式”默认一般；已有起终点时，切换会立即重新规划。轨迹匹配仍使用全网。
+- 未实现的 Navit 能力：速度剖面与时间最短、`route_depth`、through-traffic 限制、`access=no` 被 specific yes 覆盖的情况（导入层已将其设为不可规划）、`highway=road`。
+- 验证：`drivingModeExcludesNonCarRoads`（一般模式走 96 m 人行道，行车模式绕行 318 m；逐类断言 carAllowed；人行道中点吸附到车行道节点）、`routeModeMenu`（默认一般、互斥、切换后重新规划）。根 CTest 19/19。湖北实测见报告。
+- 新增/修改文件：新增 `src/app/RoutingProfile.{h,cpp}`；修改 `src/app/NavigationWorkflow.{h,cpp}`、`src/ui/map/MapView.cpp`、`CMakeLists.txt`、`tests/BusinessTests.cpp`。没有未选候选代码。
+- 补做对比确认：2026-11-11 组员 1 在被问到是否按第 7 节补做多方案对比时回复原文 `不用，就这样`，确认维持单方案、不补做对比。
+- 状态：功能完成，目标环境自动化测试通过；方案已确认；Navit 规划耗时对比受阻；需提示 3、4 号评审。
+
+### DEC-20261111-1-poi-index-01：兴趣点名称索引与“离起点最近 20 个”
+
+#### 1. 背景与约束
+
+- 2026-11-11，组员 1（同一对话已确认编号）。状态：**已完成**（确认、清理、复验均完成；Navit 对标受阻待补）。跨模块：POI 数据与导入缓存主责 2 号。
+- 用户原文：`如果没有索引就对兴趣点建立索引，在地图视图的右上角添加一个小的搜索按钮，……若符合条件的兴趣点超过20个就筛选离起点最近的20个点展示。……`（完整原文见 ai_log 对话 23）
+- 现状：`pois` 表只有 `(lat,lon)` 与 category 两个 B 树索引；`findPois()` 用 `instr` 全表扫描、按行号排序。湖北有 36,875 个 POI（18,669 个有名称）。空间/名称索引属第 7 节列明的关键算法。
+- 不涉及跨组接口；不修改 `ImportedDataset` 契约。
+
+#### 2. 全部候选与第一次选择
+
+| 组合 | 内容 | 预期利弊（非实测） | 是否入选 |
+| --- | --- | --- | --- |
+| A FTS5 trigram + 距离排序 | 首次搜索时在缓存中建外部内容 FTS5 trigram 表；不足 3 字的查询退回扫描；C++ 中按距离取前 20 | 标准 SQLite，索引持久；短查询不走索引 | 入选（AI 推荐） |
+| B 内存单字倒排 + 距离排序 | 首次搜索时把有名称的 POI 读入内存，建“字符 → POI”倒排；查询取最稀有字符的列表，再用 contains 校验；按距离取前 20 | 任意长度的中文都走索引；不落盘，每次启动重建 | 入选（AI 推荐） |
+| C R 树由近及远扩圈 | 在缓存中给 POI 坐标建 R 树，从 1 km 开始每次半径翻倍，圈内凑够 20 个就停 | 结果在附近时快；稀有或不存在的名称会扩到全省 | 入选 |
+| 忽略 | 仅本次跳过 | — | 未选 |
+
+- 选择原文：`A FTS5 三元组+距离排序（推荐）,B 内存单字倒排+距离排序（推荐）,C R 树由近及远扩圈`。确认人：组员 1，2026-11-11。
+
+#### 3. 实现范围与实测方法
+
+- 共用：`src/data/import/PoiSearch.{h,cpp}`（接口、距离、`finish` 取前 N 并读整行、全表扫描参考实现）、`PoiSearchCommon.h`；界面层全部共用（右上角搜索按钮、顶部居中搜索栏、编号点、信息框、“到这去”、吸附虚线）。
+- A：`PoiSearchFts.cpp`，表 `poi_fts`。B：`PoiSearchMemory.cpp`。C：`PoiSearchRtree.cpp`，表 `poi_rtree`。
+- 试验开关：`PoiIndexKind`、`poiIndexKindFromEnvironment()`（`P1_POI_INDEX`）、`poiIndexKindName()`、`tableExists()`（仅 A/C 使用）、`MapView` 的 `poiIndex_`、测试的三行数据。
+- 试验程序：临时目标 `p1-poi-bench`（存档为 `evidence/PoiBench.cpp.txt`），测完即删除。
+- 方法与数据：见 `NAVIT-20261111-1-poi-index-01`。
+
+#### 4. 实测指标与契合度
+
+| 组合 | 正确性 | 1–2 字查询中位 | ≥3 字查询中位 | 无匹配 | 建索引 | 磁盘 | 峰值 RSS |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| A | 与扫描一致 12/12；单元 3 行之一通过 | 5.0–5.4 ms | 0.33–0.45 ms | 0.16 ms | 658 ms | +0.95 MiB | 16.2 MiB |
+| B | 同上 | 0.17–0.31 ms | 0.20–0.29 ms | 0.003 ms | 14 ms（每次启动） | 0 | 16.6 MiB |
+| C | 同上 | 3.4–9.3 ms | 5.7–18.6 ms | 49 ms | 671 ms | +0.98 MiB | 14.3 MiB |
+
+- 契合度：B 不改 2 号的缓存文件，契合度最高；A/C 会向导入缓存追加表，需要写权限，并影响缓存的不可变假设。
+- AI 推荐：**B**。所有查询最快，不改缓存；内存只占名称与坐标（湖北约 1.9 万条）。
+
+#### 5. 最终确认
+
+- 选定：**B 内存单字倒排**。组员 1，2026-11-11，原文：`B 内存单字倒排（推荐）`。
+
+#### 6. 清理与复验
+
+- 删除：`PoiSearchFts.cpp`、`PoiSearchRtree.cpp`、`PoiIndexKind` 及环境开关和名称函数、`tableExists()`、`searchNearestPois` 的 kind 参数、`MapView::poiIndex_`、测试数据行；临时目标已从 CMake 移除。被测缓存副本在 scratch 目录，没有写入用户的导入缓存。
+- 保留：`PoiSearch.{h,cpp}`、`PoiSearchCommon.h`、`PoiSearchMemory.cpp`、单元测试 `poiIndexMatchesFullScan`、业务测试 `poiSearchGoHere`。
+- 残留检查：`grep PoiIndexKind|P1_POI_INDEX|searchFts|searchRtree|poi_fts|poi_rtree|tableExists` 无命中。
+- 复验：构建无警告；根 CTest 19/19；同数据复测 B 与试验一致（报告“清理后复测”）。
+- 当前项目只保留 B。AI 日志 23；未提交（非 Git 工作区）。
+
+### DEC-20261111-1-poi-dedup-01：导入后同名临近 POI 合并
+
+- 负责人/日期：1 / 2026-11-11。跨模块：导入与缓存主责 2 号。
+- 用户原文：`现在出现了一个问题，就是同一个POI显示了4次，在数据导入模块后新增一个检查机制，对于POI，如果名称相同且距离太近就视为一个点。……`（附截图：康魅路停车场显示 4 次）
+- 与第 7 节的关系：合并规则（同名 + 距离近即视为一点）由用户直接给出，AI 只确定阈值与实现细节（100 m、按 id 贪心、每簇保留最小 id、无名不合并、网格分桶），没有提供多种候选组合，用户也没有选择“忽略”。因此记为“用户指定单方案、未对比”，与 `DEC-20261111-1-route-mode-01` 的处理一致。
+- 实现：`src/data/import/PoiDedup.{h,cpp}`；在导入事务内建索引之前执行；旧缓存在搜索时于内存中套用。阈值常量 `kPoiDuplicateMeters=100`。
+- 已知取舍：链式点（A–B 80 m、B–C 80 m、A–C 160 m）会保留 A、C；100 m 内的同名连锁店（如马路两侧的同名加油站）也会被合并为一个。
+- 验证：`poiDuplicatesMerged`；根 CTest 19/19；湖北合并 3,023 个，康魅路停车场 4 → 1。Navit：maptool 是否做同类合并未在所装版本核实，记录在 `NAVIT-20261111-1-poi-index-01`。
+
+### DEC-20261111-1-long-route-01：远距离路线规划的路网加载（本次忽略）
+
+- 负责人/日期：1 / 2026-11-11。跨模块：`ImportedDataset` 接口主责 2，规划主责 3、4。
+- 触发：用户发来截图（武汉武昌 → 黄州商场，直线 53.5 km），状态显示“工作区域无效或过大，请选择半径 0.2–10 km 的区域”。原因：全量区域路网受 `roads()` 的 0.3°×0.5° 与 `buildNetwork` 的 25 万节点限制。
+- 展示的候选：A 仿 Navit `route_depth` 分级加载（推荐）；B 放宽区域与节点上限、仍在全量路网上跑 A*（推荐）；C 全省主干网常驻内存 + 两端拼接；忽略。
+- 选择过程（原文）：第一次只选了 `A 仉 Navit 分级加载（推荐）`；AI 说明通常需要 2–3 种后再次询问，组员 1 选择 `忽略对比，只做 A`。忽略范围仅限本次决策；下一个关键算法决策恢复正常流程。
+- 单方案：全量路网超限，或按 2/4/8 km 扩大后仍不连通时，加载分级路网：两端 3 km 全部道路；两端 15 km 内 motorway…tertiary；外框按距离 25%（≥ 5 km）外扩，其中 motorway/trunk/primary，超过 100 km 时只保留 motorway/trunk。分级路网上限为 100 万节点 / 200 万引用 / 40 万条路；全量路网上限不变。A*、吸附与行车模式不变。
+- 新增/修改：`ImportedDataset::roadsLayered()` 与 `RoadLayer`（契约新增，`roads()` 行为不变，内部共用 `load()`）；`NavigationWorkflow::buildNetwork` 新增上限参数（默认值不变）；`plan()` 中的分级回退与状态说明；测试 `longRouteUsesTieredNetwork`。
+- 验证：根 CTest 19/19。湖北 8 个终点（53–406 km）× 两种模式 16/16 成功，0.33–0.74 s，峰值 RSS 280.7 MiB；质量对照见 `NAVIT-20261111-1-long-route-01`（与全量相比，长度比中位 1.0004，最大 2.33）。
+- 状态：本次忽略，单方案已实现；Navit 同起终点对比受阻；需 2、3、4 号评审。
+

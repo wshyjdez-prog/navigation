@@ -1,0 +1,17 @@
+		<vehicleprofile name="car" route_depth="4:25%,8:40000,18:10000" flags="0x4000000" flags_forward_mask="0x4040002" flags_reverse_mask="0x4040001" route_mode="0" static_speed="5" static_distance="25">
+			<roadprofile item_types="street_0,street_1_city,living_street,street_service,track_gravelled,track_unpaved,street_parking_lane" speed="10" />
+			<roadprofile item_types="street_2_city,track_paved" speed="30" />
+			<roadprofile item_types="street_3_city" speed="40" />
+			<roadprofile item_types="street_4_city" speed="50" />
+			<roadprofile item_types="highway_city" speed="80" />
+			<roadprofile item_types="street_1_land" speed="60" />
+			<roadprofile item_types="street_2_land" speed="65" />
+			<roadprofile item_types="street_3_land" speed="70" />
+			<roadprofile item_types="street_4_land" speed="80" />
+			<roadprofile item_types="street_n_lanes" speed="120" />
+			<roadprofile item_types="highway_land" speed="120" />
+			<roadprofile item_types="ramp" speed="40" />
+			<!--roundabout does not apply to OSMaps -->
+			<roadprofile item_types="roundabout" speed="10"/>
+			<roadprofile item_types="ferry" speed="40"/>
+		</vehicleprofile>

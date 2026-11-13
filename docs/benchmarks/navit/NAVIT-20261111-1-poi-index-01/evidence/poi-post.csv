@@ -1,0 +1,14 @@
+memory,build,1,11.1,11.5,0
+memory,query,店,20,0.209,0.252,616,1
+memory,query,超市,20,0.174,0.239,164,1
+memory,query,银行,20,0.297,0.371,479,1
+memory,query,医院,20,0.258,0.271,544,1
+memory,query,餐厅,20,0.186,0.212,74,1
+memory,query,大学,20,0.300,0.429,2146,1
+memory,query,武汉大学,20,0.276,0.311,1274,1
+memory,query,中国工商银行,20,0.246,0.274,275,1
+memory,query,麦当劳,20,0.236,0.258,66,1
+memory,query,加油站,20,0.183,0.234,54,1
+memory,query,肯德基,20,0.240,0.306,61,1
+memory,query,不存在的名字xyz,0,0.003,0.003,0,1
+memory,scan-baseline,超市,5.010

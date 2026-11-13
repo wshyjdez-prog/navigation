@@ -2,6 +2,9 @@
 #include "contracts/ImportedDataset.h"
 #include "contracts/MapGeometry.h"
 #include "data/import/Sqlite.h"
+#include "data/import/PoiSearch.h"
+#include "data/import/PoiDedup.h"
+#include <QRandomGenerator>
 #include <osmium/io/any_input.hpp>
 #include <osmium/io/any_output.hpp>
 #include <QFile>
@@ -176,6 +179,70 @@ private slots:
         }
         QCOMPARE(p1::data::listImportedDatasets(dir.filePath("cache")).size(),0);
         QVERIFY_EXCEPTION_THROWN(p1::data::ImportedDataset(dir.filePath("cache/old.sqlite")).summary(),std::runtime_error);
+    }
+    void poiIndexMatchesFullScan() {
+        // 1500 seeded POIs: Chinese/ASCII names from a small vocabulary spread
+        // over ~60 km, so common words have hundreds of matches and rare ones few.
+        QTemporaryDir dir;QVERIFY(dir.isValid());QRandomGenerator rng(20261111);
+        const QStringList words{"超市","餐厅","银行","武汉大学","中国工商银行","McDonald's","Cafe","加油站","医院","书店"};
+        QByteArray osm="<osm version=\"0.6\">";
+        for(int i=1;i<=1500;++i){const auto name=words[rng.bounded(words.size())]+(rng.bounded(3)?QString("（%1店）").arg(rng.bounded(40)):QString());
+            osm+=QString("<node id=\"%1\" lat=\"%2\" lon=\"%3\"><tag k=\"shop\" v=\"convenience\"/><tag k=\"name\" v=\"%4\"/></node>")
+                .arg(i).arg(30.3+rng.generateDouble()*0.6,0,'f',7).arg(114.0+rng.generateDouble()*0.6,0,'f',7).arg(name.toHtmlEscaped()).toUtf8();}
+        osm+="<node id=\"5001\" lat=\"30.6\" lon=\"114.3\"><tag k=\"shop\" v=\"bakery\"/></node></osm>"; // unnamed
+        write(dir.filePath("pois.osm"),osm);
+        const auto entry=p1::data::OsmImportParser(dir.filePath("cache")).parse(dir.filePath("pois.osm"),{},{},{});QVERIFY2(entry.ok,qPrintable(entry.error));
+        const double lat=30.6,lon=114.3;bool first=true;
+        for(const QString q:{"超市","店","武汉大学","工商银行","cafe","MCDONALD","（1","不存在的名字","银"}){
+            for(int limit:{20,5}){
+                p1::data::PoiSearchStats stats;
+                const auto got=p1::data::searchNearestPois(entry.cachePath,q,lat,lon,limit,&stats);
+                const auto want=p1::data::searchNearestPoisByScan(entry.cachePath,q,lat,lon,limit);
+                QCOMPARE(stats.builtIndex,first);first=false;
+                QCOMPARE(got.size(),want.size());
+                for(int i=0;i<got.size();++i){QCOMPARE(got[i].id,want[i].id);QCOMPARE(got[i].poi.name,want[i].poi.name);QVERIFY(std::abs(got[i].distanceM-want[i].distanceM)<1e-6);}
+                for(int i=1;i<got.size();++i)QVERIFY(got[i-1].distanceM<=got[i].distanceM);
+                QVERIFY(got.size()<=limit);
+            }
+        }
+        QCOMPARE(p1::data::searchNearestPois(entry.cachePath,"超市",lat,lon,20).size(),20);
+        QVERIFY(p1::data::searchNearestPois(entry.cachePath,"不存在的名字",lat,lon,20).isEmpty());
+        QVERIFY_EXCEPTION_THROWN(p1::data::searchNearestPois(entry.cachePath,"  ",lat,lon,20),std::invalid_argument);
+        auto cancel=std::make_shared<std::atomic_bool>(true);
+        QVERIFY_EXCEPTION_THROWN(p1::data::searchNearestPois(entry.cachePath,"超市",lat,lon,20,nullptr,cancel),std::runtime_error);
+        // The base dataset API keeps working after the index was added.
+        QVERIFY(!p1::data::ImportedDataset(entry.cachePath).findPois("超市",5).isEmpty());
+    }
+    void poiDuplicatesMerged() {
+        // 康魅路停车场 x4: three within ~40 m (one place mapped as several
+        // platforms) and one 300 m away; another name 10 m away; two unnamed.
+        const double lat=30.4286,lon=114.4414,m=1.0/111195.08;
+        auto node=[&](int id,double dy,const QString& name){return QString("<node id=\"%1\" lat=\"%2\" lon=\"%3\"><tag k=\"public_transport\" v=\"platform\"/>%4</node>")
+            .arg(id).arg(lat+dy*m,0,'f',7).arg(lon,0,'f',7).arg(name.isEmpty()?QString():QString("<tag k=\"name\" v=\"%1\"/>").arg(name));};
+        QString osm="<osm version=\"0.6\">";
+        osm+=node(1,0,"康魅路停车场")+node(2,20,"康魅路停车场")+node(3,40,"康魅路停车场")+node(4,300,"康魅路停车场")
+            +node(5,10,"其他车站")+node(6,0,"")+node(7,0,"")+"</osm>";
+        QTemporaryDir dir;QVERIFY(dir.isValid());write(dir.filePath("dup.osm"),osm.toUtf8());
+        const auto entry=p1::data::OsmImportParser(dir.filePath("cache")).parse(dir.filePath("dup.osm"),{},{},{});QVERIFY2(entry.ok,qPrintable(entry.error));
+        QCOMPARE(entry.stats.poisMerged,quint64(2));QCOMPARE(entry.stats.pois,quint64(5));
+        QVERIFY(entry.warnings.join("\n").contains("合并"));
+        p1::data::ImportedDataset cache(entry.cachePath);QCOMPARE(cache.summary().stats.poisMerged,quint64(2));
+        const auto kept=cache.findPois("康魅路停车场",10);QCOMPARE(kept.size(),2);
+        QCOMPARE(kept[0].osmId,qint64(1));QCOMPARE(kept[1].osmId,qint64(4));
+        QCOMPARE(cache.pois({lat-0.01,lon-0.01,lat+0.01,lon+0.01,true}).size(),5); // unnamed ones never merge
+        QCOMPARE(p1::data::searchNearestPois(entry.cachePath,"康魅路",lat,lon,20).size(),2);
+        // A cache from before the check (no marker, duplicates present) is merged at search time.
+        {
+            p1::data::detail::Db db(entry.cachePath);
+            db.exec("DELETE FROM metadata WHERE key='poi_dedup_m';"
+                    "INSERT INTO pois(osm_type,osm_id,lat,lon,category,kind,name,tags) VALUES(0,99,30.42869,114.4414,'public_transport','platform','康魅路停车场','');");
+        }
+        const auto legacy=p1::data::searchNearestPois(entry.cachePath,"康魅路",lat,lon,20);QCOMPARE(legacy.size(),2);
+        const auto scan=p1::data::searchNearestPoisByScan(entry.cachePath,"康魅路",lat,lon,20);QCOMPARE(scan.size(),2);
+        QCOMPARE(legacy[0].id,scan[0].id);QCOMPARE(legacy[1].id,scan[1].id);
+        // Chain rule: B within 100 m of kept A is merged; C 160 m from A stays.
+        const auto drop=p1::data::detail::duplicatePoiIds({{1,"x",30,114},{2,"x",30+80*m,114},{3,"x",30+160*m,114},{4,"y",30,114},{5," x ",30+20*m,114}});
+        QCOMPARE(drop,(std::vector<qint64>{2,5}));
     }
 };
 QTEST_GUILESS_MAIN(ImportTests)

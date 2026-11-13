@@ -1,0 +1,41 @@
+// Trial benchmark for DEC-20261111-1-edge-loading-01 (temporary CMake target).
+// Usage: edge-bench CACHE.sqlite TILE_ROOT overscan|prefetch RUNS
+// CSV: strategy,run,scenario,step,kind,zoom,immediateCoverage,firstMs,firstBlank,visibleTiles,filledMs,completeMs
+#include "ui/map/TilePyramid.h"
+#include "contracts/ImportedDataset.h"
+#include <QApplication>
+#include <QDirIterator>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QTimer>
+#include <cmath>
+#include <cstdio>
+using namespace p1;
+constexpr double world=40075016.68557849;
+int main(int argc,char** argv){
+    QApplication app(argc,argv);if(argc<5)return 2;
+    const auto entry=data::ImportedDataset(QString::fromLocal8Bit(argv[1])).summary();const QString root=argv[2];
+    const bool prefetch=QString(argv[3])=="prefetch";const auto strategy=prefetch?ui::EdgeStrategy::Prefetch:ui::EdgeStrategy::Overscan;const int runs=std::atoi(argv[4]);
+    const QSize size(1280,800);
+    struct Step{const char* kind;double dx,dy,scale;};
+    const Step steps[]={{"pan-e",.3,0,1},{"pan-e",.3,0,1},{"pan-e",.3,0,1},{"pan-e",.3,0,1},{"pan-n",0,.3,1},{"pan-n",0,.3,1},{"zoom-out",0,0,2},{"zoom-out",0,0,2},{"zoom-in",0,0,.5},{"zoom-in",0,0,.5}};
+    for(int run=0;run<runs;++run)for(int startZ:{13,15}){
+        {QDirIterator it(root,{"raster-style*"},QDir::Dirs,QDirIterator::Subdirectories);QStringList d;while(it.hasNext())d<<it.next();for(auto&x:d)QDir(x).removeRecursively();}
+        ui::TilePyramid pyramid(nullptr,root,strategy);pyramid.setDataset(entry,{});
+        const auto c=ui::mapProject({114.305,30.593});const double w=world*size.width()/(256*std::ldexp(1.,startZ))*.75;QRectF view(c.x()-w/2,c.y()-w*size.height()/size.width()/2,w,w*size.height()/size.width());
+        QRectF covered;
+        auto request=[&](QRectF v,int step,const char* kind){
+            QEventLoop loop;QElapsedTimer t;double first=-1,filled=-1,complete=-1;int firstBlank=-1,tiles=0,zoom=0;
+            auto con=QObject::connect(&pyramid,&ui::TilePyramid::frameReady,&loop,[&](QImage,QRectF fv,ui::PyramidStats st){
+                const double ms=t.nsecsElapsed()/1e6;if(first<0){first=ms;firstBlank=st.blank;tiles=st.tiles;zoom=st.zoom;}
+                if(filled<0&&st.blank==0)filled=ms;if(st.complete){complete=ms;covered=fv;loop.quit();}});
+            const double immediate=covered.isValid()?covered.intersected(v).width()*covered.intersected(v).height()/(v.width()*v.height()):0;
+            QTimer::singleShot(600000,&loop,&QEventLoop::quit);t.start();pyramid.request(v,size,false);loop.exec();QObject::disconnect(con);
+            std::printf("%s,%d,z%d,%d,%s,%d,%.3f,%.1f,%d,%d,%.1f,%.1f\n",prefetch?"prefetch":"overscan",run,startZ,step,kind,zoom,immediate,first,firstBlank,tiles,filled,complete);std::fflush(stdout);
+            QEventLoop idle;QTimer::singleShot(400,&idle,&QEventLoop::quit);idle.exec(); // user pause; background prefetch may run
+        };
+        request(view,0,"initial");int i=1;
+        for(const auto& s:steps){const auto ctr=view.center()+QPointF(s.dx*view.width(),s.dy*view.height());view=QRectF(ctr-QPointF(view.width()*s.scale/2,view.height()*s.scale/2),view.size()*s.scale);request(view,i++,s.kind);}
+    }
+    return 0;
+}

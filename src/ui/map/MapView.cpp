@@ -2,6 +2,11 @@
 #include "TilePyramid.h"
 #include "app/NavigationWorkflow.h"
 #include "contracts/ImportedDataset.h"
+#include "data/import/PoiSearch.h"
+#include <QLabel>
+#include <QFontMetricsF>
+#include <QLineEdit>
+#include <QToolButton>
 #include "data/osmx/OsmxCache.h"
 #include "pal/linux/renderer/LinuxRenderer.h"
 #include "MapFrame.h"
@@ -13,6 +18,8 @@
 #include <QFutureWatcher>
 #include <QGridLayout>
 #include <QMenu>
+#include <QActionGroup>
+#include <tuple>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -103,9 +110,29 @@ private:
     QString notice_;QPointF pressed_,last_;bool drag_=false,moved_=false;
 };
 struct Prepared {renderer::RenderResult render;double totalMs=0;QImage tile;QString tileKey;};
+// Map pin: round head with a hole, tapering to a tip at the POI position.
+constexpr double kPoiPinHeadY=20;
+QPainterPath poiPinPath(QPointF tip,double scale) {
+    const double r=9*scale,cy=tip.y()-kPoiPinHeadY*scale,x=tip.x();
+    QPainterPath pin;pin.setFillRule(Qt::OddEvenFill);
+    pin.moveTo(tip);
+    pin.cubicTo(QPointF(x-2.5*scale,tip.y()-6*scale),QPointF(x-r,cy+6*scale),QPointF(x-r,cy));
+    pin.arcTo(QRectF(x-r,cy-r,2*r,2*r),180,-180);
+    pin.cubicTo(QPointF(x+r,cy+6*scale),QPointF(x+2.5*scale,tip.y()-6*scale),tip);
+    pin.closeSubpath();
+    pin.addEllipse(QPointF(x,cy),r*.42,r*.42);
+    return pin;
+}
+// First five characters of a POI name; longer names end with an ellipsis.
+QString poiShortName(const QString& name) {
+    const auto chars=name.trimmed().toUcs4();
+    if(chars.size()<=5) return name.trimmed();
+    return QString::fromUcs4(reinterpret_cast<const char32_t*>(chars.constData()),5)+QStringLiteral("…");
+}
 Prepared draw(const app::WorkflowResult& state,std::shared_ptr<const app::RoadNetwork> projection,
     quint64 roadsRevision,QRectF view,QSize size,MapColors colors,
-    std::optional<QPointF> start,std::optional<QPointF> end,QImage cache,QString key,QImage previousTile,QString previousTileKey,QImage pyramidBase,QRectF pyramidView) {
+    std::optional<QPointF> start,std::optional<QPointF> end,QImage cache,QString key,QImage previousTile,QString previousTileKey,QImage pyramidBase,QRectF pyramidView,
+    QVector<QPair<QPointF,QString>> pois,int selectedPoi) {
     QElapsedTimer timer;timer.start();Prepared out;renderer::MapScene scene;
     scene.logicalSize=size;scene.source=renderer::MapSource::Real;
     scene.dataVersion=projection?projection->version:"empty";
@@ -135,7 +162,49 @@ Prepared draw(const app::WorkflowResult& state,std::shared_ptr<const app::RoadNe
     if(projection&&end) scene.markers.append({"end",screen(*end),renderer::MarkerKind::End,QColor("#D64F50"),"B",10,20});
     out.render=renderer::LinuxRenderer::render(scene,nullptr,size,renderer::RenderMode::CachedBase,0,cache,key);
     if(!out.render.frame.isNull()&&projection){
-        QPainter p(&out.render.frame);p.setPen(QPen(colors.label,2));
+        QPainter p(&out.render.frame);p.setRenderHint(QPainter::Antialiasing);
+        // Dashed connectors: chosen start/end -> the road node the route was snapped to.
+        if(state.route.size()>=2) {
+            p.setPen(QPen(colors.route,2,Qt::DashLine,Qt::RoundCap));
+            auto connector=[&](std::optional<QPointF> picked,QPointF snapped){
+                if(!picked) return;
+                const QPointF a=screen(*picked),b=screen(snapped);const QLineF line(a,b);
+                if(line.length()<=12) return; // inside the endpoint marker
+                p.drawLine(line.pointAt(10/line.length()),b);
+            };
+            connector(start,state.route.front());connector(end,state.route.back());
+        }
+        // POI search results: purple map pins (tip on the POI), then the start of
+        // each name beside its pin. Names never cover another name or pin head:
+        // the selected one is placed first, then nearest-first; a name tries the
+        // right side, then the left, and is left out when both collide.
+        QVector<QRectF> heads;
+        for(int pass=0;pass<2;++pass)for(int i=0;i<pois.size();++i){
+            if((i==selectedPoi)!=(pass==1)) continue; // selected pin on top
+            const double scale=i==selectedPoi?1.3:1.;const auto tip=screen(pois[i].first);
+            p.setPen(QPen(colors.labelHalo,1.5));p.setBrush(i==selectedPoi?colors.poiSelected:colors.poi);p.drawPath(poiPinPath(tip,scale));
+        }
+        for(int i=0;i<pois.size();++i){const double scale=i==selectedPoi?1.3:1.;const auto tip=screen(pois[i].first);
+            heads.append(QRectF(tip.x()-9*scale,tip.y()-(kPoiPinHeadY+9)*scale,18*scale,(kPoiPinHeadY+9)*scale));}
+        QVector<QRectF> names;QVector<int> order;if(selectedPoi>=0&&selectedPoi<pois.size())order.append(selectedPoi);
+        for(int i=0;i<pois.size();++i)if(i!=selectedPoi)order.append(i);
+        for(int i:order){
+            const double scale=i==selectedPoi?1.3:1.;const auto tip=screen(pois[i].first);
+            QFont font=p.font();font.setPixelSize(12);font.setBold(i==selectedPoi);const QFontMetricsF fm(font);
+            const auto label=poiShortName(pois[i].second);const double w=fm.horizontalAdvance(label),h=fm.height(),baseline=tip.y()-kPoiPinHeadY*scale+fm.ascent()/2-1;
+            std::optional<QRectF> spot;
+            for(double x:{tip.x()+9*scale+3,tip.x()-9*scale-3-w}){
+                const QRectF box(x-2,baseline-fm.ascent()-2,w+4,h+4);bool free=true;
+                for(const auto& r:names)if(r.intersects(box)){free=false;break;}
+                for(int j=0;free&&j<heads.size();++j)if(j!=i&&heads[j].intersects(box))free=false;
+                if(free){spot=box;break;}
+            }
+            if(!spot) continue;
+            names.append(*spot);QPainterPath text;text.addText(QPointF(spot->left()+2,baseline),font,label);
+            p.setBrush(Qt::NoBrush);p.setPen(QPen(colors.labelHalo,3,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));p.drawPath(text);
+            p.setPen(Qt::NoPen);p.setBrush(i==selectedPoi?colors.poiSelected:colors.poi);p.drawPath(text);
+        }
+        p.setBrush(Qt::NoBrush);p.setPen(QPen(colors.label,2));
         const auto center=mapUnproject(view.center());const double metresPerPixel=view.width()/size.width()*std::cos(center.y()*std::acos(-1.)/180.);
         const double target=metresPerPixel*100;const double unit=std::pow(10.,std::floor(std::log10(std::max(.001,target))));double distance=unit;
         for(double step:{1.,2.,5.})if(step*unit<=target)distance=step*unit;
@@ -158,6 +227,42 @@ public:
         auto* menuButton=button("菜单");menuButton->setObjectName("mapMenuButton");menuButton->setAccessibleName("地图菜单");buttons->addWidget(menuButton);
         plan_=button("计算路线",true);plan_->setObjectName("calculateRoute");buttons->addWidget(plan_);plan_->hide();
         layout->addWidget(tools,0,0,Qt::AlignTop|Qt::AlignLeft);
+        // POI search: a small button top-right that expands into a top-centre bar.
+        auto* searchArea=new QWidget;searchArea->setObjectName("poiSearchArea");auto* searchLayout=new QHBoxLayout(searchArea);searchLayout->setContentsMargins(16,16,16,0);
+        searchButton_=button(QString());searchButton_->setObjectName("poiSearchButton");searchButton_->setIconSize(QSize(24,24));searchButton_->setAccessibleName("搜索兴趣点");
+        searchButton_->setToolTip("搜索兴趣点（需先右键地图设置起点）");searchLayout->addWidget(searchButton_);
+        layout->addWidget(searchArea,0,0,Qt::AlignTop|Qt::AlignRight);
+        searchBar_=new QFrame;searchBar_->setObjectName("poiSearchBar");searchBar_->setFrameShape(QFrame::NoFrame);
+        auto* bar=new QHBoxLayout(searchBar_);bar->setContentsMargins(0,0,0,0);bar->setSpacing(8);
+        searchInput_=new QLineEdit;searchInput_->setObjectName("poiSearchInput");searchInput_->setPlaceholderText("输入兴趣点名称，回车搜索（离起点最近的 20 个）");
+        searchInput_->setMinimumWidth(360);searchInput_->setClearButtonEnabled(true);bar->addWidget(searchInput_);
+        auto* close=new QToolButton;close->setObjectName("poiSearchClose");close->setText("关闭");close->setAccessibleName("关闭搜索并清除结果");bar->addWidget(close);
+        auto* barHolder=new QWidget;auto* holderLayout=new QHBoxLayout(barHolder);holderLayout->setContentsMargins(0,16,0,0);holderLayout->addWidget(searchBar_);
+        layout->addWidget(barHolder,0,0,Qt::AlignTop|Qt::AlignHCenter);searchBar_->hide();
+        poiInfo_=new QLabel(canvas_);poiInfo_->setObjectName("poiInfo");poiInfo_->setAutoFillBackground(true);poiInfo_->setFrameShape(QFrame::StyledPanel);
+        poiInfo_->setMargin(8);poiInfo_->setTextFormat(Qt::RichText);poiInfo_->hide();
+        auto stylePopups=[this]{const auto& c=theme_.colors();
+            poiInfo_->setStyleSheet(QString("QLabel#poiInfo{background:%1;color:%2;border:1px solid %3;border-radius:10px;}").arg(c.raised,c.text,c.border));
+            // Only the input and close button are visible; the bar around them stays transparent over the map.
+            searchBar_->setStyleSheet(QString("QFrame#poiSearchBar{background:transparent;border:none;}"
+                "QToolButton#poiSearchClose{background:%1;color:%2;border:none;border-radius:12px;min-height:42px;padding:0 18px;font-weight:500;}"
+                "QToolButton#poiSearchClose:hover{background:%3;}QToolButton#poiSearchClose:pressed{background:%4;}"
+                "QToolButton#poiSearchClose:focus{border:2px solid %5;}").arg(c.primary,c.onPrimary,c.primaryHover,c.primaryPressed,c.focus));
+            // Blue magnifier (state.info) replaces the "搜索" text on the collapsed search button.
+            QIcon magnifier;
+            for(int size:{24,48}) {
+                QPixmap pixmap(size*2,size*2);pixmap.setDevicePixelRatio(2);pixmap.fill(Qt::transparent);
+                QPainter p(&pixmap);p.setRenderHint(QPainter::Antialiasing);p.scale(size/24.,size/24.);
+                p.setPen(QPen(QColor(c.info),2.4,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));
+                p.drawEllipse(QPointF(10.5,10.5),6.5,6.5);p.drawLine(QPointF(15.3,15.3),QPointF(20.5,20.5));
+                p.end();magnifier.addPixmap(pixmap);
+            }
+            searchButton_->setIcon(magnifier);
+            searchButton_->setStyleSheet("QPushButton#poiSearchButton{padding:0;min-width:42px;max-width:42px;min-height:42px;max-height:42px;}");};
+        stylePopups();connect(&theme_,&Theme::changed,this,stylePopups);
+        connect(searchButton_,&QPushButton::clicked,this,&MapPage::openSearch);
+        connect(close,&QToolButton::clicked,this,&MapPage::closeSearch);
+        connect(searchInput_,&QLineEdit::returnPressed,this,&MapPage::searchPois);
         menu_=new QMenu(this);menu_->setObjectName("mapMainMenu");menuButton->setMenu(menu_);
         datasets_=menu_->addMenu("选择已导入地图");datasets_->setObjectName("mapDatasetsMenu");
         connect(menu_->addAction("导入地图…"),&QAction::triggered,this,[this]{emit pageRequested("import");});
@@ -167,6 +272,26 @@ public:
         auto* results=menu_->addAction("查看路线");results->setObjectName("fitNavigationResult");connect(results,&QAction::triggered,this,&MapPage::fitResults);
         connect(menu_->addAction("放大　+"),&QAction::triggered,this,[this]{zoom(.8);});
         connect(menu_->addAction("缩小　−"),&QAction::triggered,this,[this]{zoom(1.25);});
+        // Route mode: General (all routable ways) / Driving (Navit car profile roads).
+        auto* routeMode=menu_->addMenu("路线模式");routeMode->setObjectName("mapRouteModeMenu");
+        auto* routeGroup=new QActionGroup(routeMode);routeGroup->setExclusive(true);
+        for(const auto& [label,name,mode]:{std::tuple{"一般模式","routeModeGeneral",app::RouteMode::General},std::tuple{"行车模式","routeModeDriving",app::RouteMode::Driving}}){
+            auto* action=routeMode->addAction(QString::fromUtf8(label));action->setObjectName(name);action->setCheckable(true);
+            action->setChecked(mode==flow_->routeMode());routeGroup->addAction(action);
+            connect(action,&QAction::triggered,this,[this,mode=mode]{
+                flow_->setRouteMode(mode);
+                // An existing A-B pair is re-planned under the new mode.
+                if(projection_&&flow_->startPoint()&&flow_->endPoint()&&!flow_->busy())plan();
+            });
+        }
+        // Clarity = tile render density (1x / 1.5x / 2x); kept for this session.
+        auto* clarity=menu_->addMenu("地图清晰度");clarity->setObjectName("mapClarityMenu");
+        auto* clarityGroup=new QActionGroup(clarity);clarityGroup->setExclusive(true);
+        for(const auto& [label,name,level]:{std::tuple{"高",  "mapClarityHigh",MapClarity::High},std::tuple{"中","mapClarityMedium",MapClarity::Medium},std::tuple{"低","mapClarityLow",MapClarity::Low}}){
+            auto* action=clarity->addAction(QString::fromUtf8(label));action->setObjectName(name);action->setCheckable(true);
+            action->setChecked(level==pyramid_.clarity());clarityGroup->addAction(action);
+            connect(action,&QAction::triggered,this,[this,level=level]{pyramid_.setClarity(level);if(projection_)loadVisible();});
+        }
         connect(menu_->addAction("清除起终点与路线"),&QAction::triggered,flow_,&app::NavigationWorkflow::clearEndpoints);
         cancel_=menu_->addAction("取消当前计算");connect(cancel_,&QAction::triggered,flow_,&app::NavigationWorkflow::cancel);
         menu_->addSeparator();onlyMap_=menu_->addAction("仅显示地图　Ctrl+M");onlyMap_->setCheckable(true);
@@ -182,13 +307,20 @@ public:
             const auto actual=aspectView(view_,canvas_->size());view_.translate(delta.x()*actual.width(),delta.y()*actual.height());
             clampView();schedule();regionTimer_.start();
         });
-        connect(canvas_,&MapCanvas::clicked,this,[this](QPointF f){if(projection_) flow_->acceptMapPoint(geoPoint(f));});
-        connect(canvas_,&MapCanvas::menuRequested,this,&MapPage::showPointMenu);
+        connect(canvas_,&MapCanvas::clicked,this,[this](QPointF f){
+            if(!projection_) return;
+            const int hit=poiAt({f.x()*canvas_->width(),f.y()*canvas_->height()});
+            if(hit>=0){selectPoi(hit);return;}
+            if(selectedPoi_>=0){selectedPoi_=-1;poiInfo_->hide();schedule();}
+            flow_->acceptMapPoint(geoPoint(f));});
+        connect(canvas_,&MapCanvas::menuRequested,this,[this](QPoint position){
+            const int hit=poiAt(position);
+            if(hit>=0) showPoiMenu(hit); else showPointMenu(position);});
         connect(canvas_,&MapCanvas::resized,this,[this]{clampView();schedule();regionTimer_.start();});
         connect(flow_,&app::NavigationWorkflow::changed,this,&MapPage::sync);
         connect(&pyramid_,&TilePyramid::statusChanged,this,[this](const QString& text){regionStatus_=text;updateNotice();});
         connect(&pyramid_,&TilePyramid::frameReady,this,[this](QImage image,QRectF view,PyramidStats stats){
-            pyramidBase_=image;pyramidView_=view;++pyramidRevision_;
+            pyramidBase_=image;pyramidView_=view;++pyramidRevision_;pyramidComplete_=stats.complete;
             regionStatus_=stats.roads?QString():QString("当前范围没有已导入道路");updateNotice();
             canvas_->setProperty("tileZoom",stats.zoom);canvas_->setProperty("tileCount",stats.tiles);
             canvas_->setProperty("roadCount",stats.roads);
@@ -204,11 +336,13 @@ public:
     ~MapPage() override {
         if(watcher_) watcher_->waitForFinished();
         if(catalog_) catalog_->waitForFinished();
+        if(poiSearch_) {poiCancel_->store(true);poiSearch_->waitForFinished();}
     }
 signals:
     void framePublished();
     void pageRequested(const QString& id);
     void toggleMapOnlyRequested();
+    void poiResultsReady();
 private:
     QPointF geoPoint(QPointF fraction) const {
         const auto actual=aspectView(view_,canvas_->size());
@@ -243,6 +377,87 @@ private:
         route->setEnabled(!flow_->busy()&&flow_->startPoint()&&flow_->endPoint());connect(route,&QAction::triggered,this,&MapPage::plan);
         auto* clear=menu->addAction("清除起终点与路线");connect(clear,&QAction::triggered,flow_,&app::NavigationWorkflow::clearEndpoints);
         menu->popup(canvas_->mapToGlobal(position));
+    }
+    QPointF poiScreen(int i) const {
+        const auto actual=aspectView(view_,canvas_->size());
+        return screenPoint(mapProject({pois_[i].poi.longitude,pois_[i].poi.latitude}),actual,canvas_->size());
+    }
+    // The pin under a canvas position (its head or its tip), or -1.
+    int poiAt(QPointF position) const {
+        int best=-1;double bestDistance=1e9;
+        for(int i=0;i<pois_.size();++i){
+            const auto tip=poiScreen(i);const double scale=i==selectedPoi_?1.3:1.;
+            const double head=QLineF(tip-QPointF(0,kPoiPinHeadY*scale),position).length(),point=QLineF(tip,position).length();
+            const double d=std::min(head<=12*scale?head:1e9,point<=8?point:1e9);
+            if(d<bestDistance){bestDistance=d;best=i;}}
+        return best;
+    }
+    void openSearch() {
+        if(!projection_) {workflowStatus_="请先从菜单选择已导入地图";updateNotice();return;}
+        if(!flow_->startPoint()) {workflowStatus_="请先右键地图设置起点，再搜索兴趣点";noticeTimer_.start();updateNotice();return;}
+        searchButton_->hide();searchBar_->show();searchInput_->setFocus();
+    }
+    void closeSearch() {
+        if(poiSearch_) poiCancel_->store(true);
+        searchBar_->hide();searchButton_->show();pois_.clear();selectedPoi_=-1;poiInfo_->hide();
+        canvas_->setProperty("poiCount",0);schedule();
+    }
+    void searchPois() {
+        const auto text=searchInput_->text().trimmed();const auto dataset=flow_->activeDataset();
+        if(text.isEmpty()) return;
+        if(!flow_->startPoint()) {workflowStatus_="请先右键地图设置起点，再搜索兴趣点";updateNotice();return;}
+        if(!dataset||dataset->sourceFormat=="osmx") {workflowStatus_="当前数据集没有兴趣点数据（仅标准 OSM 导入提供）";updateNotice();return;}
+        if(poiSearch_) poiCancel_->store(true);
+        auto token=std::make_shared<std::atomic_bool>(false);poiCancel_=token;
+        const auto origin=*flow_->startPoint();const auto path=dataset->cachePath;
+        workflowStatus_=QString("正在搜索“%1”…").arg(text);updateNotice();
+        auto* watcher=new QFutureWatcher<std::pair<QVector<data::PoiHit>,QString>>(this);poiSearch_=watcher;
+        connect(watcher,&QFutureWatcher<std::pair<QVector<data::PoiHit>,QString>>::finished,this,[this,watcher,token,text,origin]{
+            const auto [hits,error]=watcher->result();watcher->deleteLater();if(poiSearch_==watcher) poiSearch_=nullptr;
+            if(token->load()) return;
+            if(!error.isEmpty()) {workflowStatus_="兴趣点搜索失败："+error;updateNotice();return;}
+            pois_=hits;selectedPoi_=-1;poiInfo_->hide();canvas_->setProperty("poiCount",int(hits.size()));
+            workflowStatus_=hits.isEmpty()?QString("没有找到名称包含“%1”的兴趣点").arg(text)
+                :hits.size()>=20?QString("“%1”：显示离起点最近的 20 个兴趣点").arg(text):QString("“%1”：找到 %2 个兴趣点").arg(text).arg(hits.size());
+            noticeTimer_.start();updateNotice();
+            if(!hits.isEmpty()) showAll(origin);
+            schedule();emit poiResultsReady();
+        });
+        watcher->setFuture(QtConcurrent::run([path,text,origin,token]()->std::pair<QVector<data::PoiHit>,QString>{
+            try{return {data::searchNearestPois(path,text,origin.y(),origin.x(),20,nullptr,token),{}};}
+            catch(const std::exception& e){return {{},QString::fromUtf8(e.what())};}}));
+    }
+    // Keeps the start and every result on screen when some are outside.
+    void showAll(QPointF origin) {
+        const auto actual=aspectView(view_,canvas_->size());const auto inner=actual.adjusted(actual.width()*.05,actual.height()*.05,-actual.width()*.05,-actual.height()*.05);
+        QRectF box(mapProject(origin),QSizeF());bool outside=false;
+        for(const auto& hit:pois_){const auto p=mapProject({hit.poi.longitude,hit.poi.latitude});box=box.united(QRectF(p,QSizeF()));if(!inner.contains(p))outside=true;}
+        if(!outside) return;
+        const double pad=std::max(80.,std::max(box.width(),box.height())*.15);view_=box.adjusted(-pad,-pad,pad,pad);clampView();regionTimer_.start();
+    }
+    void selectPoi(int i) {
+        selectedPoi_=i;const auto& hit=pois_[i];
+        const auto kind=hit.poi.kind.isEmpty()?hit.poi.category:hit.poi.category+" / "+hit.poi.kind;
+        poiInfo_->setText(QString("<b>%1</b><br>类别：%2<br>距起点：%3<br>%4, %5<br><span style='color:gray'>右键该点可“到这去”</span>")
+            .arg(hit.poi.name.toHtmlEscaped(),kind.toHtmlEscaped(),hit.distanceM>=1000?QString("%1 km").arg(hit.distanceM/1000,0,'f',2):QString("%1 m").arg(hit.distanceM,0,'f',0))
+            .arg(hit.poi.latitude,0,'f',6).arg(hit.poi.longitude,0,'f',6));
+        poiInfo_->adjustSize();placePoiInfo();poiInfo_->show();poiInfo_->raise();canvas_->setProperty("selectedPoi",i);schedule();
+    }
+    void placePoiInfo() {
+        if(selectedPoi_<0||selectedPoi_>=pois_.size()) return;
+        const auto p=poiScreen(selectedPoi_).toPoint();
+        poiInfo_->move(std::clamp(p.x()-poiInfo_->width()/2,4,std::max(4,canvas_->width()-poiInfo_->width()-4)),
+                       std::clamp(p.y()-poiInfo_->height()-int(kPoiPinHeadY*1.3+16),4,std::max(4,canvas_->height()-poiInfo_->height()-4)));
+    }
+    void showPoiMenu(int i) {
+        auto* menu=new QMenu(canvas_);menu->setObjectName("poiMenu");menu->setAttribute(Qt::WA_DeleteOnClose);
+        auto* go=menu->addAction("到这去");go->setObjectName("poiGoHere");
+        const QPointF target(pois_[i].poi.longitude,pois_[i].poi.latitude);const auto name=pois_[i].poi.name;
+        connect(go,&QAction::triggered,this,[this,target,name]{
+            flow_->setEndpoint(false,target);workflowStatus_=QString("终点：%1").arg(name);
+            if(flow_->startPoint()) plan();});
+        // Opens right next to the point.
+        menu->popup(canvas_->mapToGlobal(poiScreen(i).toPoint()+QPoint(10,-6)));
     }
     void clampView() {
         if(!projection_||!view_.isValid()) return;
@@ -313,7 +528,7 @@ private:
         }));
     }
     void schedule() {
-        ++revision_;
+        ++revision_;placePoiInfo();
         canvas_->setViewport(aspectView(view_.isValid()?view_:QRectF(-500,-500,1000,1000),canvas_->size()),mapColors(theme_.isDark()).land);
         if(!debounce_.isActive()) debounce_.start();
     }
@@ -327,10 +542,11 @@ private:
             canvas_->setProperty("viewWidthMetres",view.width());canvas_->setProperty("viewHeightMetres",view.height());}
         const auto colors=mapColors(theme_.isDark());const auto image=cache_;const auto key=key_;const auto tile=tile_;const auto tileKey=tileKey_;
         const auto projection=projection_;const auto roadsRevision=pyramidRevision_;
-        const auto pyramidBase=pyramidBase_;const auto pyramidView=pyramidView_;
+        const auto pyramidBase=pyramidBase_;const auto pyramidView=pyramidView_;const bool complete=pyramidComplete_;
         const auto start=flow_->startPoint(),end=flow_->endPoint();
+        QVector<QPair<QPointF,QString>> pois;for(const auto& hit:pois_)pois.append({QPointF(hit.poi.longitude,hit.poi.latitude),hit.poi.name});const int selectedPoi=selectedPoi_;
         auto* watcher=new QFutureWatcher<Prepared>(this);watcher_=watcher;
-        connect(watcher,&QFutureWatcher<Prepared>::finished,this,[this,watcher,revision,view] {
+        connect(watcher,&QFutureWatcher<Prepared>::finished,this,[this,watcher,revision,view,complete] {
             const auto result=watcher->result();watcher_=nullptr;watcher->deleteLater();
             if(revision==revision_) {
                 if(result.render.error.isEmpty()) {
@@ -338,24 +554,27 @@ private:
                     canvas_->setProperty("realDataset",bool(projection_));
                     const auto& state=flow_->state();const int count=int(state.route.size()>1)+int(state.observations.size()>1)+int(state.matched.size()>1);
                     canvas_->setProperty("routeCount",count);canvas_->setProperty("markerCount",int(bool(flow_->startPoint()))+int(bool(flow_->endPoint())));
-                    canvas_->setProperty("regionRevision",pyramidRevision_);
+                    canvas_->setProperty("regionRevision",pyramidRevision_);canvas_->setProperty("tilesComplete",complete);
                     canvas_->setProperty("cacheHit",result.render.stats.cacheHit);canvas_->setProperty("renderElapsedMs",result.totalMs);emit framePublished();
                 } else canvas_->setNotice(result.render.error);
             }
             if(pending_||revision!=revision_) {pending_=false;debounce_.start();}
         });
-        watcher->setFuture(QtConcurrent::run([state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView] {
-            return draw(state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView);
+        watcher->setFuture(QtConcurrent::run([state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi] {
+            return draw(state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi);
         }));
     }
     Theme& theme_;app::NavigationWorkflow* flow_;QString directory_;
     MapCanvas* canvas_;QPushButton* plan_;QMenu *menu_,*datasets_;QAction *onlyMap_,*cancel_;
-    TilePyramid pyramid_;QImage pyramidBase_;QRectF pyramidView_;quint64 pyramidRevision_=0;
+    TilePyramid pyramid_;QImage pyramidBase_;QRectF pyramidView_;quint64 pyramidRevision_=0;bool pyramidComplete_=false;
     std::shared_ptr<const app::RoadNetwork> projection_;
     QRectF view_;QTimer debounce_,regionTimer_,noticeTimer_;
     quint64 revision_=0,sourceRevision_=0;bool pending_=false;
     QFutureWatcher<Prepared>* watcher_=nullptr;QFutureWatcher<QVector<app::ImportResult>>* catalog_=nullptr;
     QImage cache_,tile_;QString key_,tileKey_,regionStatus_,workflowStatus_,lastStatus_;
+    QPushButton* searchButton_=nullptr;QFrame* searchBar_=nullptr;QLineEdit* searchInput_=nullptr;QLabel* poiInfo_=nullptr;
+    QVector<data::PoiHit> pois_;int selectedPoi_=-1;
+    QFutureWatcher<std::pair<QVector<data::PoiHit>,QString>>* poiSearch_=nullptr;std::shared_ptr<std::atomic_bool> poiCancel_=std::make_shared<std::atomic_bool>(false);
 };
 }
 QWidget* createMapPage(Theme& theme,QWidget* parent) {

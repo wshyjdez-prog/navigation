@@ -1,0 +1,4 @@
+	Command being timed: "build/p1-edge-bench /tmp/claude-1000/-home-abt-navigation/e1572a5a-0f48-4f9a-86d2-3a1999b04dee/scratchpad/hubei-cache/e95c93f7-ad1e-4f77-a1a8-37d686300772.sqlite /tmp/claude-1000/-home-abt-navigation/e1572a5a-0f48-4f9a-86d2-3a1999b04dee/scratchpad/tiles-road prefetch 3"
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:39.62
+	Maximum resident set size (kbytes): 240044
+	Exit status: 0

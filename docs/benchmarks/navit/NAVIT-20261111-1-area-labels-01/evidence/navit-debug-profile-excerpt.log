@@ -1,0 +1,21 @@
+debug:profile:navit:do_draw:process_selection
+
+     0.4 ms
+
+debug:profile:navit:do_draw:draw
+
+     0.0 ms
+
+debug:navit:transform_get_order:order 14
+debug:navit:callback_call:cb->pcount=1
+debug:navit:callback_call:cb->p[0]=0x60043dca8ac0
+debug:navit:callback_call:pcount=0
+debug:profile:navit:do_draw:callback
+
+     1.1 ms
+
+debug:profile:navit:do_draw:end
+
+     1.5 ms
+
+debug:navit:callback_call:cb->pcount=1

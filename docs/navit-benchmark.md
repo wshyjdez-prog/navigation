@@ -57,6 +57,12 @@ Navit 是否支持某项任务、能否在相同计时边界观测，须在实�
 | `NAVIT-20261101-4-planner-bridge-01` / 2026-11-01 | 规划对接层（对接真实计算）/ 4 | 本组 main `cb056d0` + 对接层提交；Navit 未建立基线（VM 未安装） | 规划请求链路（stub 模拟延迟）；无真实算法与同源路网场景 | 受阻（未测） | 对接层正确性实测通过（ctest 9/9、警告 0；心跳证明 UI 不阻塞）；规划为 stub 模拟、偏航状态机属第 3 次，无等价任务可比，不计算性能差值 | [报告及恢复步骤](benchmarks/navit/NAVIT-20261101-4-planner-bridge-01.md) |
 | `NAVIT-20261101-5-renderer-01` / 2026-11-01 | LinuxRenderer 功能验收 / 5 | 本组 main/cb056d0 + 未提交修改；Navit trunk/590b50a 源码参考 | 单一路径 Mock MapScene | 本次取消比较；统一 Ubuntu 功能验收待测 | 用户明确不需要 A/B 比较，界面和正常构建不提供比较入口；Windows 预检数据不作为验收结论 | [说明与功能验收边界](benchmarks/navit/NAVIT-20261101-5-renderer-01.md) |
 | `NAVIT-20261111-1-osm-feature-import-01` / 2026-11-11 | 标准 OSM 要素导入（POI/道路/面）/ 1 授权，主责 2 | 本组 562119e + 本轮修改；Navit 本环境未安装 | OSM→要素缓存的预处理；仅有合成样例 | 受阻（未测） | 云端容器正确性测试通过；无统一虚拟机、无同源真实数据、无 Navit，未产生性能数值 | [报告](benchmarks/navit/NAVIT-20261111-1-osm-feature-import-01.md) |
+| `NAVIT-20261111-1-area-labels-01` / 2026-11-11 | 地图面名称分级显示 / 1 | 本组本地未提交工作区；Navit 0.5.7（CPack 安装包） | 湖北 PBF 同源，3 场景 × z9–z17 | 部分（本组 A/B 已测；Navit 渲染受阻） | A/B 冷帧相近，B 热帧多 60–80 ms；选 A。Navit 具备面名称能力，maptool 19.0 s/175 MiB；同口径帧耗时未测 | [报告](benchmarks/navit/NAVIT-20261111-1-area-labels-01.md) |
+| `NAVIT-20261111-1-edge-loading-01` / 2026-11-11 | 地图拖动/缩放边缘加载 / 1 | 本组本地未提交工作区；Navit 0.5.7 | 湖北 PBF 同源，武汉中心平移/缩放序列 | 部分（本组 A/B 已测；Navit 受阻） | A 平移空白消失中位约 20 ms、缩小首帧空白 0–11%；B 缩小首帧空白约 70%；选 A。Navit 同场景未测 | [报告](benchmarks/navit/NAVIT-20261111-1-edge-loading-01.md) |
+| `NAVIT-20261111-1-map-clarity-01` / 2026-11-11 | 地图清晰度高/中/低 / 1 | 本组本地未提交工作区；Navit 0.5.7 | 湖北 PBF 同源，武汉中心 z13/z15/z17 | 部分（本组三档已测；Navit 档位不适用、耗时受阻） | 冷绘完 中≈1.36×、高≈1.63–1.75× 低；热帧均 10–15 ms；PNG 约 1:1.7:2.5 | [报告](benchmarks/navit/NAVIT-20261111-1-map-clarity-01.md) |
+| `NAVIT-20261111-1-route-mode-01` / 2026-11-11 | 路线模式（一般/行车）/ 1 授权，主责 3、4 | 本组本地未提交工作区；Navit 0.5.7 car 配置 + maptool v0.5.7 | 湖北 PBF，武汉中心 3 km，40 对起终点 | 部分（规则已对照、本组已测；Navit 耗时受阻） | 一般模式 19/35 条路线借用非机动车道路，行车模式 0；A* 中位 3.49 → 2.43 ms | [报告](benchmarks/navit/NAVIT-20261111-1-route-mode-01.md) |
+| `NAVIT-20261111-1-poi-index-01` / 2026-11-11 | 兴趣点名称索引与最近 20 个 / 1 授权，主责 2 | 本组本地未提交工作区；Navit 0.5.7 | 湖北 PBF（36,875 个 POI），12 个查询 × 20 次 | 部分（本组 A/B/C 已测；Navit 受阻） | B 查询 0.003–0.31 ms，A 短查询约 5 ms，C 最长 49 ms；选 B | [报告](benchmarks/navit/NAVIT-20261111-1-poi-index-01.md) |
+| `NAVIT-20261111-1-long-route-01` / 2026-11-11 | 远距离路线规划（分级路网）/ 1 授权，主责 2、3、4 | 本组本地未提交工作区；Navit 0.5.7 car `route_depth` | 湖北，武昌到 8 个城市（53–406 km），两种模式 | 部分（本组已测；Navit 受阻） | 16/16 成功，0.33–0.74 s；与全量相比长度比中位 1.0004，最大 2.33 | [报告](benchmarks/navit/NAVIT-20261111-1-long-route-01.md) |
 
 每次完成或受阻时更新索引和 `project.md` 的模块记录；算法试验还需在 `decision_log.md` 引用报告，将候选与正式方案区分。重要 AI 成果在 `ai_log.md` 记录摘要和报告 ID。阶段交付汇总全部模块，包括退化、未测和不适用项。
 
@@ -94,3 +100,9 @@ project.md / decision_log.md / ai_log.md 的引用与下一步：
 - 2026-11-03：[团队整合回归](benchmarks/navit/NAVIT-20261103-1-team-integration-01.md)，NAVIT-20261103-1-team-integration-01：功能共同回归通过，完整业务性能仍受同源数据、真实FMM配置和生产数据转换缺口阻塞，无新性能倍数。
 
 - 2026-11-11：[标准 OSM 要素导入](benchmarks/navit/NAVIT-20261111-1-osm-feature-import-01.md)，NAVIT-20261111-1-osm-feature-import-01：受阻未测；云端容器只做了正确性测试，缺统一虚拟机、同源真实 PBF 与 Navit 运行基线。
+- 2026-11-11：[地图面名称分级显示](benchmarks/navit/NAVIT-20261111-1-area-labels-01.md)，NAVIT-20261111-1-area-labels-01：本组 A/B 在湖北同源数据实测完成并选 A；Navit 0.5.7 具备对应能力，但没有可用的同口径帧计时，渲染耗时受阻未测。
+- 2026-11-11：[地图拖动/缩放边缘加载](benchmarks/navit/NAVIT-20261111-1-edge-loading-01.md)，NAVIT-20261111-1-edge-loading-01：本组 A/B 在湖北同源数据上实测并选 A；Navit 不使用瓦片金字塔，同场景空白比例与填满时间未测。
+- 2026-11-11：[地图清晰度高/中/低](benchmarks/navit/NAVIT-20261111-1-map-clarity-01.md)，NAVIT-20261111-1-map-clarity-01：本组三档已实测；Navit 直接按屏幕分辨率绘制矢量，没有瓦片密度参数（不适用），同视野绘制耗时受阻未测。
+- 2026-11-11：[路线模式](benchmarks/navit/NAVIT-20261111-1-route-mode-01.md)，NAVIT-20261111-1-route-mode-01：行车模式的道路选择已逐项对照 Navit 0.5.7 car 配置与 maptool；本组两种模式已实测；Navit 同起终点规划耗时受阻未测。
+- 2026-11-11：[兴趣点索引](benchmarks/navit/NAVIT-20261111-1-poi-index-01.md)，NAVIT-20261111-1-poi-index-01：三种索引在湖北同源数据上实测，结果均与全表扫描一致，选 B；Navit 名称搜索只部分对应，耗时受阻未测。
+- 2026-11-11：[远距离路线规划](benchmarks/navit/NAVIT-20261111-1-long-route-01.md)，NAVIT-20261111-1-long-route-01：仿 Navit `route_depth` 分级加载，湖北 53–406 km 16/16 成功；Navit 同起终点耗时受阻未测。

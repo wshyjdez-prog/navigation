@@ -10,7 +10,8 @@ file(STRINGS "${OSMIUM_INCLUDE_DIR}/osmium/version.hpp" OSMIUM_VERSION_LINE
 if(NOT OSMIUM_VERSION_LINE MATCHES "\"2\\.20\\.0\"")
     message(FATAL_ERROR "This import baseline requires libosmium 2.20.0; found: ${OSMIUM_VERSION_LINE}")
 endif()
-add_library(p1_data_import STATIC OsmImportParser.cpp ImportedDataset.cpp ImportedRoads.cpp MapGeometry.cpp MapAreas.cpp)
+add_library(p1_data_import STATIC OsmImportParser.cpp ImportedDataset.cpp ImportedRoads.cpp MapGeometry.cpp MapAreas.cpp
+    PoiSearch.cpp PoiSearchMemory.cpp PoiDedup.cpp)
 target_include_directories(p1_data_import PUBLIC "${PROJECT_SOURCE_DIR}/src" "${PROJECT_SOURCE_DIR}/include")
 target_include_directories(p1_data_import SYSTEM PRIVATE "${OSMIUM_INCLUDE_DIR}" "${PROTOZERO_INCLUDE_DIR}")
 target_link_libraries(p1_data_import PUBLIC Qt6::Core p1_data_osmx PRIVATE SQLite::SQLite3 EXPAT::EXPAT ZLIB::ZLIB BZip2::BZip2 Threads::Threads)

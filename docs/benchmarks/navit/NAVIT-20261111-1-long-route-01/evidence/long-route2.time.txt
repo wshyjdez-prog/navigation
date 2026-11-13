@@ -1,0 +1,4 @@
+	Command being timed: "build/p1-long-route /home/abt/.local/share/P1Linux/p1-navigation/imports/d08fd759-a0e9-44fe-aa9f-183e20a53580.sqlite"
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:08.13
+	Maximum resident set size (kbytes): 287396
+	Exit status: 0
