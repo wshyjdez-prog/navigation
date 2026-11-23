@@ -5,3 +5,4 @@
 .DS_Store
 /*.zip
 /*.zip.[0-9]*
+/third_party/voice/

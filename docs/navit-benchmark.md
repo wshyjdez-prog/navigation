@@ -63,6 +63,7 @@ Navit 是否支持某项任务、能否在相同计时边界观测，须在实�
 | `NAVIT-20261111-1-route-mode-01` / 2026-11-11 | 路线模式（一般/行车）/ 1 授权，主责 3、4 | 本组本地未提交工作区；Navit 0.5.7 car 配置 + maptool v0.5.7 | 湖北 PBF，武汉中心 3 km，40 对起终点 | 部分（规则已对照、本组已测；Navit 耗时受阻） | 一般模式 19/35 条路线借用非机动车道路，行车模式 0；A* 中位 3.49 → 2.43 ms | [报告](benchmarks/navit/NAVIT-20261111-1-route-mode-01.md) |
 | `NAVIT-20261111-1-poi-index-01` / 2026-11-11 | 兴趣点名称索引与最近 20 个 / 1 授权，主责 2 | 本组本地未提交工作区；Navit 0.5.7 | 湖北 PBF（36,875 个 POI），12 个查询 × 20 次 | 部分（本组 A/B/C 已测；Navit 受阻） | B 查询 0.003–0.31 ms，A 短查询约 5 ms，C 最长 49 ms；选 B | [报告](benchmarks/navit/NAVIT-20261111-1-poi-index-01.md) |
 | `NAVIT-20261111-1-long-route-01` / 2026-11-11 | 远距离路线规划（分级路网）/ 1 授权，主责 2、3、4 | 本组本地未提交工作区；Navit 0.5.7 car `route_depth` | 湖北，武昌到 8 个城市（53–406 km），两种模式 | 部分（本组已测；Navit 受阻） | 16/16 成功，0.33–0.74 s；与全量相比长度比中位 1.0004，最大 2.33 | [报告](benchmarks/navit/NAVIT-20261111-1-long-route-01.md) |
+| `NAVIT-20261123-1-voice-01` / 2026-11-23 | LinuxVoiceAdapter 本地 TTS/ASR / 1 | 本组 a6d13cf + 本轮修改；Navit 0.5.7 speech_cmdline | 20 句普通话导航文本，Piper 合成语音作识别输入 | 部分（播报总耗时已比较；首音/打断/ASR 不适用；espeak-ng 命令行未测） | 最终 Piper+Vosk 播报中位 1704 ms vs Navit spd-say 2763 ms（音色不同，不作效率结论）；试验期同后端 B 2757 vs 2763 ms 持平；Navit 无 ASR | [报告](benchmarks/navit/NAVIT-20261123-1-voice-01.md) |
 
 每次完成或受阻时更新索引和 `project.md` 的模块记录；算法试验还需在 `decision_log.md` 引用报告，将候选与正式方案区分。重要 AI 成果在 `ai_log.md` 记录摘要和报告 ID。阶段交付汇总全部模块，包括退化、未测和不适用项。
 
@@ -106,3 +107,4 @@ project.md / decision_log.md / ai_log.md 的引用与下一步：
 - 2026-11-11：[路线模式](benchmarks/navit/NAVIT-20261111-1-route-mode-01.md)，NAVIT-20261111-1-route-mode-01：行车模式的道路选择已逐项对照 Navit 0.5.7 car 配置与 maptool；本组两种模式已实测；Navit 同起终点规划耗时受阻未测。
 - 2026-11-11：[兴趣点索引](benchmarks/navit/NAVIT-20261111-1-poi-index-01.md)，NAVIT-20261111-1-poi-index-01：三种索引在湖北同源数据上实测，结果均与全表扫描一致，选 B；Navit 名称搜索只部分对应，耗时受阻未测。
 - 2026-11-11：[远距离路线规划](benchmarks/navit/NAVIT-20261111-1-long-route-01.md)，NAVIT-20261111-1-long-route-01：仿 Navit `route_depth` 分级加载，湖北 53–406 km 16/16 成功；Navit 同起终点耗时受阻未测。
+- 2026-11-23：[LinuxVoiceAdapter](benchmarks/navit/NAVIT-20261123-1-voice-01.md)，NAVIT-20261123-1-voice-01：三种语音组合与 Navit 0.5.7 speech_cmdline 等价路径实测，最终 Piper+Vosk 复测；Navit 无 ASR/打断/首音回调，espeak-ng 命令行配置未测。

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.5
+Name=P1 Navigation
+Name[zh_CN]=P1 导航
+Comment=Offline Linux navigation with local Chinese voice guidance
+Comment[zh_CN]=离线 Linux 导航，本地中文语音播报与语音指令
+Exec=p1-navigation
+Icon=p1-navigation
+Terminal=false
+Categories=Utility;Maps;
+Keywords=navigation;map;route;voice;导航;地图;语音;
+StartupNotify=true

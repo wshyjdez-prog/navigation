@@ -13,6 +13,8 @@ endif()
 add_subdirectory(src/data/import)
 add_subdirectory(src/data/osmx)
 add_subdirectory(src/pal/linux/renderer)
+# 1 号：LinuxVoiceAdapter（libp1_voice.so，C ABI/FFI）。
+add_subdirectory(src/pal/linux/voice)
 
 add_library(p1_ui_common STATIC
     src/ui/common/Theme.cpp
@@ -37,22 +39,36 @@ add_library(p1_ui STATIC
     src/app/RoutingProfile.cpp
     src/app/RoutingProfile.h
     src/app/NavigationWorkflow.h
+    src/app/voice/VoiceService.cpp
+    src/app/voice/VoiceService.h
+    src/app/voice/VoiceNavigationBridge.cpp
+    src/app/voice/VoiceNavigationBridge.h
+    src/app/voice/VoicePage.cpp
+    src/app/voice/VoicePage.h
     src/app/MainWindow.cpp)
 target_include_directories(p1_ui PUBLIC src)
-target_link_libraries(p1_ui PUBLIC p1_ui_common p1_import_page Qt6::Widgets p1_renderer PRIVATE Qt6::Concurrent)
+target_link_libraries(p1_ui PUBLIC p1_ui_common p1_import_page Qt6::Widgets p1_renderer p1_voice PRIVATE Qt6::Concurrent)
 target_compile_options(p1_ui PRIVATE
     "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
     "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
 
 qt_add_executable(p1-navigation src/app/main.cpp)
 target_link_libraries(p1-navigation PRIVATE p1_ui)
+set_target_properties(p1-navigation PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
 install(TARGETS p1-navigation RUNTIME DESTINATION bin)
+# 1 号：桌面入口（应用 ID p1-navigation，GeoClue2 按 desktop id 授权定位）。
+install(FILES packaging/linux/p1-navigation.desktop DESTINATION share/applications)
 
 if(BUILD_TESTING)
     qt_add_executable(p1-ui-tests tests/UiTests.cpp)
     target_link_libraries(p1-ui-tests PRIVATE p1_ui Qt6::Test)
     add_test(NAME ui-contracts COMMAND p1-ui-tests)
     set_tests_properties(ui-contracts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    # 1 号：语音服务与导航桥接（真实 LinuxVoiceAdapter，WAV 输入输出，无需声卡）。
+    qt_add_executable(p1-voice-bridge-tests tests/VoiceBridgeTests.cpp)
+    target_link_libraries(p1-voice-bridge-tests PRIVATE p1_ui Qt6::Test)
+    add_test(NAME voice-bridge COMMAND p1-voice-bridge-tests)
+    set_tests_properties(voice-bridge PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 300)
 endif()
 
 # 模块装配必须位于 include(CTest) 之后，统一注册各模块已有测试。

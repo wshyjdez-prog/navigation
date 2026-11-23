@@ -1,0 +1,371 @@
+== 共同 ASR 输入：Piper 与 espeak-ng 各合成 20 句
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+corpus piper: 20/20 wav
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+corpus espeak-ng: 20/20 wav
+== TTS espeak-ng 实际播放（默认输出）
+service error: asr=none: 未编译 ASR 后端: none
+tts=espeak-ng mode=playback init_ms=8.3
+  first_audio_ms               n=60 median=12.57 p95=19.69 min=6.75 max=23.92 ms
+  total_ms                     n=60 median=2443.54 p95=5597.95 min=1507.73 max=6177.72 ms
+  total_ms_per_char            n=60 median=391.44 p95=448.00 min=342.00 max=462.85 ms/char
+  cancel_ms                    n=3 median=20.99 p95=21.05 min=20.95 max=21.06 ms
+  failures=0
+  self VmHWM=16.5 MiB; speech-dispatch(10992) VmHWM=14.6289MiB; sd_espeak-ng(11007) VmHWM=13.4688MiB; 
+  destroy_ms=0.3
+== TTS espeak-ng 写 WAV（纯合成）
+service error: asr=none: 未编译 ASR 后端: none
+tts=espeak-ng mode=wav init_ms=9.0
+  first_audio_ms               n=60 median=0.15 p95=0.24 min=0.08 max=0.28 ms
+  total_ms                     n=60 median=1.86 p95=4.14 min=0.97 max=4.41 ms
+  total_ms_per_char            n=60 median=0.29 p95=0.33 min=0.24 max=0.40 ms/char
+  failures=0
+  self VmHWM=17.0 MiB; speech-dispatch(10992) VmHWM=14.6289MiB; sd_espeak-ng(11007) VmHWM=13.4688MiB; 
+  destroy_ms=0.2
+== TTS speech-dispatcher 实际播放（默认输出）
+service error: asr=none: 未编译 ASR 后端: none
+tts=speech-dispatcher mode=playback init_ms=158.9
+  first_audio_ms               n=60 median=3.71 p95=7.10 min=1.22 max=7.81 ms
+  total_ms                     n=60 median=2756.95 p95=6033.59 min=1865.23 max=6591.81 ms
+  total_ms_per_char            n=60 median=460.20 p95=528.69 min=365.00 max=544.06 ms/char
+  cancel_ms                    n=3 median=37.09 p95=38.97 min=25.15 max=39.18 ms
+  failures=0
+  self VmHWM=12.9 MiB; speech-dispatch(25187) VmHWM=14.4531MiB; sd_espeak-ng(25202) VmHWM=12.0273MiB; 
+  destroy_ms=0.6
+== TTS piper 实际播放（默认输出）
+service error: asr=none: 未编译 ASR 后端: none
+tts=piper mode=playback init_ms=188.5
+  first_audio_ms               n=60 median=65.15 p95=121.35 min=43.58 max=216.35 ms
+  total_ms                     n=60 median=1706.93 p95=3692.40 min=1031.25 max=4228.85 ms
+  total_ms_per_char            n=60 median=280.78 p95=343.09 min=212.86 max=370.83 ms/char
+  cancel_ms                    n=3 median=21.05 p95=21.82 min=1.82 max=21.91 ms
+  failures=0
+  self VmHWM=14.2 MiB; speech-dispatch(25187) VmHWM=14.4531MiB; sd_espeak-ng(25202) VmHWM=12.0273MiB; piper(25501) VmHWM=240.547MiB; 
+  destroy_ms=20.7
+== TTS piper 写 WAV（纯合成）
+service error: asr=none: 未编译 ASR 后端: none
+tts=piper mode=wav init_ms=184.6
+  first_audio_ms               n=60 median=43.77 p95=97.58 min=27.91 max=131.13 ms
+  total_ms                     n=60 median=43.88 p95=97.74 min=28.00 max=131.29 ms
+  total_ms_per_char            n=60 median=7.36 p95=9.61 min=5.63 max=10.43 ms/char
+  failures=0
+  self VmHWM=12.8 MiB; speech-dispatch(25187) VmHWM=14.4531MiB; sd_espeak-ng(25202) VmHWM=12.0273MiB; piper(25677) VmHWM=165.25MiB; 
+  destroy_ms=20.4
+== ASR vosk 输入 piper 合成语音（尽快送入）
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+  [00] 前方三百米右转    -> 前方三百米右转 (CER 0.00)
+  [01] 沿当前道路继续直行两公里 -> 盐当前道路继续执行两公里 (CER 0.17)
+  [02] 前方路口向左转进入中山大道 -> 前方路口向左转进入中甚大到 (CER 0.15)
+  [03] 请靠右行驶进入匝道 -> 请靠右行驶进入匝道 (CER 0.00)
+  [04] 您已偏离路线正在重新规划 -> 你以偏离路线正在重新桂花 (CER 0.33)
+  [05] 前方五十米进入环岛请从第二个出口驶出 -> 前方五十米进入环岛请从第二个出口使出 (CER 0.06)
+  [06] 即将到达目的地    -> 即将到达目的地 (CER 0.00)
+  [07] 您已到达目的地本次导航结束 -> 你一到达目的地本次导航结束 (CER 0.15)
+  [08] 开始导航             -> 开始导航 (CER 0.00)
+  [09] 停止导航             -> 停止导航 (CER 0.00)
+  [10] 暂停导航             -> 暂停导航 (CER 0.00)
+  [11] 继续导航             -> 继续导航 (CER 0.00)
+  [12] 重新规划路线       -> 重新规划路线 (CER 0.00)
+  [13] 还有多远             -> 还有多远 (CER 0.00)
+  [14] 现在几点到达       -> 现在几点到达 (CER 0.00)
+  [15] 放大地图             -> 风大地图 (CER 0.25)
+  [16] 缩小地图             -> 缩小地图 (CER 0.00)
+  [17] 导航到武汉大学    -> 导航到武汉大学 (CER 0.00)
+  [18] 打开语音播报       -> 打开语音播报 (CER 0.00)
+  [19] 关闭语音播报       -> 关闭语音播报 (CER 0.00)
+asr=vosk corpus=piper mode=fast init_ms(first)=223.9
+  recognize_ms                 n=60 median=74.89 p95=716.68 min=30.27 max=945.25 ms
+  rtf                          n=60 median=0.04 p95=0.47 min=0.03 max=0.48 x
+  CER=0.0800 (36/450) exact=42/60 failures=0 self VmHWM=314.9 MiB
+== ASR vosk 输入 espeak-ng 合成语音（尽快送入）
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+  [00] 前方三百米右转    -> 答应对方网上买里面要疯女人 (CER 1.71)
+  [01] 沿当前道路继续直行两公里 -> 让对方观察员追赶有否了服务结构能否之林指导员阳光 (CER 2.00)
+  [02] 前方路口向左转进入中山大道 -> 就对方忘了风就不那春风里的水洗脸水煎服了泡着闪光的疯来疯 (CER 2.08)
+  [03] 请靠右行驶进入匝道 -> 给你[unk] (CER 1.00)
+  [04] 您已偏离路线正在重新规划 -> 对于所以他萤光绿 (CER 1.00)
+  [05] 前方五十米进入环岛请从第二个出口驶出 -> 就对方关注并已经走了否决这有水平不一方案方案法庭上去回去上班 (CER 1.61)
+  [06] 即将到达目的地    -> 最佳网贷有否他说能否开发法语待发 (CER 2.29)
+  [07] 您已到达目的地本次导航结束 -> 这也一大有否大对 (CER 1.00)
+  [08] 开始导航             -> 大湾区非常 (CER 1.25)
+  [09] 停止导航             -> 针对非常这 (CER 1.25)
+  [10] 暂停导航             -> 那你[unk]寒 (CER 1.00)
+  [11] 继续导航             -> 姐夫能否有属于犯罪 (CER 2.25)
+  [12] 重新规划路线       -> 着无与伦比的否了否那与否 (CER 2.00)
+  [13] 还有多远             -> 孩子[unk]去了 (CER 1.00)
+  [14] 现在几点到达       -> 那疯来疯也是丫丫你不应该有法律 (CER 2.50)
+  [15] 放大地图             -> 那你[unk] (CER 1.00)
+  [16] 缩小地图             -> 的哪有的所以在法语早就 (CER 2.75)
+  [17] 导航到武汉大学    -> 要所以看有风度寒风的有罪 (CER 1.71)
+  [18] 打开语音播报       -> 大夫一看网剧演员的了麦克风 (CER 2.17)
+  [19] 关闭语音播报       -> 往往被否女演员的麦克风 (CER 1.83)
+asr=vosk corpus=espeak-ng mode=fast init_ms(first)=220.2
+  recognize_ms                 n=60 median=715.37 p95=2419.57 min=154.72 max=4109.02 ms
+  rtf                          n=60 median=0.18 p95=0.89 min=0.04 max=1.05 x
+  CER=1.7711 (797/450) exact=0/60 failures=0 self VmHWM=727.6 MiB
+== ASR vosk 输入 piper 合成语音（实时送入，句末延迟）
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+  [00] 前方三百米右转    -> 前方三百米右转 (CER 0.00)
+  [01] 沿当前道路继续直行两公里 -> 盐当前道路继续执行两公里 (CER 0.17)
+  [02] 前方路口向左转进入中山大道 -> 前方路口向左转进入中甚大到 (CER 0.15)
+  [03] 请靠右行驶进入匝道 -> 请靠右行驶进入匝道 (CER 0.00)
+  [04] 您已偏离路线正在重新规划 -> 你以偏离路线正在重新桂花 (CER 0.33)
+  [05] 前方五十米进入环岛请从第二个出口驶出 -> 前方五十米进入环岛请从第二个出口使出 (CER 0.06)
+  [06] 即将到达目的地    -> 即将到达目的地 (CER 0.00)
+  [07] 您已到达目的地本次导航结束 -> 你一到达目的地本次导航结束 (CER 0.15)
+  [08] 开始导航             -> 开始导航 (CER 0.00)
+  [09] 停止导航             -> 停止导航 (CER 0.00)
+  [10] 暂停导航             -> 暂停导航 (CER 0.00)
+  [11] 继续导航             -> 继续导航 (CER 0.00)
+  [12] 重新规划路线       -> 重新规划路线 (CER 0.00)
+  [13] 还有多远             -> 还有多远 (CER 0.00)
+  [14] 现在几点到达       -> 现在几点到达 (CER 0.00)
+  [15] 放大地图             -> 风大地图 (CER 0.25)
+  [16] 缩小地图             -> 缩小地图 (CER 0.00)
+  [17] 导航到武汉大学    -> 导航到武汉大学 (CER 0.00)
+  [18] 打开语音播报       -> 打开语音播报 (CER 0.00)
+  [19] 关闭语音播报       -> 关闭语音播报 (CER 0.00)
+asr=vosk corpus=piper mode=realtime init_ms(first)=209.9
+  end_of_audio_to_result_ms    n=20 median=58.30 p95=215.10 min=21.55 max=232.55 ms
+  CER=0.0800 (12/150) exact=14/20 failures=0 self VmHWM=423.3 MiB
+== ASR whisper 输入 piper 合成语音（尽快送入）
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+  [00] 前方三百米右转    -> 前方300米右转。 (CER 0.00)
+  [01] 沿当前道路继续直行两公里 -> 言当前道路继续执行两公里。 (CER 0.17)
+  [02] 前方路口向左转进入中山大道 -> 前方路口向左转进入中,善大道。 (CER 0.08)
+  [03] 请靠右行驶进入匝道 -> 请靠右行使进入扎稻。 (CER 0.33)
+  [04] 您已偏离路线正在重新规划 -> 您已片离路线正在重新规划。 (CER 0.08)
+  [05] 前方五十米进入环岛请从第二个出口驶出 -> 前放50米进入环岛请从第2个出口使出。 (CER 0.11)
+  [06] 即将到达目的地    -> 即将到达目的地。 (CER 0.00)
+  [07] 您已到达目的地本次导航结束 -> 您已到达目地地本次到航结束。 (CER 0.15)
+  [08] 开始导航             -> 开始导航。 (CER 0.00)
+  [09] 停止导航             -> 停止导航。 (CER 0.00)
+  [10] 暂停导航             -> 暂停导航。 (CER 0.00)
+  [11] 继续导航             -> 继续导航。 (CER 0.00)
+  [12] 重新规划路线       -> 重新规划路线。 (CER 0.00)
+  [13] 还有多远             -> 还有多元。 (CER 0.25)
+  [14] 现在几点到达       -> 现在几点到达。 (CER 0.00)
+  [15] 放大地图             -> 方大地图 (CER 0.25)
+  [16] 缩小地图             -> 搜小地图 (CER 0.25)
+  [17] 导航到武汉大学    -> 导航到武汉大学 (CER 0.00)
+  [18] 打开语音播报       -> 打开与音播报。 (CER 0.17)
+  [19] 关闭语音播报       -> 关闭于音播报。 (CER 0.17)
+asr=whisper corpus=piper mode=fast init_ms(first)=81.5
+  recognize_ms                 n=60 median=808.32 p95=885.96 min=760.82 max=942.88 ms
+  rtf                          n=60 median=0.51 p95=0.71 min=0.21 max=0.82 x
+  CER=0.1067 (48/450) exact=27/60 failures=0 self VmHWM=615.6 MiB
+== ASR whisper 输入 espeak-ng 合成语音（尽快送入）
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+  [00] 前方三百米右转    -> 下午2分1分1杯3杯3r4 u3 (CER 1.71)
+  [01] 沿当前道路继续直行两公里 -> 。 (CER 1.00)
+  [02] 前方路口向左转进入中山大道 -> 。 (CER 1.00)
+  [03] 请靠右行驶进入匝道 -> 肯3K4要4N2是4LA4N1K4 (CER 1.22)
+  [04] 您已偏离路线正在重新规划 -> 。 (CER 1.00)
+  [05] 前方五十米进入环岛请从第二个出口驶出 -> 。 (CER 1.00)
+  [06] 即将到达目的地    -> 以至于翔幌的4-4-4-5-5 (CER 1.43)
+  [07] 您已到达目的地本次导航结束 -> 。 (CER 1.00)
+  [08] 开始导航             -> I want you to play a free hand-to (CER 1.00)
+  [09] 停止导航             -> 请阻止每一会儿。 (CER 1.50)
+  [10] 暂停导航             -> 。 (CER 1.00)
+  [11] 继续导航             -> 4-4-3-2 (CER 1.00)
+  [12] 重新规划路线       -> 中文1-1-2-4-4-9-4 (CER 1.50)
+  [13] 还有多远             -> 。 (CER 1.00)
+  [14] 现在几点到达       -> i4-4-4-4-4-4-4-2 (CER 1.33)
+  [15] 放大地图             -> 粉丝4-4-5-2 (CER 1.50)
+  [16] 缩小地图             -> 请问1-3-5-2 (CER 1.50)
+  [17] 导航到武汉大学    -> 第3行2第4弩行4第4弩2 (CER 1.86)
+  [18] 打开语音播报       -> 那3K1U1.1P4。 (CER 1.00)
+  [19] 关闭语音播报       -> 1-1 before you in 1-1 before (CER 1.00)
+asr=whisper corpus=espeak-ng mode=fast init_ms(first)=79.8
+  recognize_ms                 n=60 median=907.96 p95=1977.71 min=753.30 max=4616.29 ms
+  rtf                          n=60 median=0.42 p95=1.04 min=0.18 max=1.39 x
+  CER=1.1533 (519/450) exact=0/60 failures=0 self VmHWM=610.0 MiB
+== ASR whisper 输入 piper 合成语音（实时送入，句末延迟）
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+  [00] 前方三百米右转    -> 前方300米右转。 (CER 0.00)
+  [01] 沿当前道路继续直行两公里 -> 言当前道路继续执行两公里。 (CER 0.17)
+  [02] 前方路口向左转进入中山大道 -> 前方路口向左转进入中,善大道。 (CER 0.08)
+  [03] 请靠右行驶进入匝道 -> 请靠右行使进入扎稻。 (CER 0.33)
+  [04] 您已偏离路线正在重新规划 -> 您已片离路线正在重新规划。 (CER 0.08)
+  [05] 前方五十米进入环岛请从第二个出口驶出 -> 前放50米进入环岛请从第2个出口使出。 (CER 0.11)
+  [06] 即将到达目的地    -> 即将到达目的地。 (CER 0.00)
+  [07] 您已到达目的地本次导航结束 -> 您已到达目地地本次到航结束。 (CER 0.15)
+  [08] 开始导航             -> 开始导航。 (CER 0.00)
+  [09] 停止导航             -> 停止导航。 (CER 0.00)
+  [10] 暂停导航             -> 暂停导航。 (CER 0.00)
+  [11] 继续导航             -> 继续导航。 (CER 0.00)
+  [12] 重新规划路线       -> 重新规划路线。 (CER 0.00)
+  [13] 还有多远             -> 还有多元。 (CER 0.25)
+  [14] 现在几点到达       -> 现在几点到达。 (CER 0.00)
+  [15] 放大地图             -> 方大地图 (CER 0.25)
+  [16] 缩小地图             -> 搜小地图 (CER 0.25)
+  [17] 导航到武汉大学    -> 导航到武汉大学 (CER 0.00)
+  [18] 打开语音播报       -> 打开与音播报。 (CER 0.17)
+  [19] 关闭语音播报       -> 关闭于音播报。 (CER 0.17)
+asr=whisper corpus=piper mode=realtime init_ms(first)=81.6
+  end_of_audio_to_result_ms    n=20 median=859.32 p95=935.98 min=829.41 max=949.64 ms
+  CER=0.1067 (16/150) exact=9/20 failures=0 self VmHWM=591.7 MiB
+== Navit 0.5.7 speech_cmdline 等价路径
+  navit-cmdline-spd-say: n=60 total_ms median=2763.1 p95=6542.3 ms/char median=459.2
+Traceback (most recent call last):
+  File "<stdin>", line 17, in <module>
+  File "/usr/lib/python3.12/subprocess.py", line 548, in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/subprocess.py", line 1026, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.12/subprocess.py", line 1955, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+FileNotFoundError: [Errno 2] No such file or directory: 'espeak-ng'

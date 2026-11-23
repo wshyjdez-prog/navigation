@@ -1,0 +1,134 @@
+== ASR 输入：Piper 合成 20 句
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+service error: asr=none: 未编译 ASR 后端: none
+corpus piper: 20/20 wav
+== TTS piper 实际播放（默认输出）
+service error: asr=none: 未编译 ASR 后端: none
+tts=piper mode=playback init_ms=177.9
+  first_audio_ms               n=60 median=63.00 p95=143.99 min=42.59 max=184.21 ms
+  total_ms                     n=60 median=1703.60 p95=3546.76 min=1024.88 max=4240.98 ms
+  total_ms_per_char            n=60 median=278.17 p95=362.25 min=215.21 max=400.77 ms/char
+  cancel_ms                    n=3 median=21.25 p95=21.25 min=20.87 max=21.25 ms
+  failures=0
+  self VmHWM=12.5 MiB; speech-dispatch(25187) VmHWM=14.4961MiB; sd_espeak-ng(25202) VmHWM=12.0273MiB; piper(212317) VmHWM=236.664MiB; 
+  destroy_ms=20.6
+== TTS piper 写 WAV（纯合成）
+service error: asr=none: 未编译 ASR 后端: none
+tts=piper mode=wav init_ms=187.7
+  first_audio_ms               n=60 median=46.91 p95=106.77 min=27.45 max=122.57 ms
+  total_ms                     n=60 median=47.02 p95=106.97 min=27.56 max=122.76 ms
+  total_ms_per_char            n=60 median=7.72 p95=9.57 min=5.92 max=10.68 ms/char
+  failures=0
+  self VmHWM=11.2 MiB; speech-dispatch(25187) VmHWM=14.4961MiB; sd_espeak-ng(25202) VmHWM=12.0273MiB; piper(212525) VmHWM=165.75MiB; 
+  destroy_ms=20.4
+== ASR vosk 输入 piper 合成语音（尽快送入）
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+  [00] 前方三百米右转    -> 前方三百米右转 (CER 0.00)
+  [01] 沿当前道路继续直行两公里 -> 盐当前道路继续执行两公里 (CER 0.17)
+  [02] 前方路口向左转进入中山大道 -> 前方路口向左转进入中善待到 (CER 0.23)
+  [03] 请靠右行驶进入匝道 -> 请靠右行驶进入匝道 (CER 0.00)
+  [04] 您已偏离路线正在重新规划 -> 你以偏离路线正在重新桂花 (CER 0.33)
+  [05] 前方五十米进入环岛请从第二个出口驶出 -> 前方五十米进入环岛请从第二个出口使出 (CER 0.06)
+  [06] 即将到达目的地    -> 即将到达目的地 (CER 0.00)
+  [07] 您已到达目的地本次导航结束 -> 你以到达目的地本次导航结束 (CER 0.15)
+  [08] 开始导航             -> 开始导航 (CER 0.00)
+  [09] 停止导航             -> 停止导航 (CER 0.00)
+  [10] 暂停导航             -> 暂停导航 (CER 0.00)
+  [11] 继续导航             -> 继续导航 (CER 0.00)
+  [12] 重新规划路线       -> 重新规划路线 (CER 0.00)
+  [13] 还有多远             -> 还有多远 (CER 0.00)
+  [14] 现在几点到达       -> 现在几点到达 (CER 0.00)
+  [15] 放大地图             -> 风大地图 (CER 0.25)
+  [16] 缩小地图             -> 缩小的图 (CER 0.25)
+  [17] 导航到武汉大学    -> 导航到武汉大学 (CER 0.00)
+  [18] 打开语音播报       -> 打开语音播报 (CER 0.00)
+  [19] 关闭语音播报       -> 关闭语音播报 (CER 0.00)
+asr=vosk corpus=piper mode=fast init_ms(first)=223.6
+  recognize_ms                 n=60 median=87.91 p95=743.22 min=29.26 max=950.26 ms
+  rtf                          n=60 median=0.04 p95=0.37 min=0.03 max=0.55 x
+  CER=0.0933 (42/450) exact=39/60 failures=0 self VmHWM=445.1 MiB
+== ASR vosk 输入 piper 合成语音（实时送入，句末延迟）
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+service error: tts=none: 未编译 TTS 后端: none
+  [00] 前方三百米右转    -> 前方三百米右转 (CER 0.00)
+  [01] 沿当前道路继续直行两公里 -> 盐当前道路继续执行两公里 (CER 0.17)
+  [02] 前方路口向左转进入中山大道 -> 前方路口向左转进入中善待到 (CER 0.23)
+  [03] 请靠右行驶进入匝道 -> 请靠右行驶进入匝道 (CER 0.00)
+  [04] 您已偏离路线正在重新规划 -> 你以偏离路线正在重新桂花 (CER 0.33)
+  [05] 前方五十米进入环岛请从第二个出口驶出 -> 前方五十米进入环岛请从第二个出口使出 (CER 0.06)
+  [06] 即将到达目的地    -> 即将到达目的地 (CER 0.00)
+  [07] 您已到达目的地本次导航结束 -> 你以到达目的地本次导航结束 (CER 0.15)
+  [08] 开始导航             -> 开始导航 (CER 0.00)
+  [09] 停止导航             -> 停止导航 (CER 0.00)
+  [10] 暂停导航             -> 暂停导航 (CER 0.00)
+  [11] 继续导航             -> 继续导航 (CER 0.00)
+  [12] 重新规划路线       -> 重新规划路线 (CER 0.00)
+  [13] 还有多远             -> 还有多远 (CER 0.00)
+  [14] 现在几点到达       -> 现在几点到达 (CER 0.00)
+  [15] 放大地图             -> 风大地图 (CER 0.25)
+  [16] 缩小地图             -> 缩小的图 (CER 0.25)
+  [17] 导航到武汉大学    -> 导航到武汉大学 (CER 0.00)
+  [18] 打开语音播报       -> 打开语音播报 (CER 0.00)
+  [19] 关闭语音播报       -> 关闭语音播报 (CER 0.00)
+asr=vosk corpus=piper mode=realtime init_ms(first)=218.6
+  end_of_audio_to_result_ms    n=20 median=32.70 p95=235.84 min=9.70 max=237.22 ms
+  CER=0.0933 (14/150) exact=13/20 failures=0 self VmHWM=420.3 MiB
+== Navit 0.5.7 speech_cmdline 等价路径
+  navit-cmdline-spd-say: n=60 total_ms median=2762.6 p95=6543.3 ms/char median=458.7
+  navit-cmdline-espeak-ng: 未测（命令 espeak-ng 未安装）
+  children max RSS (largest single child) = 12.8 MiB

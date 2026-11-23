@@ -2,6 +2,9 @@
 #include "app/ImportFactory.h"
 #include "app/ImportPage.h"
 #include "app/NavigationWorkflow.h"
+#include "app/voice/VoiceNavigationBridge.h"
+#include "app/voice/VoicePage.h"
+#include "app/voice/VoiceService.h"
 #include "ui/common/Components.h"
 #include "ui/common/Theme.h"
 #include "ui/map/MapPage.h"
@@ -46,6 +49,7 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     sidebarLayout->addLayout(navigation_);
     addNavigation("import","数据导入","upload",true);
     addNavigation("map","地图导航","map",true);
+    addNavigation("voice","语音助手","mic",true);
     addNavigation("algorithms","算法实验","code",false);
     addNavigation("offline","离线数据","folder",false);
     addNavigation("history","收藏历史","clock",false);
@@ -73,7 +77,7 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     description_ = label({},"secondary");
     headings->addWidget(title_); headings->addWidget(description_);
     header->addLayout(headings,1);
-    auto* phase = badge("第 2 次作业");
+    auto* phase = badge("第 3 次作业");
     header->addWidget(phase,0,Qt::AlignTop);
     themeButton_ = button("深色主题");
     themeButton_->setObjectName("themeButton");
@@ -89,7 +93,7 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     auto* status = new QHBoxLayout(status_);status->setContentsMargins(0,0,0,0);
     status->addWidget(label("●  本地会话", "caption"));
     status->addStretch();
-    auto* serviceStatus = label("真实路网 / A* / FMM  ·  定位与语音属于后续作业", "caption");
+    auto* serviceStatus = label("真实路网 / A* / FMM  ·  本地中文语音 TTS/ASR", "caption");
     serviceStatus->setWordWrap(false);
     status->addWidget(serviceStatus);
     work->addWidget(status_);
@@ -103,6 +107,18 @@ MainWindow::MainWindow(Theme& theme, QWidget* parent, const QString& importCache
     registerPage("map","地图导航","拖动自动加载本地地图，右键设置起终点。",map);
     connect(map,SIGNAL(pageRequested(QString)),this,SLOT(openPage(QString)));
     connect(map,SIGNAL(toggleMapOnlyRequested()),this,SLOT(toggleMapOnly()));
+    // 1 号：LinuxVoiceAdapter。语音服务按需启动；4 号导航控制器就绪后经 bridge->attach() 接入引导与语音控制。
+    auto* voice = new VoiceService(this);
+    voice->setObjectName("voiceService");
+    auto* voiceBridge = new VoiceNavigationBridge(voice, this);
+    voiceBridge->setObjectName("voiceNavigationBridge");
+    registerPage("voice","语音助手","本地离线中文播报与语音指令，回调经 FFI 返回导航核心。",createVoicePage(theme,voice,voiceBridge));
+    // 语音服务已启用时播报规划结果（不因规划而强制加载语音模型）。
+    connect(workflow,&NavigationWorkflow::completed,voiceBridge,[voice,voiceBridge](const QString& kind,bool ok){
+        if(kind==QStringLiteral("A* 规划") && voice->running())
+            voiceBridge->announce(ok?QStringLiteral("路线规划完成"):QStringLiteral("路线规划失败，请调整起终点"),false);
+    });
+    connect(voiceBridge,&VoiceNavigationBridge::zoomRequested,this,[this]{setCurrentPage("map");});
     registerPage("algorithms","算法实验","真实路网上的 A* 路径规划与 FMM/HMM 轨迹匹配。",createAlgorithmsPage(theme,workflow,importCacheDirectory));
     connect(qobject_cast<ImportPage*>(registry_["import"].widget), &ImportPage::importFinished, this,
         [this,workflow](const ImportResult& result) { if(result.ok) {

@@ -1,0 +1,29 @@
+# Flatpak 分发清单模板（1 号）。⚠ 未验证：当前统一虚拟机未安装 flatpak / flatpak-builder，
+# 本文件只用于落实 LOCATION / MICROPHONE 在 Flatpak 分发方式下的具体声明，构建与运行待补测。
+#
+# 权限映射（任务书中的 LOCATION / MICROPHONE 不是 Linux 通用配置键，按分发方式落实）：
+#   MICROPHONE → --socket=pulseaudio（PulseAudio/PipeWire 兼容层，同时提供播放与录音；
+#                未授予时 LinuxVoiceAdapter 连接失败，listen() 返回 P1_VOICE_ERR_PERMISSION_DENIED/DEVICE）
+#   LOCATION   → --system-talk-name=org.freedesktop.GeoClue2（4 号 LocationAdapter；GeoClue2 再按
+#                desktop id 由桌面代理询问用户）；更推荐的 xdg-desktop-portal Location 门户待 4 号评估
+app-id: cn.p1.Navigation
+runtime: org.kde.Platform
+runtime-version: '6.4'
+sdk: org.kde.Sdk
+command: p1-navigation
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --socket=pulseaudio
+  - --system-talk-name=org.freedesktop.GeoClue2
+modules:
+  - name: p1-navigation
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+    sources:
+      - type: dir
+        path: ../..

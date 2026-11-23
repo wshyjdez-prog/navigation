@@ -45,12 +45,21 @@ int main(int argc, char* argv[]) {
             window.setCurrentPage("components");
             QTimer::singleShot(250,&window,[&window,&theme,&app,capture,ok]() mutable {
                 ok = capture("components-light") && ok;
-                theme.setDark(true); window.setCurrentPage("import");
-                QTimer::singleShot(250,&window,[&window,&theme,&app,capture,ok]() mutable {
-                    ok = capture("import-dark") && ok;
-                    theme.setDark(false); window.resize(1024,720);
-                    QTimer::singleShot(250,&window,[&app,capture,ok] {
-                        app.exit(capture("import-compact") && ok ? 0 : 3);
+                // 语音页显示时按需启动语音服务，留出加载识别模型的时间再截图。
+                window.setCurrentPage("voice");
+                QTimer::singleShot(3000,&window,[&window,&theme,&app,capture,ok]() mutable {
+                    ok = capture("voice-light") && ok;
+                    theme.setDark(true);
+                    QTimer::singleShot(250,&window,[&window,&theme,&app,capture,ok]() mutable {
+                        ok = capture("voice-dark") && ok;
+                        window.setCurrentPage("import");
+                        QTimer::singleShot(250,&window,[&window,&theme,&app,capture,ok]() mutable {
+                            ok = capture("import-dark") && ok;
+                            theme.setDark(false); window.resize(1024,720);
+                            QTimer::singleShot(250,&window,[&app,capture,ok] {
+                                app.exit(capture("import-compact") && ok ? 0 : 3);
+                            });
+                        });
                     });
                 });
             });
