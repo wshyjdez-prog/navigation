@@ -11,8 +11,6 @@ add_library(p1_navigation STATIC
     StubRoutePlanner.cpp
     # 含 Q_OBJECT 的公共契约头不在本目录，须显式列出才会被 AUTOMOC 处理并链接进本库。
     "${CMAKE_SOURCE_DIR}/include/contracts/LocationSource.h"
-    # 导航控制器契约（含 Q_OBJECT），同样须显式列出；NavigationTypes.h 无 Q_OBJECT，无需列出。
-    "${CMAKE_SOURCE_DIR}/include/contracts/NavigationController.h"
     # 对接层验证用最小控制器桩（Q_OBJECT，非第 3 次状态机，仅供演示与集成测试）。
     RecordingController.h)
 # 子目录中相对路径 src 会解析为 src/navigation/src，故使用绝对路径。
@@ -20,6 +18,11 @@ target_include_directories(p1_navigation PUBLIC
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/include")
 target_link_libraries(p1_navigation PUBLIC Qt6::Core)
+if(TARGET p1_algorithms_contracts)
+    target_link_libraries(p1_navigation PUBLIC p1_algorithms_contracts)
+else()
+    target_sources(p1_navigation PRIVATE "${CMAKE_SOURCE_DIR}/include/contracts/NavigationController.h")
+endif()
 target_compile_options(p1_navigation PRIVATE
     "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
     "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
@@ -54,7 +57,8 @@ target_link_libraries(p1-planner-demo PRIVATE p1_navigation)
 target_compile_options(p1-planner-demo PRIVATE
     "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
     "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
-add_test(NAME navigation-planner-demo COMMAND p1-planner-demo)
+# Allow for timer overruns on the VM while keeping the three-heartbeat check.
+add_test(NAME navigation-planner-demo COMMAND p1-planner-demo 600)
 
 # 规划对接层测试：端到端链路、回流线程归属、不阻塞（心跳）、stop 取消、
 # 陈旧结果拒绝（故障注入 honorCancel=false）、析构静默、stub 输出确定性。

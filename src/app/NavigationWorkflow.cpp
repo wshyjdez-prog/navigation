@@ -1,4 +1,5 @@
 #include "NavigationWorkflow.h"
+#include "NavigationRuntime.h"
 #include "contracts/ImportedDataset.h"
 #include "data/osmx/OsmxParser.h"
 #include "data/osmx/OsmxStore.h"
@@ -17,8 +18,12 @@
 #include <QProcess>
 #include <QStandardPaths>
 #include <QCryptographicHash>
+#include <QDateTime>
+#include <QtEndian>
 #include <cmath>
 #include <limits>
+#include <unordered_map>
+#include <unordered_set>
 #include <stdexcept>
 
 namespace p1::app {
@@ -46,13 +51,18 @@ quint32 snap(const RoadNetwork& n,QPointF geo,bool origin) {
     return *index;
 }
 // Driving snap: nearest node (500 m) that a car can leave (origin) or reach.
-quint32 snapDriving(const RoadNetwork& n,const algorithms::model::GraphData& g,QPointF geo,bool origin) {
+quint32 snapDriving(const RoadNetwork& n,const algorithms::model::GraphData& g,QPointF geo,bool origin,
+                   const algorithms::Cancellation& cancel) {
     if(!std::isfinite(geo.x())||!std::isfinite(geo.y())||std::abs(geo.x())>180||std::abs(geo.y())>90)
         throw std::runtime_error("起终点必须是有效 WGS84 经纬度");
     std::vector<char> usable(n.roads->nodeCount(),0);
-    for(const auto& e:g.edges) usable[size_t((origin?e.from:e.to).value-1)]=1;
+    for(std::size_t i=0;i<g.edges.size();++i) {
+        if(i%1024==0) check(cancel);
+        const auto& e=g.edges[i];
+        usable[size_t((origin?e.from:e.to).value-1)]=1;
+    }
     double best=500;std::optional<quint32> found;
-    for(quint32 i=0;i<n.roads->nodeCount();++i){if(!usable[i])continue;const auto& node=n.roads->nodeAt(i);
+    for(quint32 i=0;i<n.roads->nodeCount();++i){if(i%1024==0) check(cancel); if(!usable[i])continue;const auto& node=n.roads->nodeAt(i);
         const double d=data::osmxDistanceMeters(geo.y(),geo.x(),node.lat,node.lon);if(d<=best){best=d;found=i;}}
     if(!found) throw std::runtime_error("行车模式：选点 500 m 内没有机动车可通行道路，请靠近车行道重选");
     return *found;
@@ -66,15 +76,17 @@ QString backend(const QString& name) {
 // Minimal ESRI PolyLine writer for the selected FMM loader. Three numeric ID
 // fields; two projected metre coordinates per directed edge. No GDAL dependency
 // leaks into the application. Files are ephemeral, owned by the matching task.
-void writeShape(const RoadNetwork& n,const QString& stem,const std::shared_ptr<std::atomic_bool>& c) {
-    const auto count=int(n.graph.edges.size());
+void writeShape(const algorithms::model::GraphData& graph,const QString& stem,const std::shared_ptr<std::atomic_bool>& c) {
+    if (graph.edges.size() > std::size_t((std::numeric_limits<qint32>::max() - 50) / 44))
+        throw std::runtime_error("FMM 路网超过 Shapefile 记录容量");
+    const auto count=int(graph.edges.size());
     auto header=[&](QDataStream& s,int words) {
         s.setByteOrder(QDataStream::BigEndian); s<<qint32(9994);
         for(int i=0;i<5;++i) { s<<qint32(0); }
         s<<qint32(words);
         s.setByteOrder(QDataStream::LittleEndian); s<<qint32(1000)<<qint32(3);
         double xmin=1e100,ymin=1e100,xmax=-1e100,ymax=-1e100;
-        for(const auto& v:n.graph.nodes) { xmin=std::min(xmin,v.position.x_m); xmax=std::max(xmax,v.position.x_m);
+        for(const auto& v:graph.nodes) { xmin=std::min(xmin,v.position.x_m); xmax=std::max(xmax,v.position.x_m);
             ymin=std::min(ymin,v.position.y_m); ymax=std::max(ymax,v.position.y_m); }
         s<<xmin<<ymin<<xmax<<ymax<<0.0<<0.0<<0.0<<0.0;
     };
@@ -89,36 +101,250 @@ void writeShape(const RoadNetwork& n,const QString& stem,const std::shared_ptr<s
     const char* names[]={"id","source","target"};
     for(int j=0;j<3;++j) { const auto name=QByteArray(names[j]);
         std::copy(name.begin(),name.end(),h.begin()+32+j*32); h[32+j*32+11]='N'; h[32+j*32+16]=12; }
-    h[128]=13; dbf.write(h);
+    auto writeDbf = [&](const QByteArray& bytes) {
+        if (dbf.write(bytes) != bytes.size()) throw std::runtime_error("写入临时 DBF 失败");
+    };
+    h[128]=13;
+    writeDbf(h);
     for(int i=0;i<count;++i) {
         if(i%1024==0) check(c);
-        const auto& e=n.graph.edges[size_t(i)]; const auto& a=e.geometry.front(); const auto& b=e.geometry.back();
+        const auto& e=graph.edges[size_t(i)]; const auto& a=e.geometry.front(); const auto& b=e.geometry.back();
         s.setByteOrder(QDataStream::BigEndian); s<<qint32(i+1)<<qint32(40);
         s.setByteOrder(QDataStream::LittleEndian); s<<qint32(3)<<std::min(a.x_m,b.x_m)<<std::min(a.y_m,b.y_m)
             <<std::max(a.x_m,b.x_m)<<std::max(a.y_m,b.y_m)<<qint32(1)<<qint32(2)<<qint32(0)<<a.x_m<<a.y_m<<b.x_m<<b.y_m;
         x.setByteOrder(QDataStream::BigEndian); x<<qint32(50+44*i)<<qint32(40);
-        dbf.write(" "); for(auto id:{e.id.value,e.from.value,e.to.value}) dbf.write(QByteArray::number(qulonglong(id)).rightJustified(12,' '));
+        QByteArray row(" ");
+        for (auto id : {e.id.value,e.from.value,e.to.value}) {
+            const auto text = QByteArray::number(qulonglong(id));
+            if (text.size() > 12) throw std::runtime_error("路网 ID 超过 DBF 字段容量");
+            row += text.rightJustified(12, ' ');
+        }
+        writeDbf(row);
     }
-    dbf.write(QByteArray(1,char(26)));
+    writeDbf(QByteArray(1,char(26)));
     if(!shp.flush()||!shx.flush()||!dbf.flush() || s.status()!=QDataStream::Ok || x.status()!=QDataStream::Ok)
         throw std::runtime_error("写入临时路网失败");
 }
+constexpr int ubodtDeltaM = 2000;
+
 void generateUbodt(const QString& executable,const QString& stem,const QString& output,
                    const std::shared_ptr<std::atomic_bool>& c) {
-    if(executable.isEmpty()) throw std::runtime_error("找不到真实 ubodt_gen 后端，请检查安装");
     QProcess p; p.setProcessChannelMode(QProcess::MergedChannels);
     p.start(executable,{"--network",stem+".shp","--network_id","id","--source","source","--target","target",
-        "--output",output,"--delta","2000","--log_level","4"});
-    if(!p.waitForStarted(5000)) throw std::runtime_error(p.errorString().toStdString());
+        "--output",output,"--delta",QString::number(ubodtDeltaM),"--log_level","4"});
+    if(!p.waitForStarted(5000))
+        throw MatchingNetworkError(algorithms::FmmStatus::ExecutionFailed, p.errorString());
     QElapsedTimer timer; timer.start(); QByteArray log;
     while(!p.waitForFinished(50)) {
         log+=p.readAll(); if(log.size()>16384) log=log.right(16384);
         if((c&&c->load())||timer.elapsed()>180000) { p.kill(); p.waitForFinished(3000);
-            throw std::runtime_error(c&&c->load()?"已取消":"UBODT 预处理超时，请缩小工作区域"); }
+            if(c&&c->load()) throw MatchingNetworkError(algorithms::FmmStatus::Cancelled, "已取消");
+            throw MatchingNetworkError(algorithms::FmmStatus::TimedOut, "UBODT 预处理超时，请缩小工作区域"); }
     }
     if(p.exitStatus()!=QProcess::NormalExit||p.exitCode()!=0||!QFileInfo::exists(output)||QFileInfo(output).size()==0)
-        throw std::runtime_error(("UBODT 生成失败："+QString::fromUtf8(log+p.readAll()).right(800)).toStdString());
+        throw MatchingNetworkError(algorithms::FmmStatus::ExecutionFailed,
+            "UBODT 生成失败："+QString::fromUtf8(log+p.readAll()).right(800));
 }
+
+void requireAsset(bool ok, const QString& reason) {
+    if (!ok) throw MatchingNetworkError(algorithms::FmmStatus::InvalidConfiguration, reason);
+}
+
+// Read exactly the format that writeShape exports and hash the bytes validated.
+// UBODT indexes correspond to OGR record order and first encounter of each node.
+std::shared_ptr<const algorithms::FmmResourceSeal> sealMatchingAssets(
+    const QString& stem, const QString& table, const algorithms::model::GraphData& graph,
+    const algorithms::Cancellation& token) {
+    auto seal = std::make_shared<algorithms::FmmResourceSeal>();
+    const std::array<QString, 4> paths{stem + ".shp", stem + ".shx", stem + ".dbf", table};
+    const qint64 count = qint64(graph.edges.size());
+    const std::array<qint64, 3> expectedSizes{100 + 88 * count, 100 + 8 * count, 130 + 37 * count};
+    for (std::size_t i = 0; i < paths.size(); ++i) {
+        const QFileInfo info(paths[i]);
+        requireAsset(info.isFile() && info.isReadable() && info.size() > 0 &&
+            (i == expectedSizes.size() || info.size() == expectedSizes[i]),
+            QStringLiteral("FMM 资源大小或配套文件无效：%1").arg(info.fileName()));
+        (*seal)[i] = {paths[i], info.size(), info.lastModified().toMSecsSinceEpoch(), {}};
+    }
+    QFile shp(paths[0]), shx(paths[1]), dbf(paths[2]), ubodt(paths[3]);
+    QCryptographicHash shpSha(QCryptographicHash::Sha256), shxSha(QCryptographicHash::Sha256);
+    QCryptographicHash dbfSha(QCryptographicHash::Sha256), tableSha(QCryptographicHash::Sha256);
+    for (auto* file : {&shp, &shx, &dbf, &ubodt})
+        requireAsset(file->open(QIODevice::ReadOnly), QStringLiteral("读取 FMM 资源失败：%1").arg(file->fileName()));
+    auto exact = [](QFile& file, QCryptographicHash& digest, qint64 size) {
+        const auto bytes = file.read(size);
+        requireAsset(bytes.size() == size, QStringLiteral("FMM 资源记录截断：%1").arg(file.fileName()));
+        digest.addData(bytes);
+        return bytes;
+    };
+    auto checkShapeHeader = [&](QFile& file, QCryptographicHash& digest) {
+        const auto header = exact(file, digest, 100);
+        requireAsset(qFromBigEndian<quint32>(header.constData()) == 9994 &&
+            qFromBigEndian<quint32>(header.constData() + 24) == file.size() / 2 &&
+            qFromLittleEndian<quint32>(header.constData() + 28) == 1000 &&
+            qFromLittleEndian<quint32>(header.constData() + 32) == 3,
+            QStringLiteral("临时 Shapefile 表头无效"));
+    };
+    checkShapeHeader(shp, shpSha);
+    checkShapeHeader(shx, shxSha);
+    const auto header = exact(dbf, dbfSha, 129);
+    requireAsset(header[0] == 3 && header[128] == 13 &&
+        qFromLittleEndian<quint32>(header.constData() + 4) == count &&
+        qFromLittleEndian<quint16>(header.constData() + 8) == 129 &&
+        qFromLittleEndian<quint16>(header.constData() + 10) == 37,
+        QStringLiteral("临时 DBF 记录数或表头无效"));
+    const std::array<QByteArray, 3> fieldNames{"id", "source", "target"};
+    for (std::size_t i = 0; i < fieldNames.size(); ++i) {
+        const auto field = header.mid(qsizetype(32 + i * 32), 32);
+        requireAsset(field.left(11) == fieldNames[i].leftJustified(11, '\0') &&
+            field[11] == 'N' && field[16] == 12 && field[17] == 0,
+            QStringLiteral("临时 DBF 字段无效"));
+    }
+    struct IndexedEdge { std::size_t from, to; double length; };
+    std::vector<IndexedEdge> indexed;
+    std::unordered_map<quint64, std::size_t> nodeIndex;
+    std::unordered_set<quint64> edgeIds;
+    indexed.reserve(graph.edges.size());
+    for (std::size_t i = 0; i < graph.edges.size(); ++i) {
+        if (i % 1024 == 0) check(token);
+        const auto& edge = graph.edges[i];
+        const auto shape = exact(shp, shpSha, 88);
+        const auto index = exact(shx, shxSha, 8);
+        requireAsset(qFromBigEndian<quint32>(shape.constData()) == i + 1 &&
+            qFromBigEndian<quint32>(shape.constData() + 4) == 40 &&
+            qFromLittleEndian<quint32>(shape.constData() + 8) == 3 &&
+            qFromLittleEndian<quint32>(shape.constData() + 44) == 1 &&
+            qFromLittleEndian<quint32>(shape.constData() + 48) == 2 &&
+            qFromBigEndian<quint32>(index.constData()) == 50 + i * 44 &&
+            qFromBigEndian<quint32>(index.constData() + 4) == 40,
+            QStringLiteral("临时 Shapefile 记录或 SHX 偏移无效"));
+        const auto dbfRow = exact(dbf, dbfSha, 37);
+        QByteArray expected(" ");
+        for (const auto id : {edge.id.value, edge.from.value, edge.to.value})
+            expected += QByteArray::number(qulonglong(id)).rightJustified(12, ' ');
+        requireAsset(expected == dbfRow && edgeIds.insert(edge.id.value).second,
+            QStringLiteral("临时 DBF 记录与导出有向边不一致"));
+        const auto from = nodeIndex.emplace(edge.from.value, nodeIndex.size()).first->second;
+        const auto to = nodeIndex.emplace(edge.to.value, nodeIndex.size()).first->second;
+        const auto a = edge.geometry.front(), b = edge.geometry.back();
+        indexed.push_back({from, to, std::hypot(b.x_m - a.x_m, b.y_m - a.y_m)});
+    }
+    requireAsset(exact(dbf, dbfSha, 1) == QByteArray(1, char(26)), QStringLiteral("临时 DBF 缺少结尾"));
+    const auto tableHeader = ubodt.readLine(512);
+    requireAsset(tableHeader.trimmed() == "source;target;next_n;prev_n;next_e;distance" &&
+        tableHeader.endsWith('\n'), QStringLiteral("UBODT 表头无效"));
+    tableSha.addData(tableHeader);
+    std::vector<std::vector<std::size_t>> outgoing(nodeIndex.size());
+    std::vector<bool> needsRow(nodeIndex.size()), sawRow(nodeIndex.size());
+    for (const auto& edge : indexed) {
+        outgoing[edge.from].push_back(edge.to);
+        if (edge.from != edge.to && edge.length <= ubodtDeltaM) needsRow[edge.from] = true;
+    }
+    std::size_t rows = 0;
+    while (!ubodt.atEnd()) {
+        if (rows++ % 1024 == 0) check(token);
+        const auto raw = ubodt.readLine(512);
+        const auto fields = raw.trimmed().split(';');
+        requireAsset(raw.endsWith('\n') && fields.size() == 6, QStringLiteral("UBODT 残行或字段数无效"));
+        std::array<std::size_t, 5> ids;
+        for (std::size_t i = 0; i < ids.size(); ++i) {
+            bool ok = false;
+            const auto id = fields[qsizetype(i)].toULongLong(&ok);
+            requireAsset(ok && id < (i == 4 ? indexed.size() : nodeIndex.size()),
+                QStringLiteral("UBODT 内部索引无效"));
+            ids[i] = std::size_t(id);
+        }
+        const auto [from, to, next, prev, edgeIndex] = ids;
+        bool ok = false;
+        const double distance = fields[5].toDouble(&ok);
+        constexpr double rounding = 0.01;
+        const auto& first = indexed[edgeIndex];
+        const auto& tail = outgoing[prev];
+        requireAsset(from != to && first.from == from && first.to == next &&
+            std::find(tail.begin(), tail.end(), to) != tail.end() && (next != to || prev == from) &&
+            ok && std::isfinite(distance) && distance >= 0 && distance <= ubodtDeltaM + rounding &&
+            distance >= first.length - rounding, QStringLiteral("UBODT 首跳、末跳或距离与有向图不一致"));
+        sawRow[from] = true;
+        tableSha.addData(raw);
+    }
+    requireAsset(ubodt.error() == QFileDevice::NoError, QStringLiteral("读取 UBODT 失败"));
+    for (std::size_t i = 0; i < needsRow.size(); ++i)
+        requireAsset(!needsRow[i] || sawRow[i], QStringLiteral("UBODT 缺少阈值内短边源的转移记录"));
+    const std::array<QByteArray, 4> hashes{shpSha.result(), shxSha.result(), dbfSha.result(), tableSha.result()};
+    for (std::size_t i = 0; i < seal->size(); ++i) {
+        auto& entry = (*seal)[i];
+        const QFileInfo info(entry.path);
+        requireAsset(info.size() == entry.size && info.lastModified().toMSecsSinceEpoch() == entry.mtime,
+            QStringLiteral("资源在首发校验期间变化"));
+        entry.sha256 = hashes[i];
+    }
+    check(token);
+    return seal;
+}
+
+
+}
+
+MatchingNetwork prepareMatchingNetwork(const RoadNetwork& network, const algorithms::model::GraphData& graph,
+    const QString& version, const algorithms::Cancellation& token, const QString& fmm,
+    const QString& ubodt, int timeoutMs) {
+    const QString matcher = fmm.isEmpty() ? backend("fmm") : fmm;
+    const QString generator = ubodt.isEmpty() ? backend("ubodt_gen") : ubodt;
+    for (const auto& executable : {matcher, generator}) {
+        const QFileInfo info(executable);
+        if (!info.isAbsolute() || !info.isFile() || !info.isExecutable())
+            throw MatchingNetworkError(algorithms::FmmStatus::ExecutionFailed, "FMM 或 ubodt_gen 不可用");
+    }
+    if (!network.roads || graph.edges.empty() || version.isEmpty())
+        throw MatchingNetworkError(algorithms::FmmStatus::InvalidConfiguration, "匹配路网无有效版本或有向边");
+    check(token);
+    MatchingNetwork result;
+    result.files = std::make_shared<QTemporaryDir>();
+    if (!result.files->isValid()) throw std::runtime_error("临时目录创建失败");
+    const auto stem = result.files->filePath("network");
+    const auto table = result.files->filePath("ubodt.csv");
+    QElapsedTimer timer;
+    timer.start();
+    writeShape(graph, stem, token);
+    result.exportMs = timer.nsecsElapsed()/1e6;
+    timer.restart();
+    generateUbodt(generator, stem, table, token);
+    result.ubodtMs = timer.nsecsElapsed()/1e6;
+    auto& config = result.config;
+    config.executable = matcher;
+    config.networkFile = stem + ".shp";
+    config.ubodtFile = table;
+    config.datasetId = network.roads->info().datasetId;
+    config.networkVersion = config.ubodtNetworkVersion = version;
+    config.coordinateDefinition = QString::fromStdString(graph.metadata.frame.definition);
+    config.timeoutMs = timeoutMs;
+    config.collectLoadTiming = true;
+    config.resources = sealMatchingAssets(stem, table, graph, token);
+    for (std::size_t i = 0; i < graph.edges.size(); ++i) {
+        if (i % 1024 == 0) check(token);
+        const auto id = graph.edges[i].id;
+        config.p0EdgeIds.emplace(qint64(id.value), id);
+    }
+    return result;
+}
+
+algorithms::RoutePath planOnSnapshot(const RoadNetwork& network, const algorithms::model::GraphData& graph,
+    RouteMode mode, QPointF start, QPointF end, const algorithms::Cancellation& token) {
+    check(token);
+    const bool driving = mode == RouteMode::Driving;
+    if (driving && graph.edges.empty()) throw std::runtime_error("行车模式：当前工作区域没有机动车可通行道路");
+    const auto a = driving ? snapDriving(network, graph, start, true, token) : snap(network, start, true);
+    const auto b = driving ? snapDriving(network, graph, end, false, token) : snap(network, end, false);
+    return algorithms::findRoute(graph, algorithms::model::NodeId(a+1), algorithms::model::NodeId(b+1), token);
+}
+
+QVector<QPointF> geographicRoute(const RoadNetwork& network, const std::vector<algorithms::model::MetricPoint>& geometry) {
+    QVector<QPointF> result;
+    for (const auto& p : geometry) {
+        const auto geo = network.unproject({p.x_m,p.y_m});
+        if (result.isEmpty() || result.last() != geo) result.append(geo);
+    }
+    return result;
 }
 QPointF RoadNetwork::project(QPointF g) const { return {(g.x()-lon0)*metresLon,(g.y()-lat0)*metresLat}; }
 QPointF RoadNetwork::unproject(QPointF m) const { return {lon0+m.x()/metresLon,lat0+m.y()/metresLat}; }
@@ -164,10 +390,13 @@ std::shared_ptr<const RoadNetwork> NavigationWorkflow::buildNetwork(std::shared_
     if(n->graph.edges.empty()) throw std::runtime_error("路网没有有效的非零长度边");
     return n;
 }
-algorithms::model::GraphData NavigationWorkflow::drivingGraph(const RoadNetwork& n) {
+algorithms::model::GraphData NavigationWorkflow::drivingGraph(const RoadNetwork& n,
+    const algorithms::Cancellation& cancel) {
     algorithms::model::GraphData g;g.metadata=n.graph.metadata;g.nodes=n.graph.nodes;
     std::vector<signed char> allowed(n.roads->wayCount(),-1);
-    for(const auto& e:n.graph.edges) {
+    for(std::size_t i=0;i<n.graph.edges.size();++i) {
+        if(i%1024==0) check(cancel);
+        const auto& e=n.graph.edges[i];
         const auto way=n.roads->edgeAt(quint32(e.id.value-1)).way;
         if(allowed[way]<0) allowed[way]=carAllowed(*n.roads,way)?1:0;
         if(allowed[way]) g.edges.push_back(e);
@@ -178,11 +407,10 @@ void NavigationWorkflow::setRouteMode(RouteMode mode) {
     if(mode==routeMode_) return;
     routeMode_=mode;status_=QString("已切换为%1").arg(routeModeName(mode));emit changed();
 }
-NavigationWorkflow::NavigationWorkflow(QObject* p):QObject(p) { pool_.setMaxThreadCount(2); }
 QString NavigationWorkflow::runtimeStatus() const {
-    return QString("工作线程 %1/%2 · %3").arg(pool_.activeThreadCount()).arg(pool_.maxThreadCount()).arg(rss());
+    return QString("工作线程 %1/%2 · 导航任务 %3 · %4").arg(pool_.activeThreadCount())
+        .arg(pool_.maxThreadCount()).arg(navigationTaskCount()).arg(rss());
 }
-NavigationWorkflow::~NavigationWorkflow() { for(const auto& c:cancellations_) c->store(true); pool_.waitForDone(); }
 void NavigationWorkflow::beginMapPick(bool start) {
     if(busy_) cancel();
     pickMode_=start?1:2;status_=start?"请在地图上单击起点":"请在地图上单击终点";
@@ -196,16 +424,19 @@ void NavigationWorkflow::acceptMapPoint(QPointF geo) {
 void NavigationWorkflow::setEndpoint(bool start,QPointF geo) {
     if(!std::isfinite(geo.x())||!std::isfinite(geo.y())||std::abs(geo.x())>180||std::abs(geo.y())>90) return;
     if(busy_) cancel();
+    stopNavigation();
     pickMode_=0;
     (start?startPoint_:endPoint_)=geo;
-    state_.route.clear();state_.distanceM=0;
+    state_.route.clear();state_.routeGeometry.reset();state_.destination.reset();state_.distanceM=0;
     emit endpointSelected(start,geo);
     status_=startPoint_&&endPoint_?"起终点已选好，可计算路线":"请右键地图设置另一个端点";
     emit changed();
 }
 void NavigationWorkflow::clearEndpoints() {
     if(busy_) cancel();
-    pickMode_=0;startPoint_.reset();endPoint_.reset();state_.route.clear();state_.distanceM=0;
+    stopNavigation();
+    pickMode_=0;startPoint_.reset();endPoint_.reset();state_.route.clear();
+    state_.routeGeometry.reset();state_.destination.reset();state_.distanceM=0;
     status_="已清除路线；右键地图设置起点和终点";emit changed();
 }
 void NavigationWorkflow::cancel() { for(const auto& c:cancellations_) c->store(true); ++generation_;
@@ -227,6 +458,7 @@ void NavigationWorkflow::run(const QString& kind,std::function<WorkflowResult(st
                 activeDataset_=pendingDataset_;++datasetRevision_;startPoint_.reset();endPoint_.reset();
             }
             else if(kind=="A* 规划") { state_.route=r.route; state_.distanceM=r.distanceM;
+                state_.routeGeometry=r.routeGeometry;state_.destination=r.destination;state_.routeMode=r.routeMode;
                 if(r.network) state_.network=r.network;
                 if(r.loadedArea.valid) state_.loadedArea=r.loadedArea;
             }
@@ -240,6 +472,7 @@ void NavigationWorkflow::run(const QString& kind,std::function<WorkflowResult(st
     }));
 }
 void NavigationWorkflow::load(const ImportResult& entry,double lat,double lon,double radiusKm) {
+    stopNavigation();
     pendingDataset_=entry;
     run("加载路网",[entry,lat,lon,radiusKm](auto c) {
         WorkflowResult r; std::shared_ptr<const data::OsmxDataset> ds;
@@ -261,6 +494,7 @@ void NavigationWorkflow::load(const ImportResult& entry,double lat,double lon,do
     });
 }
 void NavigationWorkflow::plan(QPointF start,QPointF end) {
+    stopNavigation();
     auto n=state_.network;
     startPoint_=start;endPoint_=end;
     const auto entry=activeDataset_;
@@ -291,15 +525,12 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
             catch(const std::exception& e) { if(c&&c->load()) throw; detailedLimit=QString::fromUtf8(e.what()); n.reset(); }
         }
         const bool driving=mode==RouteMode::Driving;
-        auto attempt=[&](const RoadNetwork& net,quint32& a,quint32& b){
-            const auto car=driving?drivingGraph(net):algorithms::model::GraphData{};
-            if(driving&&car.edges.empty()) throw std::runtime_error("行车模式：当前工作区域没有机动车可通行道路");
+        auto attempt=[&](const RoadNetwork& net){
+            const auto car=driving?drivingGraph(net,c):algorithms::model::GraphData{};
             const auto& graph=driving?car:net.graph;
-            a=driving?snapDriving(net,car,start,true):snap(net,start,true);
-            b=driving?snapDriving(net,car,end,false):snap(net,end,false);
-            return algorithms::findRoute(graph,algorithms::model::NodeId(a+1),algorithms::model::NodeId(b+1),c);};
-        quint32 a=0,b=0;algorithms::RoutePath path;
-        if(n) path=attempt(*n,a,b); else path.status=algorithms::RouteStatus::Unreachable;
+            return planOnSnapshot(net,graph,mode,start,end,c);};
+        algorithms::RoutePath path;
+        if(n) path=attempt(*n); else path.status=algorithms::RouteStatus::Unreachable;
         // A route may have to leave the loaded rectangle (round a lake, to a
         // bridge, through a one-way system). When no directed path exists, the
         // standard-OSM area grows 2 -> 4 -> 8 km beyond the endpoints and A*
@@ -311,7 +542,7 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
             std::shared_ptr<const RoadNetwork> bigger;
             try { bigger=buildNetwork(data::ImportedDataset(entry->cachePath).roads(wider,c),c); }
             catch(const std::exception& e) { if(c&&c->load()) throw; stopped=QString::fromUtf8(e.what()); break; }
-            n=bigger;area=wider;expandedTo=margin;path=attempt(*n,a,b);
+            n=bigger;area=wider;expandedTo=margin;path=attempt(*n);
         }
         // Tiered fallback (DEC-20261111-1-long-route-01, after Navit's car
         // route_depth "4:25%,8:40000,18:10000"): every road within 3 km of each
@@ -333,7 +564,7 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
             try { tieredNet=buildNetwork(data::ImportedDataset(entry->cachePath).roadsLayered(layers,c),c,1000000,2000000); }
             catch(const std::exception& e) { if(c&&c->load()) throw; stopped=QString("分级路网也无法加载：")+QString::fromUtf8(e.what()); }
             if(tieredNet) {
-                quint32 ta=0,tb=0;const auto tpath=attempt(*tieredNet,ta,tb);
+                const auto tpath=attempt(*tieredNet);
                 if(tpath.status==algorithms::RouteStatus::Success) {n=tieredNet;area=box(start,3000);path=tpath;tiered=true;}
                 else if(path.message.empty()) path=tpath;
             }
@@ -347,10 +578,10 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
         }
         if(path.geometry.size()<2) throw std::runtime_error("起终点吸附到同一节点，请拉开距离");
         WorkflowResult r; r.ok=true; r.network=n; r.loadedArea=area;r.distanceM=path.total_distance_m; r.algorithmMs=path.elapsed_ms; r.count=int(path.edges.size());
-        for(const auto& p:path.geometry) {
-            const auto geo=n->unproject({p.x_m,p.y_m});
-            if(r.route.isEmpty() || r.route.last()!=geo) r.route.append(geo);
-        }
+        r.route=geographicRoute(*n,path.geometry);
+        r.routeGeometry=std::make_shared<const std::vector<algorithms::model::MetricPoint>>(std::move(path.geometry));
+        r.destination=end;
+        r.routeMode=mode;
         r.message=QString("%1 · A* 路线 %2 m · %3 条边；两端 500 m 内吸附，遵循单行线/通行限制%4").arg(routeModeName(mode)).arg(r.distanceM,0,'f',1).arg(r.count)
             .arg(driving?"，不含人行道/步道/台阶等非机动车道路（参照 Navit 车辆配置）":"");
         if(tiered) r.message+=QString("；远距离：按 Navit route_depth 方式分级加载（两端 3 km 全部道路、15 km 内三级路以上、走廊内主干道），中段只走主干道，可能不是严格最短");
@@ -359,6 +590,7 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
     });
 }
 void NavigationWorkflow::match(const QString& path) {
+    stopNavigation();
     auto n=state_.network;
     run("FMM 匹配",[n,path](auto c) {
         if(!n) throw std::runtime_error("请先加载路网");
@@ -375,16 +607,8 @@ void NavigationWorkflow::match(const QString& path) {
             if(points.size()>256) throw std::runtime_error("本次匹配支持 2–256 个轨迹点，请裁剪轨迹");
         }
         if(points.size()<2) throw std::runtime_error("匹配至少需要 2 个轨迹点");
-        const QString fmm=backend("fmm"),ubodt=backend("ubodt_gen");
-        if(fmm.isEmpty()) throw std::runtime_error("找不到真实 FMM 后端，请检查安装");
-        QTemporaryDir temp; if(!temp.isValid()) throw std::runtime_error("临时目录创建失败");
-        const auto stem=temp.filePath("network"),table=temp.filePath("ubodt.csv");
-        writeShape(*n,stem,c); generateUbodt(ubodt,stem,table,c); check(c);
-        algorithms::FmmConfig config; config.executable=fmm; config.networkFile=stem+".shp"; config.ubodtFile=table;
-        config.datasetId=n->roads->info().datasetId; config.networkVersion=n->version; config.ubodtNetworkVersion=n->version;
-        config.coordinateDefinition=QString::fromStdString(n->graph.metadata.frame.definition); config.timeoutMs=120000;
-        for(const auto& e:n->graph.edges) config.p0EdgeIds.emplace(qint64(e.id.value),e.id);
-        const auto matched=algorithms::runFmm(config,points,c);
+        const auto prepared=prepareMatchingNetwork(*n,n->graph,n->version,c,{}, {},120000);
+        const auto matched=algorithms::runFmm(prepared.config,points,c);
         if(matched.status!=algorithms::FmmStatus::Matched) throw std::runtime_error((matched.message+" "+matched.processLog.right(500)).toStdString());
         for(const auto& p:matched.matchedGeometry) r.matched.append(n->unproject({p.x,p.y}));
         if(r.matched.size()<2) throw std::runtime_error("匹配没有返回可绘制几何");

@@ -1,6 +1,18 @@
 # FMM/HMM 与 Qt MapMatcher 接入
 
-状态（2026-11-01）：**Ubuntu 24.04 独立算法模块 CTest 5/5 通过，失败 0，总耗时 3.51 秒**；真实 FMM/HMM 经新 Qt MapMatcher 适配器运行并生成三条匹配 CSV。已读取共享证据核实，不再仅依据口头反馈。合并前根回归 **4/5、ui-contracts 失败**保留为历史；合入 main `9cc04b1` 后，用户最新确认独立算法 **5/5**、根工程 **7/7**、失败 **0**，libbz2-dev、libosmium2-dev 已补齐；完整导航应用联调未完成。此前 A* Debug/Release 各 3/3 的历史验收保留。
+## 第三次作业连续导航
+
+先在算法工作台加载 OSM 或 OSMX 道路并计算路线，再从“轨迹”页启动模拟 GPS 回放。回放用 `FixedTrackLoader` 的 WGS84 CSV/JSON 格式，含样本时间戳和 `dataVersion`。实际定位模块可在工作流所属线程传入已有 `LocationSource`，也可提交 `PositionSample`。与批量 CSV 一致，外部程序可用 `P1_FMM_EXECUTABLE` 和 `P1_UBODT_EXECUTABLE` 指定。
+
+连续会话共用规划时的道路快照和路线模式。行车模式按已选机动车规则构建子图，FMM 路网、ID 表及 UBODT 由该子图生成并在会话内复用。有效匹配点投影到当前路线的米制折线，得到横向偏离和沿线累计距离。偏航依据连续源序号、严格大于 15 m、至少三帧及跨度至少 3 s 确认，重算最小间隔为 10 s。
+
+重算只在触发匹配帧仍为最新接纳帧时派发，Boost A* 起点、请求坐标和来源序号均取该帧的有效匹配结果，终点沿用原目的地。工作流最多保留一个待接纳候选。确认当前位置能够沿有向前缀接入后，裁剪已驶路段，或将当前匹配点至候选首节点的有效有向入边尾段计入两套几何及总里程。重算失败、过期或接入条件失效时保留原路线。
+
+会话资源发布前校验 Shapefile 三件及 UBODT 的结构并计算 SHA-256。每窗在进程前后轻查文件，内容核验默认每 30 s 到期，在下一合格窗口执行，受每次 30 s 协作预算及两次失败上限约束。确认损坏后，等旧进程结算再用新目录准备。同一故障最多三次准备，第二、第三次分别至少退避 1 s 和 5 s。无匹配、子进程错误及核验错误分别返回对应状态。
+
+根工程注册 `member3-live-geometry`、`member3-live-fmm` 和 `member3-live-fix-regressions`。后两项使用 `P1_FMM_EXECUTABLE` 与 `P1_UBODT_EXECUTABLE`，通过 `ctest --test-dir <build> --no-tests=error -R '^member3-live-'` 运行。2026-11-23 第三次作业独立审核为 **PASS WITH NOTES**。Ubuntu 24.04 根工程 23/23、独立算法 5/5、连续导航 3/3，官方三条轨迹均通过。连续工作流使用合成 OSM、模拟 GPS 与真实 FMM，真实湖北路网和实采 GPS 的连续导航仍待验收。
+
+历史验收（2026-11-01）：**Ubuntu 24.04 独立算法模块 CTest 5/5 通过，失败 0，总耗时 3.51 秒**；真实 FMM/HMM 经新 Qt MapMatcher 适配器运行并生成三条匹配 CSV。已读取共享证据核实，不再仅依据口头反馈。合并前根回归 **4/5、ui-contracts 失败**保留为历史；合入 main `9cc04b1` 后，用户确认独立算法 **5/5**、根工程 **7/7**、失败 **0**，libbz2-dev、libosmium2-dev 已补齐；该阶段的完整导航应用联调未完成。此前 A* Debug/Release 各 3/3 的历史验收保留。
 
 ## 来源与调用方式
 
@@ -30,7 +42,7 @@ MapMatchRequest(WGS84, requestId, locationSeq, routeId)
 
 构造时深复制配置（含 ID 映射表）到自有只读共享对象；调用方预先保留的可写表项引用不会修改该副本，任务间共享该配置，每个定位请求不重复复制整个 ID 表。`lastDetails()` 返回 `shared_ptr<const FmmMatchDetails>`，包括 requestId/locationSeq 与批量结果；`detailsReady(quint64)` 在所属线程通知读取。保留句柄可跨越下一次结果替换，模型向量按值复制，Qt 字节串按写时复制管理，无外部可写别名。所有方法与句柄读取在所属线程进行；若另一线程要使用结果，先在所属线程取得拥有所有权的只读句柄。
 
-公共 `MapMatchResult` 只填 requestId、locationSeq、matched。当前位置道路为 `lastDetails()->batch.observationEdges.back()`，不是 `cpath.back()` 的推测。失败/待匹配返回空 matched，内部状态区分原因。**distanceToRouteM/alongRouteDistanceM 保持空**：当前没有传入既定路线几何，FMM 的 error 是到道路距离，offset 是沿单边距离，均不能冒充到既定路线的偏离/进度。
+公共 `MapMatchResult` 始终保留 requestId 和 locationSeq，成功时填 matched。当前位置道路取 `lastDetails()->batch.observationEdges.back()`。失败或待匹配返回空 matched，内部状态区分原因。第三次作业装配通过 `setReferenceRoute()` 提供同投影的米制路线几何，匹配路线 ID 时计算 `distanceToRouteM` 和 `alongRouteDistanceM`。独立调用未给出参考路线时两者保持空。FMM 的 error 测量到道路的距离，offset 对应单边位置。
 
 ## 坐标、ID 与版本边界
 
@@ -198,7 +210,7 @@ printf '\nRoot regression log: %s\n' "$log"
 BASH
 ```
 
-## 交接与阶段边界
+## 第二次作业交接与阶段边界（2026-11-01 历史记录）
 
 - 二号：真实米制有向路网、投影/逆投影、覆盖范围、ID 映射及与 UBODT 同版本的生成记录。适配器不读取二号内部数据库，不假设样例 ID 就是 P0 ID。
 - 四号：确认 requestId/locationSeq 生命周期、将停止/定位断层接到 resetWindow、等待/失败的内部状态消费；公共结果缺少道路/版本/来源/取消入口，当前走具体类内部接口，不擅改契约。既定路线距离及偏航判断仍缺真实路线几何供给，不能用道路误差代替。

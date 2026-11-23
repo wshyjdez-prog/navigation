@@ -34,6 +34,7 @@ add_library(p1_ui STATIC
     src/ui/map/MapRegionLoader.cpp
     src/ui/map/MapRegionLoader.h
     src/app/NavigationWorkflow.cpp
+    src/app/NavigationWorkflowLive.cpp
     src/app/RoutingProfile.cpp
     src/app/RoutingProfile.h
     src/app/NavigationWorkflow.h
@@ -76,7 +77,7 @@ add_subdirectory(src/navigation)
 if(NOT P1_NAVIGATION_REAL_PLANNER OR NOT P1_ALGORITHMS_BUILD_FMM_ADAPTER)
     message(FATAL_ERROR "The business workflow requires the selected A* and FMM adapters")
 endif()
-target_link_libraries(p1_ui PUBLIC p1_algorithms_astar p1_algorithms_fmm)
+target_link_libraries(p1_ui PUBLIC p1_algorithms_astar p1_algorithms_fmm PRIVATE p1_navigation)
 if(BUILD_TESTING)
     qt_add_executable(p1-pyramid-tests tests/TilePyramidTests.cpp)
     target_link_libraries(p1-pyramid-tests PRIVATE p1_ui Qt6::Test)
@@ -86,4 +87,25 @@ if(BUILD_TESTING)
     target_link_libraries(p1-business-tests PRIVATE p1_ui Qt6::Test)
     add_test(NAME business-workflow COMMAND p1-business-tests regionalRoads routeAndCancel uiPipeline automaticMapRegions clarityMenu drivingModeExcludesNonCarRoads routeModeMenu poiSearchGoHere planningExpandsAreaWhenRouteLeavesIt longRouteUsesTieredNetwork panZoomKeepsVisibleMapBeforeWorkerReturns newestMapRegionWins malformedTrajectory)
     set_tests_properties(business-workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(p1-live-navigation-tests tests/LiveNavigationTests.cpp)
+    target_link_libraries(p1-live-navigation-tests PRIVATE p1_ui p1_navigation Qt6::Test)
+    add_test(NAME member3-live-geometry COMMAND p1-live-navigation-tests routeGeometry invalidStart)
+    if(UNIX AND P1_FMM_EXECUTABLE)
+        get_filename_component(p1_fmm_bin "${P1_FMM_EXECUTABLE}" DIRECTORY)
+        set(P1_UBODT_EXECUTABLE "${p1_fmm_bin}/ubodt_gen" CACHE FILEPATH "FMM UBODT generator for live navigation tests")
+    endif()
+    if(UNIX AND P1_FMM_EXECUTABLE AND EXISTS "${P1_UBODT_EXECUTABLE}")
+        add_test(NAME member3-live-fmm COMMAND p1-live-navigation-tests replayWindowAndGap
+            deviationAndReroute unreachableCooldown recoverBackends stopWithWorkInFlight missingBackendRecovers)
+        add_test(NAME member3-live-fix-regressions COMMAND p1-live-navigation-tests
+            gapAndStaleRegression missingDbfRegression movingCandidate incomingEdgeRemainsOnRoute
+            cancelledRerouteRetainsPhysicalSlot
+            candidateWaitsForLatest incompatibleCandidate sixSecondIntegrity initialPreparationRejected
+            legalEmptyTableAndManualMatching preparationBudgetRecovers integrityBudgetStops)
+        set_tests_properties(member3-live-fmm member3-live-fix-regressions PROPERTIES TIMEOUT 180 ENVIRONMENT
+            "P1_FMM_EXECUTABLE=${P1_FMM_EXECUTABLE};P1_UBODT_EXECUTABLE=${P1_UBODT_EXECUTABLE}")
+    else()
+        message(STATUS "Real live FMM tests require Linux, P1_FMM_EXECUTABLE and P1_UBODT_EXECUTABLE")
+    endif()
 endif()

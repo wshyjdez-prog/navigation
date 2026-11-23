@@ -1,8 +1,11 @@
 #include "fmm/FmmClient.h"
+#include <QCryptographicHash>
+#include <QDateTime>
 #include <QElapsedTimer>
 #include <QFile>
 #include <QFileInfo>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QTemporaryDir>
 #include <cmath>
 #include <locale>
@@ -98,7 +101,7 @@ FmmResult parseFmmOutput(const QByteArray& bytes, std::size_t expectedPoints) {
     return result;
 }
 
-FmmResult runFmm(const FmmConfig& config, const std::vector<FmmPoint>& points,
+static FmmResult runFmmProcess(const FmmConfig& config, const std::vector<FmmPoint>& points,
                  const FmmCancellation& cancel) {
     QElapsedTimer clock;
     clock.start();
@@ -155,7 +158,7 @@ FmmResult runFmm(const FmmConfig& config, const std::vector<FmmPoint>& points,
         QStringLiteral("--candidates"), QString::number(config.candidates),
         QStringLiteral("--radius"), QString::number(config.radius, 'g', 17),
         QStringLiteral("--error"), QString::number(config.gpsError, 'g', 17),
-        QStringLiteral("--log_level"), QStringLiteral("4")}); // no shell, no ST-Matching
+        QStringLiteral("--log_level"), config.collectLoadTiming ? QStringLiteral("2") : QStringLiteral("4")});
     if (!process.waitForStarted(qMin(config.timeoutMs, 3000)))
         return finish(FmmStatus::ExecutionFailed, process.errorString());
     auto collectLog = [&] {
@@ -183,6 +186,14 @@ FmmResult runFmm(const FmmConfig& config, const std::vector<FmmPoint>& points,
     const auto log = result.processLog;
     result = parseFmmOutput(output.readAll(), points.size());
     result.processLog = log;
+    if (config.collectLoadTiming) {
+        static const QRegularExpression timing(
+            QStringLiteral("Read UBODT file in ([0-9.eE+-]+) seconds"));
+        const auto duration = timing.match(log);
+        bool ok = false;
+        const double seconds = duration.captured(1).toDouble(&ok);
+        if (ok && std::isfinite(seconds) && seconds >= 0) result.ubodtLoadMs = seconds * 1000;
+    }
     if (result.status == FmmStatus::Matched && !config.p0EdgeIds.empty()) {
         auto mapIds = [&](const std::vector<FmmEdgeId>& ids, std::vector<model::EdgeId>& mapped) {
             for (const auto id : ids) {
@@ -198,5 +209,129 @@ FmmResult runFmm(const FmmConfig& config, const std::vector<FmmPoint>& points,
     }
     if (cancelled(cancel)) return finish(FmmStatus::Cancelled, QStringLiteral("Cancelled"));
     return finish(result.status, result.message);
+}
+namespace {
+using Health = FmmResourceReport::Health;
+
+std::optional<FmmResourceTimes> inspectFiles(const FmmResourceSeal& files, FmmResourceReport& report) {
+    FmmResourceTimes times;
+    for (std::size_t i = 0; i < files.size(); ++i) {
+        const auto& file = files[i];
+        const QFileInfo info(file.path);
+        if (!info.isFile() || !info.isReadable() || info.size() != file.size) {
+            report.health = Health::Corrupt;
+            report.reason = QStringLiteral("会话资源缺失、不可读或长度不符：%1").arg(info.fileName());
+            return {};
+        }
+        times[i] = info.lastModified().toMSecsSinceEpoch();
+    }
+    return times;
+}
+
+void verifyFiles(const FmmConfig& config, const FmmCancellation& cancel,
+                 const FmmResourceTimes& before, FmmResourceReport& report) {
+    report.scanned = true;
+    QElapsedTimer timer;
+    timer.start();
+    if (config.auditStarted) config.auditStarted();
+    auto check = [&] {
+        report.scanMs = timer.elapsed();
+        if (cancelled(cancel)) {
+            report.health = Health::Deferred;
+            report.reason = QStringLiteral("资源核验已取消");
+            return false;
+        }
+        if (report.scanMs >= config.auditBudgetMs) {
+            report.health = Health::ScanFailed;
+            report.reason = QStringLiteral("资源完整性核验超过总时间预算");
+            return false;
+        }
+        return true;
+    };
+    QByteArray buffer(256 * 1024, Qt::Uninitialized);
+    bool changed = false;
+    for (const auto& item : *config.resources) {
+        if (!check()) return;
+        QFile file(item.path);
+        if (!file.open(QIODevice::ReadOnly)) {
+            if (inspectFiles(*config.resources, report)) {
+                report.health = Health::ScanFailed;
+                report.reason = QStringLiteral("暂时无法读取资源：%1").arg(file.errorString());
+            }
+            return;
+        }
+        QCryptographicHash sha(QCryptographicHash::Sha256);
+        while (!file.atEnd()) {
+            if (!check()) return;
+            const auto count = file.read(buffer.data(), buffer.size());
+            if (count <= 0) {
+                report.health = Health::ScanFailed;
+                report.reason = QStringLiteral("读取资源失败：%1").arg(file.errorString());
+                return;
+            }
+            sha.addData(QByteArrayView(buffer.constData(), count));
+        }
+        if (sha.result() != item.sha256) changed = true;
+    }
+    if (!check()) return;
+    const auto after = inspectFiles(*config.resources, report);
+    if (!after) return;
+    if (*after != before) {
+        report.health = Health::ScanFailed;
+        report.reason = QStringLiteral("核验期间资源元数据改变");
+    } else if (changed) {
+        report.health = Health::Corrupt;
+        report.reason = QStringLiteral("会话资源 SHA-256 校验不符");
+    } else {
+        report.health = Health::Verified;
+        report.times = after;
+    }
+}
+}
+
+FmmResult runFmm(const FmmConfig& config, const std::vector<FmmPoint>& points,
+                 const FmmCancellation& cancel, const FmmAuditRequest& audit) {
+    if (!config.resources) return runFmmProcess(config, points, cancel);
+    FmmResourceReport report;
+    auto failure = [&](FmmStatus status, const QString& reason) {
+        FmmResult result;
+        result.status = status;
+        result.message = reason;
+        result.datasetId = config.datasetId;
+        result.dataVersion = config.networkVersion;
+        result.inputPointCount = points.size();
+        result.resource = report;
+        return result;
+    };
+    const auto start = inspectFiles(*config.resources, report);
+    if (!start) return failure(FmmStatus::InvalidConfiguration, report.reason);
+    if (cancelled(cancel)) return failure(FmmStatus::Cancelled, QStringLiteral("Cancelled"));
+    FmmResourceTimes known;
+    for (std::size_t i = 0; i < known.size(); ++i) known[i] = (*config.resources)[i].mtime;
+    if (audit.knownTimes) known = *audit.knownTimes;
+    if (audit.due || *start != known || audit.blocked) {
+        if (audit.blocked || !audit.mayScan) {
+            report.health = Health::Deferred;
+            report.reason = audit.blocked ? QStringLiteral("资源核验预算已用完，请停止并重新开始导航")
+                                          : QStringLiteral("等待下一次资源完整性核验");
+            return failure(FmmStatus::ExecutionFailed, report.reason);
+        }
+        verifyFiles(config, cancel, *start, report);
+        if (report.health == Health::Corrupt) return failure(FmmStatus::InvalidConfiguration, report.reason);
+        if (report.health != Health::Verified)
+            return failure(cancelled(cancel) ? FmmStatus::Cancelled : FmmStatus::ExecutionFailed, report.reason);
+    }
+    auto result = runFmmProcess(config, points, cancel);
+    report.backendTimeout = result.status == FmmStatus::TimedOut;
+    const auto after = inspectFiles(*config.resources, report); // also after cancellation and child reaping
+    if (!after) return failure(FmmStatus::InvalidConfiguration, report.reason);
+    if (*after != *start) {
+        report.health = Health::Deferred;
+        report.times.reset();
+        report.reason = QStringLiteral("匹配期间资源元数据改变，等待核验");
+        return failure(FmmStatus::ExecutionFailed, report.reason);
+    }
+    result.resource = report;
+    return result;
 }
 } // namespace p1::algorithms

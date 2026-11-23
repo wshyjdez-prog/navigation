@@ -171,7 +171,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | 第二次作业应用集成 | 1 汇总，2/3/4/5 协作 | 进行中 | 五人源码已共同装配，Ubuntu CTest 17/17、Wayland UI 13/13、OSMX 页面4/4；真实 A* 桥与 FMM 调用层进入根构建。算法调用页/监控和生产数据转换未贯通；见 docs/assignment-2-team-integration.md |
 | 窗口/导航/主题/公共组件基线 | 1 | 已完成（基础子项） | 真实 Wayland 桌面启动、屏幕适配、主题/组件与文件选择回传通过；源码、双平台测试、实际桌面截图与安装入口见框架说明；不包含真实导入和完整缩放验收 |
 | 数据导入/StorageAdapter/离线包 | 2（1 号整合） | 进行中 | 标准 OSM/PBF 与 OSMX 均进入根工程，Ubuntu 导入/缓存/重开测试通过；真实 OSMX 样例本次缺失跳过，完整存储及 G7/X07 离线包仍待办。**2026-11-11**：标准 OSM 改为 libosmium 提取 POI/道路/面（schema 2，POI 不上图），云端容器根 CTest 19/19；统一虚拟机复验、真实 PBF、Navit 对标（NAVIT-20261111-1-osm-feature-import-01）未完成，旧缓存需重新导入，见 docs/osm-import.md |
-| C++ A*/HMM/性能页 | 3（1/4 号整合） | 进行中 | 算法源码已合并，真实 A* 与4号桥共建回归通过；FMM 适配层已编译/调度测试，当前 VM 真实 FMM 未复验。算法页/监控/生产转换仍待完成 |
+| C++ A*/HMM/性能页 | 3（1/4 号整合） | 进行中（第三次作业独立审核 PASS WITH NOTES） | 连续 FMM、同一触发帧的匹配起点、有向入边重算及资源恢复已验收。Ubuntu 根 CTest 23/23、独立算法 5/5、连续导航 3/3；实采定位和真实湖北连续导航待验收 |
 | LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；main（`9cc04b1`）Linux 复验通过（ctest 7/7）。**第二次作业对接层已交付（2026-11-01）**：`AsyncPlannerBridge`（QThread+Worker 线程化对接，落实契约"计算不阻塞 UI"）、`StubRoutePlanner`（确定性桩，延迟/失败/取消可注入）、`RecordingController`（验证桩）、`p1-planner-demo` 与 7 例集成测试；虚拟机实测 configure/build 零警告、全量 ctest **9/9**（新增 navigation-integration、navigation-planner-demo）。接口选择见 DEC-20261101-4-planner-bridge-interface-01（契约先行，3 号真实 A*/HMM 实现既定 `RoutePlanner` 接口即插即换）、DEC-20261101-4-async-model-01（本次忽略）。Navit 对标受阻未测（NAVIT-20261101-4-planner-bridge-01）。导航状态机、偏航/重算去重、GeoClue2、权限与 X06 联调未完成（第 3 次作业） |
 | LinuxRenderer/地图/仪表盘 | 5（1 号整合复验） | 进行中 | 异步 Qt 渲染与 MapPage 在统一 Ubuntu 测试和真实 Wayland 首帧/截图通过；输入仍为 Mock，真实数据、仪表盘及 OpenGL ES 未验收。**2026-11-11**：金字塔瓦片增加分级面名称（方案 A，DEC-20261111-1-area-labels-01），根 CTest 19/19；Navit 渲染对标受阻（NAVIT-20261111-1-area-labels-01）；同日修复拖动/缩放边缘空白（方案 A 外扩帧+渐进+粗底图，DEC-20261111-1-edge-loading-01）；新增地图清晰度高/中/低（NAVIT-20261111-1-map-clarity-01） |
 | LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 未开始 | 本地 TTS/ASR、FFI、中文与麦克风权限 |
@@ -487,3 +487,18 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 - 限制：索引不落盘，每次启动后首次搜索重建；“名称包含”不做分词与拼音；面状 POI（路/多边形）的位置是外包框中心，凹形时可能落在面外；起终点吸附仍是最近节点（不是最近道路上的投影点），虚线连到该节点；没在真实桌面人工操作过；offscreen 测试屏宽 800 px，菜单位置只在屏内的点上验证。
 - 下一步：2 号评审 POI 接口；真实桌面目测；补 Navit 搜索对比。
 - 记录：`DEC-20261111-1-poi-index-01`、`NAVIT-20261111-1-poi-index-01`、AI 日志 23。
+
+
+### 2026-11-23：成员 3 连续导航算法接入
+
+- 工作流通过现有位置契约接入有限窗口 FMM，应用算法工作台支持固定轨迹回放。当前路线、FMM 与重算共用道路快照、米制投影和路线模式，机动车过滤规则及外部固定 FMM 继续沿用。
+- 已实现路线偏离及沿线距离、已确认的偏航阈值和重算去重、失败后保留原路线、暂停/断流/停止的后台取消与回流过滤。重算使用同一触发帧的有效 FMM 匹配点和原目的地。继续沿用 `DEC-20261101-3-open-source-01` 与 `DEC-20261028-4-offroute-reroute-01`。
+- Ubuntu 24.04.5 / Qt 6.4.2 / G++ 13.3.0 / CMake 3.28.3，Release。新目录根 CTest 22/22、独立算法 5/5、新增用例入口 2/2。合成 OSM/模拟 GPS 走真实后端，独立官方三条轨迹复验成功。真实湖北、实采 GPS 与完整定位服务装配待验证。
+- 代码见 `src/app/NavigationWorkflowLive.cpp`、`src/algorithms/qt/FmmMapMatcher.cpp` 和 `tests/LiveNavigationTests.cpp`。第四次作业在真实道路与轨迹上补 Navit 同类场景、持续窗口分位数、资源和取消延迟。AI 日志 26。
+
+### 2026-11-23：成员 3 第三次作业独立审核修复
+
+- 帧身份检查、同帧匹配起点和单候选机制接入现有工作流。按有界有向前缀确认并裁剪慢 A* 路线，持续 1 Hz 的首边内部与跨短边反例均能提交。
+- FMM 会话资源增加首次结构校验、独立内容核验和有限重建。6 秒健康组继续用原资源，损坏组退役后切换新目录，均由真实 FMM 动态验收。保持 3/4 号公共接口及既有核心算法。
+- 有向入边尾段纳入发布路线和里程。75 m、55 m 两组在超过冷却后均只重算一次，40 m 停车与跨短边回归通过。
+- 最终独立审核结论为 **PASS WITH NOTES**。Ubuntu 24.04 干净构建中，根 CTest 23/23、独立算法 5/5、连续导航 3/3（修复回归入口内 21 组业务用例），官方三条 FMM 轨迹均通过。真实 OSMX 可选文件未提供，真实湖北连续导航与实采 GPS 仍待验收。使用和回归入口见 [FMM 接入说明](src/algorithms/FMM_INTEGRATION.md)。AI 日志 27。

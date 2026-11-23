@@ -45,7 +45,12 @@ public:
         auto* format=label("CSV 首行：latitude,longitude\n后续每行一对 WGS84 纬度、经度。支持 2–256 点；相邻点沿路距离不超过 2000 m。","secondary");format->setWordWrap(true);ml->addWidget(format);
         match_=button("选择轨迹并运行 FMM",true);match_->setObjectName("matchTrajectory");ml->addWidget(match_);
         auto* exportRoute=button("导出路线为测试轨迹");exportRoute->setObjectName("exportRouteTrajectory");ml->addWidget(exportRoute);
-        auto* legend=label("灰线：原始轨迹\n橙线：FMM/HMM 匹配路径\n蓝线：A* 规划路线\n\n后台生成本区域 UBODT；取消会终止子进程，任务结束清理临时文件。","caption");legend->setWordWrap(true);ml->addWidget(legend);ml->addStretch();tabs->addTab(matchPage,"轨迹");
+        auto* legend=label("灰线：原始轨迹\n橙线：FMM/HMM 匹配路径\n蓝线：A* 规划路线","caption");legend->setWordWrap(true);ml->addWidget(legend);
+        auto* replay=button("开始模拟 GPS 回放");replay->setObjectName("startNavigationReplay");ml->addWidget(replay);
+        auto* pause=button("暂停导航");pause->setObjectName("pauseNavigationReplay");ml->addWidget(pause);
+        auto* stop=button("停止导航");stop->setObjectName("stopNavigationReplay");ml->addWidget(stop);
+        replay->setEnabled(false);pause->setEnabled(false);stop->setEnabled(false);
+        ml->addStretch();tabs->addTab(matchPage,"轨迹");
         auto* cancel=button("取消当前任务");cancel->setObjectName("cancelNavigationTask");l->addWidget(cancel);
         status_=label(flow_->status(),"secondary");status_->setObjectName("navigationStatus");status_->setWordWrap(true);l->addWidget(status_);
         metrics_=label({},"caption");metrics_->setObjectName("algorithmMetrics");metrics_->setWordWrap(true);l->addWidget(metrics_);
@@ -57,6 +62,14 @@ public:
         connect(load,&QPushButton::clicked,this,[this]{int i=datasets_->currentIndex();if(i>=0&&i<entries_.size())flow_->load(entries_[i],lat_->value(),lon_->value(),radius_->value());});
         connect(route_,&QPushButton::clicked,this,[this]{flow_->plan({startLon_->value(),startLat_->value()},{endLon_->value(),endLat_->value()});});
         connect(match_,&QPushButton::clicked,this,[this]{const auto p=QFileDialog::getOpenFileName(this,"选择 WGS84 轨迹 CSV",{},"CSV (*.csv)");if(!p.isEmpty())flow_->match(p);});
+        connect(replay,&QPushButton::clicked,this,[this]{
+            const auto path=QFileDialog::getOpenFileName(this,"选择带时间戳的模拟轨迹",{},"固定轨迹 (*.csv *.json)");
+            if(!path.isEmpty())flow_->startNavigationReplay(path);
+        });
+        connect(pause,&QPushButton::clicked,this,[this]{
+            if(flow_->liveNavigation().paused)flow_->resumeNavigation();else flow_->pauseNavigation();
+        });
+        connect(stop,&QPushButton::clicked,flow_,&app::NavigationWorkflow::stopNavigation);
         connect(exportRoute,&QPushButton::clicked,this,[this]{const auto& route=flow_->state().route;
             if(route.size()<2){status_->setText("请先计算路线，再导出沿路线生成的测试轨迹（非实采 GPS）");return;}
             const auto path=QFileDialog::getSaveFileName(this,"导出合成测试轨迹（非实采 GPS）","route-synthetic.csv","CSV (*.csv)");if(path.isEmpty())return;
@@ -70,8 +83,12 @@ public:
         connect(pickEnd,&QPushButton::clicked,this,[this]{flow_->beginMapPick(false);});
         connect(flow_,&app::NavigationWorkflow::endpointSelected,this,[this](bool start,QPointF p){
             (start?startLat_:endLat_)->setValue(p.y());(start?startLon_:endLon_)->setValue(p.x());});
-        connect(flow_,&app::NavigationWorkflow::changed,this,[this,cancel,load]{status_->setText(flow_->status());metrics_->setText(flow_->metrics());
-            route_->setEnabled(!flow_->busy()&&bool(flow_->state().network));match_->setEnabled(route_->isEnabled());cancel->setEnabled(flow_->busy());load->setEnabled(!flow_->busy()&&!entries_.isEmpty());});
+        connect(flow_,&app::NavigationWorkflow::changed,this,[this,cancel,load,replay,pause,stop]{status_->setText(flow_->status());metrics_->setText(flow_->metrics());
+            route_->setEnabled(!flow_->busy()&&bool(flow_->state().network));match_->setEnabled(route_->isEnabled());cancel->setEnabled(flow_->busy());load->setEnabled(!flow_->busy()&&!entries_.isEmpty());
+            const auto& live=flow_->liveNavigation();
+            replay->setEnabled(!flow_->busy()&&flow_->state().route.size()>=2);
+            pause->setEnabled(live.active);stop->setEnabled(live.active);
+            pause->setText(live.paused?QStringLiteral("恢复导航"):QStringLiteral("暂停导航"));});
         cancel->setEnabled(false);route_->setEnabled(false);match_->setEnabled(false);load->setEnabled(false);
         connect(this,&Controls::catalogReady,load,[load](bool ready){load->setEnabled(ready);});this->refresh();
     }
