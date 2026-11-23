@@ -31,6 +31,71 @@
 | `DEC-20261111-1-long-route-01` | 远距离路线规划的路网加载 / 1 授权，主责 2（接口）、3/4（规划） | 本次忽略（单方案 A） | A 仿 Navit 分级加载 / B 放宽上限 / C 全省主干网常驻 / 忽略 四选项展示 | A：全量超限时改用分级路网 | project.md 2026-11-11 远距离规划记录；ai_log 对话 25；NAVIT-20261111-1-long-route-01 |
 | `DEC-20261101-3-open-source-01` | A*/HMM 来源与 Qt 适配 / 3 | 本次忽略多方案比较；独立验收通过，Navit 待测 | Boost.Graph A*、固定 FMM HMM | h=0 有向图、外部 CLI 与有限窗口，公共契约不变 | project.md 三号汇总；ai_log：A* 对话 12，FMM/HMM 对话 13（原 ID 保留） |
 | `DEC-20261111-1-osm-feature-import-01` | 标准 OSM 要素导入（POI/道路/面）/ 1 授权，主责 2 | 用户指定单方案；未做 2–3 种试验对比，也未选择“忽略”，待用户确认是否补做 | 不适用 | libosmium 两遍读取 + Assembler 组面 + SQLite schema 2 | project.md 2026-11-11 记录；ai_log 对话 18；NAVIT-20261111-1-osm-feature-import-01 |
+| `DEC-20261123-1-voice-backend-01` | LinuxVoiceAdapter 本地 TTS/ASR 后端 / 1（X09：G10 无接口，按组员要求用开源代替） | 已完成（清理与复验完成；真人语音/扬声器、Navit espeak-ng 命令行待补测） | A espeak-ng+Vosk、B speech-dispatcher+Vosk、C Piper+whisper.cpp（三种全选） | D Piper+Vosk（由 C 的 TTS 与 A/B 的 ASR 组成，组员明确选择）；espeak-ng、speech-dispatcher、whisper.cpp 已清理 | project.md 2026-11-23 语音记录；ai_log 对话 26；NAVIT-20261123-1-voice-01 |
+
+### DEC-20261123-1-voice-backend-01：LinuxVoiceAdapter 本地 TTS/ASR 后端
+
+#### 1. 背景与约束
+
+- 发起：2026-11-23（Asia/Shanghai），组员 1，第 3 次作业。状态：已完成（真人语音与扬声器听感未测，见第 6 节）。
+- 目标：任务书要求 speak() 调本地 TTS、listen() 调本地 ASR、中文语言环境、回调经 FFI 传回核心层、管理语音服务生命周期。质量要求：普通话可懂、指令识别正确、播报可打断、不阻塞 UI、离线可分发。
+- 基线：`a6d13cf`（codex/member-1/map-poi-labels-route-mode）+ 本轮未提交修改。公共接口：本轮新增 `include/contracts/VoiceFfi.h`（C ABI），桥接只用 4 号 `NavigationController` 契约。
+- 跨组接口 X09（G10）：G10 未提供接口。组员 1 原文：“我是组员1,现在完成第三次作业，目前没有其他组的接口，因此涉及到其他组的接口时就使用开源算法代替。” 据此本次以开源本地语音代替（接近第 3 节方案 B 的“本组可替换实现”；任务书第 4 次允许“G10 方案或本地 TTS”，第 3 次要求本地 TTS/ASR）。G10 若后续交付，需另行确认是否接入。
+- 环境：Hyper-V 虚拟机 Ubuntu 24.04.5，8 vCPU、约 9.7 GiB；GCC 13.3.0、CMake 3.28.3、Qt 6.4.2；PipeWire 1.0.5，**无声卡/麦克风**（auto_null）。用户安装了 libespeak-ng-dev、libspeechd-dev、libpulse-dev、libgeoclue-2-dev；组员 1 授权下载 Vosk、Piper 与 whisper.cpp 资源（见 ai_log 对话 26）。
+
+#### 2. 全部候选与第一次选择
+
+| 组合 ID | 组成 | 预期利弊（非实测） | 与已有模块关系 | AI 推荐理由 | 是否入选 |
+| --- | --- | --- | --- | --- | --- |
+| A | TTS libespeak-ng C API（同步合成，cmn 音色）+ PulseAudio 播放；ASR Vosk C API + vosk-model-small-cn-0.22，流式 | 极快、无模型；机械音；直接链接 GPL-3 库 | 同一 C ABI | 作为轻量基线 | 入选 |
+| B | TTS 系统 speech-dispatcher（libspeechd SSIP，espeak-ng 模块，zh）；ASR 同 A | Linux 桌面标准服务、异步通知与打断；依赖守护进程；音色同 A | 同一 C ABI | 推荐（服务生命周期典型） | 入选 |
+| C | TTS Piper（VITS/onnxruntime，zh_CN-huayan-medium，常驻子进程）；ASR whisper.cpp v1.7.6 + ggml-base，非流式 | 音质/识别率预期高；体积大、延迟高 | 同一 C ABI | 质量上限对照 | 入选 |
+| 未单列 | PocketSphinx（Ubuntu 包为 0.8 旧版，无中文模型） | 中文质量差 | — | 不推荐 | 未入选 |
+
+- 同时展示“忽略：仅本次跳过方案对比规则”。组员 1 选择原文：`A: espeak-ng + Vosk,B: speech-dispatcher + Vosk（推荐）,C: Piper + whisper.cpp`（2026-11-23）。
+
+#### 3. 实现范围与实测方法
+
+- 公共适配器：`src/pal/linux/voice/LinuxVoiceAdapter.cpp`、`AudioIo.*`、`VoiceEngine.h`、`EngineFactory.cpp`、`VoiceText.h`；所有组合经同一 C ABI 测量。
+- 试验专属文件（已在第 6 节删除）：`backends/EspeakTts.cpp`（A）、`backends/SpeechDispatcherTts.cpp`（B）、`backends/WhisperAsr.cpp`（C）；CMake 中 espeak-ng/speech-dispatcher 的 pkg-config 检查与 whisper/ggml 静态库链接；适配器中只服务 Whisper 的能量 VAD 与静音门限；libespeak-ng 独占后端机制；语音页的组合下拉框；`third_party/voice/whisper*` 构建与 `resources/whisper-model`。共享保留：`backends/PiperTts.cpp`、`backends/VoskAsr.cpp`。
+- 输入：`tests/fixtures/voice/nav_phrases_zh.txt`（20 句，SHA256 e520888f…）；ASR 输入为 Piper、espeak-ng 各自合成的 20 个 WAV（校验见报告目录 `corpus-sha256.txt`）。
+- 方法：`RUNS=3 tools/voice-bench.sh`；TTS 20 句 × 3 轮，预热 1 次；打断 3 次；ASR 每句 3 次（尽快送入）+ 1 次（实时送入）；VmHWM 峰值内存；CER 按字编辑距离（去标点、数字转汉字、不做繁简转换）。
+- 正确性：`voice-adapter` 试验期 143 项、`voice-bridge` 30 项、`voice-ffi-c-smoke` 对三种组合全部通过。
+- Navit：0.5.7 `speech_cmdline`，见 `NAVIT-20261123-1-voice-01`。
+
+#### 4. 实测指标与已有模块契合度
+
+| 组合 | 正确性 / 质量 | 耗时（中位/P95） | 峰值内存 MiB | 吞吐 / 补充 | 说明 |
+| --- | --- | --- | --- | --- | --- |
+| A | 测试全过；espeak 音色可懂度代理差：用其语音识别 CER Vosk 177% / Whisper 115%；Vosk CER 8.0%（Piper 语料），指令 11/12 全对 | 首音 12.6/19.7 ms；播报 2444/5598 ms；打断 21 ms；识别 75/717 ms，句末 58/215 ms | TTS 16.5；ASR 315 | 纯合成 0.29 ms/字；识别 RTF 0.04 | libespeak-ng 1.51 同进程二次初始化会挂起，改为进程内只初始化一次 |
+| B | 测试全过；音色同 A；ASR 同 A | 首音 3.7/7.1 ms；播报 2757/6034 ms；打断 37 ms；初始化 159 ms | 13 + 守护进程 14.5 + 模块 12.0；ASR 315 | 依赖系统守护进程 | 与 Navit spd-say 同后端 |
+| C | 测试全过；Piper 可懂度代理好：CER Vosk 8.0% / Whisper 10.7%；Whisper CER 10.7%，指令 7/12；纯静音会“幻听”，需 VAD 门限 | 首音 65/121 ms；播报 1707/3692 ms；打断 21 ms；识别 808/886 ms，句末 859/936 ms | TTS 14 + Piper 240.5；ASR 616 | Piper 纯合成 7.4 ms/字；Whisper RTF 0.51 | 分发约 255 MiB |
+
+| 组合 | 回归 | 适配改动 | 线程/资源 | 依赖兼容 | 契合度 |
+| --- | --- | --- | --- | --- | --- |
+| A | 根 CTest 22/22 | 无（同一 ABI） | 全局状态，进程内独占 | 直接链接 GPL-3.0+ libespeak-ng | 中：功能完整，许可与音质受限 |
+| B | 22/22 | 无 | 守护进程 autospawn，回调线程需避免持锁调用 spd_say（实现中已修正） | libspeechd LGPL-2.1+；Flatpak 需放行 socket | 中：系统服务依赖、音质同 A |
+| C | 22/22 | 无 | Piper 子进程所有权清晰；Whisper 非流式 | 全为 MIT/Apache；体积大 | 中：TTS 高，ASR 偏慢 |
+
+- AI 推荐：试验数据显示 Piper 播报、Vosk 识别分别最优，推荐由二者组成的 D（不在原入选的三种之内，两组件均已在同一契约下实测，须组员明确选择）；若只能在 A/B/C 中选，推荐 C。综合评分：未评分。
+- 展示与回复：2026-11-23 以对照表展示。
+
+#### 5. 最终确认
+
+- 选定：**D Piper + Vosk**。组员 1，2026-11-23，确认原文：`D: Piper + Vosk（推荐）`。
+- 理由（AI 依据数据）：播报可懂度代理最好（CER 8%）、总时长最短；识别 CER 8.0%、句末 58 ms、支持中间结果、内存约为 Whisper 一半；依赖均为 MIT/Apache 且以独立进程使用 GPL 组件；不依赖系统守护进程。组员自己的理由待用户填写。
+- 尚存限制：Piper 首音约 65 ms（非流式整句合成），常驻子进程约 165–240 MiB；音色许可未核实；真人语音未测。
+- 正式入口：`libp1_voice.so`（`include/contracts/VoiceFfi.h`），默认 `tts=piper`、`asr=vosk`；资源 `share/p1-navigation/voice`。
+
+#### 6. 清理与复验
+
+- 保留：`LinuxVoiceAdapter.cpp`、`AudioIo.*`、`VoiceEngine.h`、`VoiceText.h`、`EngineFactory.cpp`、`backends/PiperTts.cpp`、`backends/VoskAsr.cpp`、测试与基准程序；Qt 侧 `src/app/voice/*`。
+- 已删除：`src/pal/linux/voice/backends/EspeakTts.cpp`、`SpeechDispatcherTts.cpp`、`WhisperAsr.cpp`；CMake 中 `P1_ESPEAK`/`P1_SPEECHD` 检查、`P1_VOICE_WHISPER_DIR` 与 whisper/ggml 链接、`P1_VOICE_DEFAULT_TTS/ASR` 缓存变量、编译开关 `P1_VOICE_WITH_*`；适配器中的能量 VAD/静音门限与 `hasOwnEndpointing`/`supportsPartial` 接口；`acquire/releaseExclusiveBackend`；语音页组合下拉框；`fetch-voice-deps.sh` 中 whisper 下载/构建与 espeak/speechd 系统包；Flatpak 中 speech-dispatcher socket 放行；本机 `third_party/voice/whisper*`、`resources/whisper-model`、`downloads/whisper-*`。
+- 归属核对：均为本轮 1 号新增；系统包（用户安装的 -dev 包）未卸载，不影响构建。
+- 残留检查：源码中除 Navit 等价命令与 Piper 包内 espeak-ng 数据路径外无 espeak/speech-dispatcher/whisper 引用；`libp1_voice.so` 只依赖 libvosk 与 libpulse，导出 10 个 `p1_voice_*`。
+- 复验：清理后首轮根 CTest 中 `voice-adapter` 失败 1 次；最终方案复测中 Vosk 也出现 1/60 次失败。定位为适配器“先发终态事件、后清除在途标记”的竞态——核心层在 `LISTEN_RESULT` 回调里立即再次 listen 会得到 `BUSY`。已改为先在锁内清除再发事件（listen 与 speak 同理），并新增回归测试（恢复旧顺序时 3/3 失败、修复后通过）。修复后根 CTest 22/22 连续 3 轮通过；`voice-adapter` 101/101、`voice-bridge` 31/31、C 冒烟通过；安装（约 205 MiB，ldd 无缺失）与 Wayland 截图通过；最终方案性能复测见 `NAVIT-20261123-1-voice-01` 第 7 节（0 失败）。
+- 保留证据：三组合原始数据 `docs/benchmarks/navit/NAVIT-20261123-1-voice-01/`（`raw.csv`、`run.log` 等），最终方案复测 `…/final/`。
+- 完成：2026-11-23。
 
 ## 单次抉择模板（复制后填写，模板不是实际记录）
 

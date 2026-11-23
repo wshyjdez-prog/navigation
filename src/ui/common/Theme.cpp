@@ -160,6 +160,10 @@ QIcon Theme::icon(const QString& name) const {
             p.drawPolyline(QPolygonF{{3, 7}, {3, 4}, {9, 4}, {12, 7}, {21, 7}, {21, 20}, {3, 20}, {3, 7}, {21, 7}});
         } else if (name == "clock") {
             p.drawEllipse(QPointF(12,12), 9, 9); p.drawLine(12,6,12,12); p.drawLine(12,12,16,14);
+        } else if (name == "mic") {
+            p.drawRoundedRect(QRectF(9, 3, 6, 11), 3, 3);
+            p.drawArc(QRectF(5, 6, 14, 12), 200 * 16, 140 * 16);
+            p.drawLine(12, 18, 12, 21); p.drawLine(8, 21, 16, 21);
         } else if (name == "sun") {
             p.drawEllipse(QPointF(12,12),4,4);
             for (int i=0;i<8;++i) { p.drawLine(12,1,12,3); p.translate(12,12); p.rotate(45); p.translate(-12,-12); }

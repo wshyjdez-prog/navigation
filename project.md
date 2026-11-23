@@ -1,6 +1,8 @@
 # P1 Linux 导航应用：总体规划与实现状态
 
-最后更新：2026-11-11（Asia/Shanghai）。组员：1、2、3、4、5。
+最后更新：2026-11-23（Asia/Shanghai）。组员：1、2、3、4、5。
+
+当前语音增量（2026-11-23，1 号，第 3 次作业本人部分）：新增语音 PAL **LinuxVoiceAdapter**——`libp1_voice.so` 只导出纯 C ABI（`include/contracts/VoiceFfi.h`，10 个 `p1_voice_*` 函数），speak() 调本地 **Piper** 中文 TTS、listen() 调本地 **Vosk** 普通话 ASR，回调只在分发线程串行送达核心层，销毁后零回调；Qt 侧 `VoiceService`/`VoiceNavigationBridge` 把引导播报、偏航/到达打断、语音指令接到 4 号 `NavigationController` 契约；新增“语音助手”页面、麦克风探测与应用内同意、Flatpak 权限声明模板、离线语音资源安装（`share/p1-navigation/voice`）。G10（X09）无接口，按组员 1 要求以开源本地语音代替。后端按 `DEC-20261123-1-voice-backend-01` 对 espeak-ng+Vosk / speech-dispatcher+Vosk / Piper+whisper.cpp 实测后，组员 1 选定 **Piper+Vosk**，其余已清理。根 CTest 22/22。**虚拟机无声卡/麦克风，真人语音与扬声器听感未测；4 号状态机尚未实现，桥接用契约 Fake 验证**；Navit 对标部分完成（`NAVIT-20261123-1-voice-01`）。详见 [语音适配说明](docs/voice-adapter.md) 与下方 2026-11-23 记录。
 
 当前面名称增量（2026-11-11，1 号；影响 5 号渲染）：地图面图层显示名称，随 XYZ 金字塔分级出现。名称在建索引时取面内最远点，严格避让后写入瓦片，跨瓦片无缝。按 `DEC-20261111-1-area-labels-01` 对 A 瓦片内烘焙和 B 帧级叠加做了实测，组员 1 最终选 A，B 已清理。统一基线虚拟机根 CTest 19/19；湖北真实数据下热帧约 2–20 ms，索引因名称增加约 1.6 s。Navit 渲染对标受阻未测（`NAVIT-20261111-1-area-labels-01`），整体保持进行中。同日修正道路名：道路名并入同一套严格避让，相距 < 256 px 的同名标注只显示一个。同日修复拖动/缩放时的边缘空白：按 `DEC-20261111-1-edge-loading-01` 比较了 A 外扩帧+渐进+粗底图与 B 后台预取环，组员 1 选 A，B 已清理（见下方边缘加载记录）。同日新增地图菜单“地图清晰度 高/中/低”（瓦片密度 2×/1.5×/1×，默认低，见下方清晰度记录）。同日新增“路线模式：一般/行车”，行车模式按 Navit 0.5.7 car 配置排除人行道等非机动车道路（`DEC-20261111-1-route-mode-01`，影响 3/4 号）。同日起跨城远距离路线改用仿 Navit 的分级路网（`DEC-20261111-1-long-route-01`，本次忽略对比）。同日新增兴趣点搜索（右上角按钮、最近 20 个、点击看信息、右键“到这去”）与起终点吸附虚线；POI 名称索引按 `DEC-20261111-1-poi-index-01` 比较三种组合后选 B 内存单字倒排（影响 2 号）。同日补充：导入后对同名且相距 ≤ 100 m 的 POI 合并为一点（`DEC-20261111-1-poi-dedup-01`，湖北合并 3,023 个，旧缓存在搜索时套用同一规则），结果改为紫色定位针并显示名称前 5 个字。旧金字塔缓存升级为 `xyz-v4-labels2` / `raster-style5-labels`，会自动重建。详见下方 2026-11-11 面名称记录。
 
@@ -28,10 +30,10 @@ PDF 总任务中的“适配四大平台”未列出平台清单；本组明确�
 | 语言与界面 | C++17、Qt 6.4.2 / Qt Widgets；地图按 Qt Widget 或 OpenGL ES 适配 | 1 号 Qt 6.4.2 / C++17 / Qt Widgets 窗口通过；业务渲染后端待选择，OpenGL ES 未验证 |
 | IDE/构建 | Qt Creator；GCC/G++ 13.3.0；CMake 3.28.3；完整 CMake 工程 | 1 号 GCC/G++ 13.3.0、CMake 3.28.3 与 Qt Creator 专用 Kit 已验证；独立检查工程构建通过；4 号 GCC/G++ 13.3.0、CMake 3.28.3、Ninja 1.11.1 已核对，构建与 ctest 通过 |
 | 渲染 PAL | LinuxRenderer；瓦片、路线、标记及异步绘制 | 绘制接口、上下文/线程约束由 5 号落实；OpenGL 路线需验证上下文与驱动 |
-| 语音 PAL | LinuxVoiceAdapter；本地 TTS 与本地 ASR、中文环境、FFI 回调 | 后端/模型/依赖、回调 ABI、所有权及生命周期由 1 号核实 |
+| 语音 PAL | LinuxVoiceAdapter；本地 TTS 与本地 ASR、中文环境、FFI 回调 | 2026-11-23 已实现：Piper 2023.11.14-2（zh_CN-huayan-medium）+ Vosk 0.3.45（vosk-model-small-cn-0.22），C ABI `VoiceFfi.h`；依赖由 `tools/fetch-voice-deps.sh` 按 SHA256 准备，系统包只需 `libpulse-dev`。本机虚拟机无声卡/麦克风，真实音频设备未验证 |
 | 存储 PAL | StorageAdapter；SQLite 与本地文件系统 | schema、SQLite 接入、事务/路径与离线包格式由 2 号确认 |
 | 定位 PAL | LocationAdapter；GeoClue2 | 服务与权限/应用标识配置、回调与拒绝访问处理由 4 号验证 |
-| 权限与分发 | 声明 LOCATION/MICROPHONE 权限；离线数据包随应用分发 | 1 号汇总分发配置，4 号负责定位、1 号负责麦克风；按目标发行版/打包方式确认具体声明与授权机制，不能把两个名称当作通用 Linux 配置键 |
+| 权限与分发 | 声明 LOCATION/MICROPHONE 权限；离线数据包随应用分发 | 1 号汇总分发配置，4 号负责定位、1 号负责麦克风；按目标发行版/打包方式确认具体声明与授权机制，不能把两个名称当作通用 Linux 配置键。2026-11-23：原生安装用应用内同意+运行时探测；Flatpak 模板声明 `--socket=pulseaudio` 与 GeoClue2（未构建验证）；桌面入口 `p1-navigation.desktop`；语音资源随 `cmake --install` 安装。地图离线包（2 号/G7）仍待办 |
 | 版本控制 | Git / GitHub；UTF-8 文档 | origin 为 https://github.com/wshyjdez-prog/navigation.git |
 
 完整基线、安装/核对命令、共享镜像/快照和五人验证状态见 [统一开发环境](docs/development-environment.md)。1 号本机安装与运行证据见 [实测记录](docs/environment/member-1-2026-10-26.md)，其他成员尚待复现。
@@ -122,7 +124,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | X06 | G6 / 4 牵头，全员配合 | 状态/事件、偏航重算、引导、PAL 接口、异常与线程/回调契约 | 第 4 次必须完成真实联调并输出报告；临时本地状态机/Mock 不能替代该报告。记录双方版本、环境、样例、预期/实际、缺陷/复测结论 |
 | X07 | G7 / 2，1 配合 | SQLite schema、离线包清单/版本/校验、下载/更新恢复、随应用分发 | 按 G7 方案实现 Linux 适配；待交付时先做本地样例，替代方案不能自动等价于指定要求 |
 | X08 | G8（条件依赖）/ 5 | 如复用其数据/渲染协议，确认瓦片/路线/标记、坐标与 PAL 接口 | 新 PDF 要求本组 LinuxRenderer，可选 Qt Widget/OpenGL ES；是否复用 G8 待确认，不能以外部桌面程序代替本组适配 |
-| X09 | G10 / 1 | 第 4 次语音完善方案；本地 TTS/ASR、中文、FFI 回调与生命周期 | PDF 允许 G10 方案或本地 TTS；PDF 未提供 G10 详情，需核实联系人/接口，不能断言该组不存在；仅 TTS 不满足第 3 次 listen()/ASR 要求 |
+| X09 | G10 / 1 | 第 4 次语音完善方案；本地 TTS/ASR、中文、FFI 回调与生命周期 | PDF 允许 G10 方案或本地 TTS；PDF 未提供 G10 详情，需核实联系人/接口，不能断言该组不存在；仅 TTS 不满足第 3 次 listen()/ASR 要求。**2026-11-23**：G10 未提供接口，组员 1 要求“涉及到其他组的接口时就使用开源算法代替”，第 3 次以本组开源本地语音（Piper+Vosk）实现；G10 交付后是否接入另行确认 |
 
 已确认：Linux 桌面虚拟机及 Ubuntu 24.04 LTS、Qt 6.4.2、GCC/G++ 13.3.0、CMake 3.28.3 的团队基线；1 号本机基础环境已验证，其他成员待复现。待确认清单：Qt Widget 或 OpenGL ES 渲染路线；语音后端和 FFI 边界；权限/打包方案；性能具体阈值；“四大平台”的平台清单。此轮是需求与分工更新，没有替各负责人选定技术方案。
 
@@ -130,6 +132,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | --- | --- | --- |
 | 2026-10-18 | X01–X09、Linux 环境与 PAL | 依据新 PDF 更新职责和约束；具体外部接口、实现版本与选型均未确认 |
 | 2026-10-26 | 开发环境 | 用户确认 Linux 桌面虚拟机；团队统一 Ubuntu Desktop 24.04 LTS amd64 / Qt 6.4.2 / GCC-G++ 13.3.0 / CMake 3.28.3；外部接口与 PAL 后端仍待确认 |
+| 2026-11-23 | X09 / 语音 PAL | G10 无接口，组员 1 要求以开源实现代替；语音后端经 DEC-20261123-1-voice-backend-01 选定 Piper+Vosk |
 
 关键算法方案的候选组合、2–3 种试验、实测指标、最终确认及清理记录仍使用 [decision_log.md](decision_log.md)；该文件当前只有模板。项目当前方案与模块进度需引用正式抉择 ID，不得把本次平台调整当成已测出的算法选型结果。
 
@@ -174,7 +177,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | C++ A*/HMM/性能页 | 3（1/4 号整合） | 进行中 | 算法源码已合并，真实 A* 与4号桥共建回归通过；FMM 适配层已编译/调度测试，当前 VM 真实 FMM 未复验。算法页/监控/生产转换仍待完成 |
 | LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；main（`9cc04b1`）Linux 复验通过（ctest 7/7）。**第二次作业对接层已交付（2026-11-01）**：`AsyncPlannerBridge`（QThread+Worker 线程化对接，落实契约"计算不阻塞 UI"）、`StubRoutePlanner`（确定性桩，延迟/失败/取消可注入）、`RecordingController`（验证桩）、`p1-planner-demo` 与 7 例集成测试；虚拟机实测 configure/build 零警告、全量 ctest **9/9**（新增 navigation-integration、navigation-planner-demo）。接口选择见 DEC-20261101-4-planner-bridge-interface-01（契约先行，3 号真实 A*/HMM 实现既定 `RoutePlanner` 接口即插即换）、DEC-20261101-4-async-model-01（本次忽略）。Navit 对标受阻未测（NAVIT-20261101-4-planner-bridge-01）。导航状态机、偏航/重算去重、GeoClue2、权限与 X06 联调未完成（第 3 次作业） |
 | LinuxRenderer/地图/仪表盘 | 5（1 号整合复验） | 进行中 | 异步 Qt 渲染与 MapPage 在统一 Ubuntu 测试和真实 Wayland 首帧/截图通过；输入仍为 Mock，真实数据、仪表盘及 OpenGL ES 未验收。**2026-11-11**：金字塔瓦片增加分级面名称（方案 A，DEC-20261111-1-area-labels-01），根 CTest 19/19；Navit 渲染对标受阻（NAVIT-20261111-1-area-labels-01）；同日修复拖动/缩放边缘空白（方案 A 外扩帧+渐进+粗底图，DEC-20261111-1-edge-loading-01）；新增地图清晰度高/中/低（NAVIT-20261111-1-map-clarity-01） |
-| LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 未开始 | 本地 TTS/ASR、FFI、中文与麦克风权限 |
+| LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 进行中（语音 PAL 已实现并测试） | 2026-11-23：Piper+Vosk、C ABI/FFI、生命周期、麦克风探测/同意、语音页、导航桥接，CTest voice-* 3 项通过（DEC-20261123-1-voice-backend-01）。待：真人语音/扬声器实测、接入 4 号真实状态机、Navit espeak-ng 命令行补测（NAVIT-20261123-1-voice-01）、Flatpak 构建；用户页面（收藏/历史/偏好）属第 4 次 |
 | Linux 发布与最终材料 | 全员，1 汇总 | 未开始 | 逐次收集运行证据、G6 报告和 3–5 分钟视频 |
 
 第一次作业 1 号当前结论（2026-10-26）：核心框架与公共组件开发、Linux 程序及设计/构建材料已完成，可交接其他成员；完整个人验收与团队交付尚未收尾。完整人工键盘、高 DPI/200% 字号属于 design.md 的补验项，其他成员构建复现属于团队环境约定；二者不应混同为任务书新增的独立硬性评分项。真实解析/保存由 2 号实现，1 号在其交付后装配总工程并配合完整导入演示。当前源码尚未提交/推送，不能把核心完成等同为已正式交付。验收依据与剩余事项见日志 `20261026-174106-member1-native-ui-07`（现合并于重要记录对话 4）及对应验收文档。
@@ -487,3 +490,17 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 - 限制：索引不落盘，每次启动后首次搜索重建；“名称包含”不做分词与拼音；面状 POI（路/多边形）的位置是外包框中心，凹形时可能落在面外；起终点吸附仍是最近节点（不是最近道路上的投影点），虚线连到该节点；没在真实桌面人工操作过；offscreen 测试屏宽 800 px，菜单位置只在屏内的点上验证。
 - 下一步：2 号评审 POI 接口；真实桌面目测；补 Navit 搜索对比。
 - 记录：`DEC-20261111-1-poi-index-01`、`NAVIT-20261111-1-poi-index-01`、AI 日志 23。
+
+### 2026-11-23：LinuxVoiceAdapter（本地中文 TTS/ASR、FFI 与生命周期）
+
+```text
+日期 / 模块 / 负责人 / 状态：2026-11-23 / LinuxVoiceAdapter、语音助手页面、导航语音桥接 / 1 号 / 进行中（语音 PAL 已实现并通过测试；真人语音、真实状态机接入与部分 Navit 对标未完成）
+已实现能力与正式入口：libp1_voice.so（src/pal/linux/voice/，C ABI include/contracts/VoiceFfi.h）：speak() → Piper 常驻子进程（zh_CN-huayan-medium）+ PulseAudio 播放；listen() → Vosk 流式识别（vosk-model-small-cn-0.22，Kaldi 端点检测、中间结果）；打断/排队/取消、按子系统异步初始化与降级、销毁回收线程/子进程/模型、麦克风探测。Qt：src/app/voice/VoiceService（回调→QueuedConnection→主线程，按需启动，代际号丢弃旧信号）、VoiceNavigationBridge（引导同 index 只播一次、暂停不播、偏航/到达打断、重算重置序号；“暂停/继续/停止导航”直接调契约命令，“开始/重新规划/导航到/缩放”发信号给应用层；“还有多远”读快照）、VoicePage（路由 voice：服务状态、播报、按下说话、识别音频文件、手动文本解析、回调事件日志）。
+接口、数据约定、外部版本和 PAL 边界：C ABI 线程/所有权/生命周期规则见 VoiceFfi.h 文件头与 docs/voice-adapter.md；事件带 Unix 毫秒与 CLOCK_MONOTONIC 微秒；只接受 zh* 语言。桥接只依赖 include/contracts/NavigationController.h 公共契约，不读取 4 号内部状态。外部组件：Piper 2023.11.14-2、Vosk 0.3.45，SHA256 见 tools/fetch-voice-deps.sh。
+跨组选择及确认依据：X09/G10 无接口，组员 1 原文“目前没有其他组的接口，因此涉及到其他组的接口时就使用开源算法代替”；G6 核心 FFI 边界未定，本次 C ABI 为本组提案，联调时与 4 号/G6 确认。
+decision_log.md 记录 ID（如涉及）：DEC-20261123-1-voice-backend-01（三组合全选试验，最终 D Piper+Vosk，已清理并复验）。
+Linux 环境、验证步骤/结果/证据：本机 Hyper-V Ubuntu 24.04.5、GCC 13.3.0、CMake 3.28.3、Qt 6.4.2、PipeWire 1.0.5（无声卡，auto_null）。根 CTest 22/22（新增 voice-ffi-c-smoke、voice-adapter 101 项、voice-bridge 31 项）；清理后首轮出现 1 次 voice-adapter 失败，定位为“先发终态事件后清在途标记”导致回调内立即 listen 得到 BUSY 的竞态，已修复并加回归测试（恢复旧顺序时 3/3 失败），修复后连续 3 轮 22/22。cmake --install 到临时前缀：bin/p1-navigation（RUNPATH $ORIGIN/../lib）、lib/libp1_voice.so*、lib/libvosk.so、share/p1-navigation/voice、share/applications/p1-navigation.desktop（desktop-file-validate 通过），ldd 无缺失，总计约 205 MiB；安装版在 Wayland 下 --capture-dir 截图通过，证据 docs/verification/assignment3-voice/（voice-light/voice-dark 等）。
+Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用依据：NAVIT-20261123-1-voice-01（Navit 0.5.7 speech_cmdline）。spd-say 等价路径调用→结束中位 2763 ms，本组 speech-dispatcher 组合 2757 ms（同后端，差异在噪声量级）；最终 Piper 播报中位约 1.7 s、首音约 65–76 ms、打断约 21 ms；Navit 无首音回调、打断与 ASR（不适用）；Navit espeak-ng 命令行配置未测（未安装 espeak-ng 包）。
+未实现/未验证内容、下一步与涉及组员：真人语音识别与扬声器听感（需带麦克风的机器，1 号）；4 号 NavigationController 实现后调用 VoiceNavigationBridge::attach() 接入并补端到端测试（1/4 号）；开始导航/重新规划/导航到等指令的应用层处理需 3/4 号规划入口；Flatpak 构建与沙箱授权实测（1 号）；zh_CN-huayan 音色许可核实；G6 联调确认 FFI 形状（4 号牵头）。
+关联日志 / 已有提交：ai_log 对话 26；未提交。
+```

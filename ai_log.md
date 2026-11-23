@@ -29,6 +29,7 @@
 | 23 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、统一基线虚拟机内构建/CTest、湖北数据三种索引实测 | 兴趣点索引与搜索、“到这去”自动规划、起终点吸附虚线；同名临近 POI 合并与紫色定位针 |
 | 24 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、用临时程序在湖北数据上复现诊断、本机代码编辑、统一基线虚拟机内构建/CTest | 修复“无法规划”：规划区域不可达时自动扩大重试 |
 | 25 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、截图诊断、本机代码编辑、统一基线虚拟机内构建/CTest、湖北远距离实测 | 跨城远距离规划：仿 Navit route_depth 的分级路网 |
+| 26 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、下载并校验开源语音依赖、本机代码编辑、本机 Hyper-V Ubuntu 24.04.5 虚拟机内构建/CTest、三种语音组合实测与 Navit 0.5.7 对照 | 第三次作业 LinuxVoiceAdapter：C ABI/FFI、Piper+Vosk 本地中文 TTS/ASR、语音页与导航桥接、麦克风权限与离线资源分发 |
 
 ## 1. AI使用详情
 
@@ -1523,3 +1524,30 @@ AI回答：
 
 对本组的实际价值：跨城与省内远距离路线可以规划（湖北 53–406 km 16/16 成功，0.33–0.74 s）；新增 `roadsLayered()` 接口与测试 `longRouteUsesTieredNetwork`，根 CTest 19/19。限制：中段只走主干道，个别路线比全量最短长（实测最大 2.33 倍）；Navit 对比受阻（NAVIT-20261111-1-long-route-01）；需 2、3、4 号评审。
 
+### 对话 26：第三次作业 LinuxVoiceAdapter（本地中文 TTS/ASR 与 FFI）
+
+对话编号：26（组员 1；记录 ID：20261123-member1-voice-adapter-01）
+
+日期：2026-11-23（Asia/Shanghai）。
+
+场景：组员 1 完成第三次作业的本人部分（AI 询问范围时组员选择“仅 1 号部分”）。G10 无接口，按组员要求用开源本地语音代替；按 AGENTS 第 7 节展示三种语音组合，组员三种全选试验，实测后选定 Piper + Vosk，未选后端已清理。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+我是组员1,现在完成第三次作业，目前没有其他组的接口，因此涉及到其他组的接口时就使用开源算法代替。
+```
+
+AI回答：
+
+> The `.so` now exports exactly the 10 `p1_voice_*` functions
+
+> The data shows Piper is clearly the better TTS and Vosk the better ASR. That pairing, Piper + Vosk, wasn't one of the three combinations you picked for the trial, so it needs your explicit decision.
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已实现于本机工作区（未提交）；试验组合选择原文“A: espeak-ng + Vosk,B: speech-dispatcher + Vosk（推荐）,C: Piper + whisper.cpp”，最终选择原文“D: Piper + Vosk（推荐）”，见 DEC-20261123-1-voice-backend-01；采用原因待用户自己填写。
+
+对本组的实际价值：新增语音 PAL `libp1_voice.so`（纯 C ABI `include/contracts/VoiceFfi.h`，三线程模型，回调只在分发线程串行送达，销毁后零回调）、Piper 中文播报与 Vosk 中文识别、Qt `VoiceService`/`VoiceNavigationBridge`（引导去重、偏航/到达打断、语音指令驱动 `NavigationController` 契约）、“语音助手”页面、麦克风探测与应用内同意、Flatpak 权限声明模板、离线资源安装与 `tools/fetch-voice-deps.sh`（SHA256 校验）。根 CTest 22/22。限制：虚拟机无声卡/麦克风，真人语音与扬声器听感未测，识别质量用合成语音测得；4 号状态机未实现，桥接用契约 Fake 验证；Flatpak 未构建；Navit espeak-ng 命令行配置未测（NAVIT-20261123-1-voice-01）。
