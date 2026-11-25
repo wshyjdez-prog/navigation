@@ -19,7 +19,10 @@ fetch() {  # 目录 文件名 URL SHA256
   mkdir -p "$dir"
   if [[ ! -f "$dir/$file" ]] || ! echo "$sum  $dir/$file" | sha256sum -c --quiet - 2>/dev/null; then
     echo "下载 $file"
-    curl -fL --retry 3 -o "$dir/$file.part" "$url"
+    # WSL 的部分 IPv6 路由会停在 0 字节后报 curl(56)；固定 IPv4 并允许
+    # 网络错误重试，避免每次都从用户目录重新判断问题。
+    curl --ipv4 -fL --retry 5 --retry-all-errors --retry-delay 2 \
+      --connect-timeout 30 -o "$dir/$file.part" "$url"
     mv "$dir/$file.part" "$dir/$file"
   fi
   echo "$sum  $dir/$file" | sha256sum -c --quiet - || { echo "校验失败: $file" >&2; exit 1; }
