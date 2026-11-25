@@ -22,6 +22,23 @@ ctest --test-dir build --output-on-failure
 
 团队整合版将 2 号 OSMX 源码、3 号 Boost A*/FMM 适配层、4 号异步规划桥和 5 号 LinuxRenderer 纳入同一根工程；导入页保留标准 OSM/PBF 与 OSMX 两条真实路径，地图页仍明确标注 Mock。默认开启真实 A* 对接与 FMM 适配层构建，需补齐 Boost 头文件；真实 HMM 运行另需配置外部 FMM 程序、网络和 UBODT。构建方法、验证证据及未贯通能力见 [团队整合说明](docs/assignment-2-team-integration.md)。算法调用页面、监控及真实数据到算法/地图的转换仍待完成，不把共同构建通过等同完整作业验收。
 
+## 第三次作业：导航仪表盘与模拟回放
+
+地图页消费真实 A* 路线，按固定速度生成来源为 `mock` 的导航快照，显示当前位置、航向、转向提示、速度、剩余距离和预计时间，并提供开始、暂停/继续、停止及 `1× / 2× / 4×` 回放。演示流程、线程边界和验证状态见 [导航仪表盘说明](docs/assignment-3-navigation-ui.md)。
+
+在更新的 Ubuntu 工程中重新配置一次，然后构建运行：
+
+```bash
+cd /mnt/d/navigation/navigation
+cmake -S . -B build -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_CXX_COMPILER=/usr/bin/g++-13
+cmake --build build -j1
+./build/p1-navigation
+```
+
+进入“地图”，右键设置起点和终点，点击“计算路线”；路线出现后点击底部“开始回放”。
+
 ## 统一开发环境
 
 五人统一在 **Linux 桌面虚拟机**中开发和验证：Ubuntu Desktop **24.04 LTS（noble，amd64）**、Qt **6.4.2**、GCC/G++ **13.3.0**、CMake **3.28.3**（C++17）。安装、版本核对与复现步骤见 [统一开发环境](docs/development-environment.md)。1 号本机已完成虚拟机安装、版本核对、Qt 桌面窗口与 Qt Creator 构建验证；其他成员待复现，见 [实测记录](docs/environment/member-1-2026-10-26.md)。

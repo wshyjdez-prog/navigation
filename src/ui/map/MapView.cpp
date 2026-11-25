@@ -1,5 +1,6 @@
 #include "MapPage.h"
 #include "TilePyramid.h"
+#include "NavigationSimulation.h"
 #include "app/NavigationWorkflow.h"
 #include "contracts/ImportedDataset.h"
 #include "data/import/PoiSearch.h"
@@ -21,6 +22,7 @@
 #include <QGridLayout>
 #include <QMenu>
 #include <QActionGroup>
+#include <QComboBox>
 #include <tuple>
 #include <QMouseEvent>
 #include <QPainter>
@@ -134,7 +136,8 @@ QString poiShortName(const QString& name) {
 Prepared draw(const app::WorkflowResult& state,std::shared_ptr<const app::RoadNetwork> projection,
     quint64 roadsRevision,QRectF view,QSize size,MapColors colors,
     std::optional<QPointF> start,std::optional<QPointF> end,QImage cache,QString key,QImage previousTile,QString previousTileKey,QImage pyramidBase,QRectF pyramidView,
-    QVector<QPair<QPointF,QString>> pois,int selectedPoi,QVector<QPointF> track) {
+    QVector<QPair<QPointF,QString>> pois,int selectedPoi,QVector<QPointF> track,
+    std::optional<contracts::NavigationSnapshot> navigation) {
     QElapsedTimer timer;timer.start();Prepared out;renderer::MapScene scene;
     scene.logicalSize=size;scene.source=renderer::MapSource::Real;
     scene.dataVersion=projection?projection->version:"empty";
@@ -165,7 +168,15 @@ Prepared draw(const app::WorkflowResult& state,std::shared_ptr<const app::RoadNe
     line(state.matched,"fmm",QColor("#C16A1A"),5,14);
     if(projection&&start) scene.markers.append({"start",screen(*start),renderer::MarkerKind::Start,QColor("#23875B"),"A",10,20});
     if(projection&&end) scene.markers.append({"end",screen(*end),renderer::MarkerKind::End,QColor("#D64F50"),"B",10,20});
-    out.render=renderer::LinuxRenderer::render(scene,nullptr,size,renderer::RenderMode::CachedBase,0,cache,key);
+    if(projection&&navigation&&navigation->currentPosition&&
+       navigation->currentPosition->coordinate.crs==contracts::CoordinateSystem::WGS84) {
+        const auto& position=navigation->currentPosition->coordinate;
+        scene.markers.append({"current-position",screen({position.longitudeDeg,position.latitudeDeg}),
+            renderer::MarkerKind::CurrentPosition,QColor("#6F42D8"),QString(),11,30,
+            navigation->currentPosition->bearingDeg.value_or(0.0)});
+    }
+    out.render=renderer::LinuxRenderer::render(
+        scene,navigation?&*navigation:nullptr,size,renderer::RenderMode::CachedBase,0,cache,key);
     if(!out.render.frame.isNull()&&projection){
         QPainter p(&out.render.frame);p.setRenderHint(QPainter::Antialiasing);
         // Dashed connectors: chosen start/end -> the road node the route was snapped to.
@@ -271,8 +282,25 @@ public:
         layout->addWidget(barHolder,0,0,Qt::AlignTop|Qt::AlignHCenter);searchBar_->hide();
         poiInfo_=new QLabel(canvas_);poiInfo_->setObjectName("poiInfo");poiInfo_->setAutoFillBackground(true);poiInfo_->setFrameShape(QFrame::StyledPanel);
         poiInfo_->setMargin(8);poiInfo_->setTextFormat(Qt::RichText);poiInfo_->hide();
+        navPanel_=new QFrame(canvas_);navPanel_->setObjectName("navigationPanel");navPanel_->setFrameShape(QFrame::NoFrame);
+        navPanel_->setAttribute(Qt::WA_StyledBackground,true);navPanel_->setSizePolicy(QSizePolicy::Maximum,QSizePolicy::Fixed);
+        auto* navLayout=new QHBoxLayout(navPanel_);navLayout->setContentsMargins(14,10,14,10);navLayout->setSpacing(8);
+        navSource_=new QLabel("模拟导航");navSource_->setObjectName("navigationSource");navLayout->addWidget(navSource_);
+        navState_=new QLabel("路线已就绪");navState_->setObjectName("navigationState");navState_->setMinimumWidth(145);navLayout->addWidget(navState_);
+        navStart_=button("开始回放",true);navStart_->setObjectName("navigationStart");navLayout->addWidget(navStart_);
+        navPause_=button("暂停");navPause_->setObjectName("navigationPause");navPause_->setEnabled(false);navLayout->addWidget(navPause_);
+        navStop_=button("停止");navStop_->setObjectName("navigationStop");navStop_->setEnabled(false);navLayout->addWidget(navStop_);
+        navSpeed_=new QComboBox;navSpeed_->setObjectName("navigationSpeed");navSpeed_->setAccessibleName("模拟回放速度");
+        navSpeed_->addItem("1×",1.0);navSpeed_->addItem("2×",2.0);navSpeed_->addItem("4×",4.0);
+        navSpeed_->setFixedWidth(76);navLayout->addWidget(navSpeed_);
+        navPanel_->hide();
         auto stylePopups=[this]{const auto& c=theme_.colors();
             poiInfo_->setStyleSheet(QString("QLabel#poiInfo{background:%1;color:%2;border:1px solid %3;border-radius:10px;}").arg(c.raised,c.text,c.border));
+            navPanel_->setStyleSheet(QString(
+                "QFrame#navigationPanel{background:%1;border:1px solid %2;border-radius:18px;}"
+                "QLabel#navigationSource{color:%3;background:%4;border-radius:8px;padding:5px 9px;font-weight:600;}"
+                "QLabel#navigationState{color:%5;font-weight:500;}")
+                .arg(c.raised,c.border,c.info,c.infoBg,c.text));
             // Only the input and close button are visible; the bar around them stays transparent over the map.
             searchBar_->setStyleSheet(QString("QFrame#poiSearchBar{background:transparent;border:none;}"
                 "QToolButton#poiSearchClose{background:%1;color:%2;border:none;border-radius:12px;min-height:42px;padding:0 18px;font-weight:500;}"
@@ -293,6 +321,35 @@ public:
         connect(searchButton_,&QPushButton::clicked,this,&MapPage::openSearch);
         connect(close,&QToolButton::clicked,this,&MapPage::closeSearch);
         connect(searchInput_,&QLineEdit::returnPressed,this,&MapPage::searchPois);
+        navTimer_.setInterval(100);
+        connect(&navTimer_,&QTimer::timeout,this,[this]{
+            const int elapsed=navClock_.isValid()?int(navClock_.restart()):navTimer_.interval();
+            simulation_.advance(qBound(0,elapsed,1000));
+            if(simulation_.arrived()) navTimer_.stop();
+            updateNavigationControls();schedule();
+        });
+        connect(navStart_,&QPushButton::clicked,this,[this]{
+            if(!simulation_.hasRoute()) return;
+            simulation_.start();navClock_.restart();navTimer_.start();
+            fitResults();updateNavigationControls();schedule();
+        });
+        connect(navPause_,&QPushButton::clicked,this,[this]{
+            if(!simulation_.hasRoute()) return;
+            if(simulation_.paused()) {
+                simulation_.resume();navClock_.restart();navTimer_.start();
+            } else {
+                simulation_.pause();navTimer_.stop();navClock_.invalidate();
+            }
+            updateNavigationControls();schedule();
+        });
+        connect(navStop_,&QPushButton::clicked,this,[this]{
+            simulation_.stop();navTimer_.stop();navClock_.invalidate();
+            updateNavigationControls();schedule();
+        });
+        connect(navSpeed_,&QComboBox::currentIndexChanged,this,[this](int){
+            simulation_.setSpeedMultiplier(navSpeed_->currentData().toDouble());
+            updateNavigationControls();schedule();
+        });
         menu_=new QMenu(this);menu_->setObjectName("mapMainMenu");menuButton->setMenu(menu_);
         datasets_=menu_->addMenu("选择已导入地图");datasets_->setObjectName("mapDatasetsMenu");
         connect(menu_->addAction("导入地图…"),&QAction::triggered,this,[this]{emit pageRequested("import");});
@@ -354,7 +411,7 @@ public:
         connect(canvas_,&MapCanvas::menuRequested,this,[this](QPoint position){
             const int hit=poiAt(position);
             if(hit>=0) showPoiMenu(hit); else showPointMenu(position);});
-        connect(canvas_,&MapCanvas::resized,this,[this]{clampView();schedule();regionTimer_.start();});
+        connect(canvas_,&MapCanvas::resized,this,[this]{clampView();placeNavigationPanel();schedule();regionTimer_.start();});
         connect(flow_,&app::NavigationWorkflow::changed,this,&MapPage::sync);
         connect(&pyramid_,&TilePyramid::statusChanged,this,[this](const QString& text){regionStatus_=text;updateNotice();});
         connect(&pyramid_,&TilePyramid::frameReady,this,[this](QImage image,QRectF view,PyramidStats stats){
@@ -372,6 +429,7 @@ public:
         sync();refreshDatasets();schedule();
     }
     ~MapPage() override {
+        navTimer_.stop();
         if(watcher_) watcher_->waitForFinished();
         if(catalog_) catalog_->waitForFinished();
         if(poiSearch_) {poiCancel_->store(true);poiSearch_->waitForFinished();}
@@ -387,10 +445,59 @@ private:
         return mapUnproject({actual.left()+fraction.x()*actual.width(),actual.bottom()-fraction.y()*actual.height()});
     }
     void updateNotice() {canvas_->setNotice(!regionStatus_.isEmpty()?regionStatus_:workflowStatus_);}
+    void placeNavigationPanel() {
+        if(!navPanel_||!navPanel_->isVisible()) return;
+        navPanel_->adjustSize();
+        const int x=std::max(8,(canvas_->width()-navPanel_->width())/2);
+        const int y=std::max(8,canvas_->height()-navPanel_->height()-24);
+        navPanel_->move(x,y);
+    }
+    void updateNavigationControls() {
+        const bool ready=simulation_.hasRoute();
+        navPanel_->setVisible(ready);
+        if(!ready) {
+            canvas_->setProperty("navigationActive",false);
+            return;
+        }
+        const auto& snapshot=simulation_.snapshot();
+        const bool arrived=simulation_.arrived();
+        navStart_->setText(arrived?QStringLiteral("重新回放"):QStringLiteral("开始回放"));
+        navStart_->setEnabled(!simulation_.running()||arrived);
+        navPause_->setEnabled(simulation_.running()&&!arrived);
+        navStop_->setEnabled(snapshot.has_value());
+        navPause_->setText(simulation_.paused()?QStringLiteral("继续"):QStringLiteral("暂停"));
+        if(arrived) navState_->setText(QStringLiteral("已到达目的地"));
+        else if(simulation_.paused()) navState_->setText(QStringLiteral("已暂停 · 可继续回放"));
+        else if(simulation_.running()) navState_->setText(QStringLiteral("导航中 · %1×回放")
+            .arg(simulation_.speedMultiplier(),0,'g',2));
+        else navState_->setText(QStringLiteral("路线已就绪 · 模拟数据"));
+        canvas_->setProperty("navigationActive",snapshot.has_value());
+        canvas_->setProperty("navigationPaused",simulation_.paused());
+        canvas_->setProperty("navigationArrived",arrived);
+        canvas_->setProperty("navigationSpeedMultiplier",simulation_.speedMultiplier());
+        canvas_->setProperty("navigationRemainingDistanceM",simulation_.remainingM());
+        canvas_->setProperty("navigationTravelledM",simulation_.travelledM());
+        if(snapshot&&snapshot->currentPosition) {
+            canvas_->setProperty("navigationLongitude",snapshot->currentPosition->coordinate.longitudeDeg);
+            canvas_->setProperty("navigationLatitude",snapshot->currentPosition->coordinate.latitudeDeg);
+            canvas_->setProperty("navigationSpeedMps",snapshot->currentPosition->speedMps.value_or(0.0));
+        }
+        placeNavigationPanel();
+    }
     void sync() {
         if(flow_->state().network&&sourceRevision_!=flow_->datasetRevision()) {
             sourceRevision_=flow_->datasetRevision();projection_=flow_->state().network;
             pyramid_.setDataset(*flow_->activeDataset(),projection_->roads);pyramidBase_={};regionStatus_.clear();fit();
+        }
+        const auto route=flow_->state().route;
+        if(route!=simulationRoute_) {
+            navTimer_.stop();navClock_.invalidate();
+            if(route.size()>=2&&simulation_.setRoute(route)) {
+                simulationRoute_=route;
+            } else {
+                simulationRoute_.clear();simulation_.stop();navPanel_->hide();
+            }
+            updateNavigationControls();
         }
         plan_->setVisible(flow_->startPoint().has_value()&&flow_->endPoint().has_value());
         plan_->setEnabled(!flow_->busy());cancel_->setEnabled(flow_->busy());updateTrackActions();
@@ -603,6 +710,7 @@ private:
         const auto projection=projection_;const auto roadsRevision=pyramidRevision_;
         const auto pyramidBase=pyramidBase_;const auto pyramidView=pyramidView_;const bool complete=pyramidComplete_;
         const auto start=flow_->startPoint(),end=flow_->endPoint();
+        const auto navigation=simulation_.snapshot();
         QVector<QPair<QPointF,QString>> pois;for(const auto& hit:pois_)pois.append({QPointF(hit.poi.longitude,hit.poi.latitude),hit.poi.name});const int selectedPoi=selectedPoi_;
         const auto track=flow_->trackPoints();
         auto* watcher=new QFutureWatcher<Prepared>(this);watcher_=watcher;
@@ -613,15 +721,15 @@ private:
                     canvas_->setFrame(result.render.frame,view);cache_=result.render.baseCache;key_=result.render.baseCacheKey;tile_=result.tile;tileKey_=result.tileKey;
                     canvas_->setProperty("realDataset",bool(projection_));
                     const auto& state=flow_->state();const int count=int(state.route.size()>1)+int(state.observations.size()>1)+int(state.matched.size()>1);
-                    canvas_->setProperty("routeCount",count);canvas_->setProperty("markerCount",int(bool(flow_->startPoint()))+int(bool(flow_->endPoint())));
+                    canvas_->setProperty("routeCount",count);canvas_->setProperty("markerCount",result.render.stats.markerCount);
                     canvas_->setProperty("regionRevision",pyramidRevision_);canvas_->setProperty("tilesComplete",complete);
                     canvas_->setProperty("cacheHit",result.render.stats.cacheHit);canvas_->setProperty("renderElapsedMs",result.totalMs);emit framePublished();
                 } else canvas_->setNotice(result.render.error);
             }
             if(pending_||revision!=revision_) {pending_=false;debounce_.start();}
         });
-        watcher->setFuture(QtConcurrent::run([state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi,track] {
-            return draw(state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi,track);
+        watcher->setFuture(QtConcurrent::run([state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi,track,navigation] {
+            return draw(state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi,track,navigation);
         }));
     }
     Theme& theme_;app::NavigationWorkflow* flow_;QString directory_;
@@ -635,6 +743,10 @@ private:
     QPushButton* searchButton_=nullptr;QFrame* searchBar_=nullptr;QLineEdit* searchInput_=nullptr;QLabel* poiInfo_=nullptr;
     QVector<data::PoiHit> pois_;int selectedPoi_=-1;
     QFutureWatcher<std::pair<QVector<data::PoiHit>,QString>>* poiSearch_=nullptr;std::shared_ptr<std::atomic_bool> poiCancel_=std::make_shared<std::atomic_bool>(false);
+    NavigationSimulation simulation_;QVector<QPointF> simulationRoute_;
+    QFrame* navPanel_=nullptr;QLabel* navSource_=nullptr;QLabel* navState_=nullptr;
+    QPushButton* navStart_=nullptr;QPushButton* navPause_=nullptr;QPushButton* navStop_=nullptr;QComboBox* navSpeed_=nullptr;
+    QTimer navTimer_;QElapsedTimer navClock_;
 };
 }
 QWidget* createMapPage(Theme& theme,QWidget* parent) {

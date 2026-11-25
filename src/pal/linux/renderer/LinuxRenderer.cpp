@@ -45,46 +45,49 @@ void drawNavigationOverlay(QPainter& painter,
     if (!navigation) return;
 
     const qreal width = scene.logicalSize.width();
-    const qreal height = scene.logicalSize.height();
     QFont titleFont = painter.font();
-    titleFont.setPixelSize(15);
+    titleFont.setPixelSize(18);
     titleFont.setBold(true);
     QFont bodyFont = painter.font();
-    bodyFont.setPixelSize(12);
+    bodyFont.setPixelSize(13);
 
     if (navigation->guidance) {
-        const QRectF card(24, 24, 272, 78);
+        // The top-left map menu occupies 16..72 px. Put guidance below it so
+        // both remain readable instead of layering two cards on top of each other.
+        const QRectF card(24, 84, qMin<qreal>(360, width - 48), 116);
         painter.setPen(QPen(QColor(67, 53, 188, 70), 1));
         painter.setBrush(QColor(255, 255, 255, 236));
         painter.drawRoundedRect(card, 14, 14);
         painter.setFont(titleFont);
         painter.setPen(QColor(QStringLiteral("#202335")));
-        painter.drawText(card.adjusted(18, 12, -18, -36),
+        painter.drawText(card.adjusted(18, 12, -18, -64),
                          Qt::AlignLeft | Qt::AlignVCenter,
                          navigation->guidance->text);
         painter.setFont(bodyFont);
         painter.setPen(QColor(QStringLiteral("#625C73")));
-        painter.drawText(card.adjusted(18, 44, -18, -12),
+        const QString distance = navigation->remainingDistanceM
+            ? (*navigation->remainingDistanceM >= 1000.0
+                   ? QStringLiteral("剩余 %1 km").arg(*navigation->remainingDistanceM / 1000.0, 0, 'f', 1)
+                   : QStringLiteral("剩余 %1 m").arg(*navigation->remainingDistanceM, 0, 'f', 0))
+            : QStringLiteral("剩余距离 --");
+        const QString duration = navigation->remainingDurationSec
+            ? QStringLiteral("预计 %1 min").arg(*navigation->remainingDurationSec / 60.0, 0, 'f', 0)
+            : QStringLiteral("预计时间 --");
+        painter.drawText(card.adjusted(18, 58, -18, -34),
                          Qt::AlignLeft | Qt::AlignVCenter,
-                         QStringLiteral("导航中 · Mock 快照"));
-    }
-
-    painter.setFont(bodyFont);
-    painter.setPen(QColor(QStringLiteral("#625C73")));
-    if (navigation->remainingDistanceM) {
-        painter.drawText(QRectF(28, height - 44, 230, 22),
+                         distance + QStringLiteral("   ·   ") + duration);
+        const QString speed = navigation->currentPosition && navigation->currentPosition->speedMps
+            ? QStringLiteral("速度 %1 km/h").arg(*navigation->currentPosition->speedMps * 3.6, 0, 'f', 0)
+            : QStringLiteral("速度 --");
+        const QString source = navigation->source == contracts::SourceKind::Mock
+            ? QStringLiteral("模拟导航")
+            : QStringLiteral("实时导航");
+        const QString state = navigation->status == contracts::NavigationStatus::Arrived
+            ? QStringLiteral("已到达")
+            : navigation->paused ? QStringLiteral("已暂停") : source;
+        painter.drawText(card.adjusted(18, 82, -18, -10),
                          Qt::AlignLeft | Qt::AlignVCenter,
-                         QStringLiteral("剩余 %1 m").arg(*navigation->remainingDistanceM, 0, 'f', 0));
-    }
-    if (navigation->remainingDurationSec) {
-        painter.drawText(QRectF(250, height - 44, 230, 22),
-                         Qt::AlignLeft | Qt::AlignVCenter,
-                         QStringLiteral("预计 %1 min").arg(*navigation->remainingDurationSec / 60.0, 0, 'f', 0));
-    }
-    if (navigation->currentPosition && navigation->currentPosition->speedMps) {
-        painter.drawText(QRectF(width - 220, height - 44, 190, 22),
-                         Qt::AlignRight | Qt::AlignVCenter,
-                         QStringLiteral("速度 %1 km/h").arg(*navigation->currentPosition->speedMps * 3.6, 0, 'f', 0));
+                         speed + QStringLiteral("   ·   ") + state);
     }
 }
 
@@ -125,6 +128,32 @@ void drawOverlays(QPainter& painter,
     markerFont.setBold(true);
     painter.setFont(markerFont);
     for (const auto& marker : markers) {
+        if (marker.kind == MarkerKind::CurrentPosition) {
+            painter.setPen(Qt::NoPen);
+            QColor halo = markerColor(marker);
+            halo.setAlpha(42);
+            painter.setBrush(halo);
+            painter.drawEllipse(marker.position, marker.radius + 7, marker.radius + 7);
+
+            painter.setPen(QPen(Qt::white, 3));
+            painter.setBrush(markerColor(marker));
+            painter.drawEllipse(marker.position, marker.radius, marker.radius);
+
+            painter.save();
+            painter.translate(marker.position);
+            painter.rotate(marker.headingDeg);
+            QPainterPath arrow;
+            arrow.moveTo(0, -marker.radius + 2);
+            arrow.lineTo(marker.radius - 4, marker.radius - 4);
+            arrow.lineTo(0, marker.radius - 6);
+            arrow.lineTo(-marker.radius + 4, marker.radius - 4);
+            arrow.closeSubpath();
+            painter.setPen(Qt::NoPen);
+            painter.setBrush(Qt::white);
+            painter.drawPath(arrow);
+            painter.restore();
+            continue;
+        }
         painter.setPen(QPen(Qt::white, 3));
         painter.setBrush(markerColor(marker));
         painter.drawEllipse(marker.position, marker.radius, marker.radius);
