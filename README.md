@@ -39,6 +39,9 @@ cmake --build build -j1
 
 进入“地图”，右键设置起点和终点，点击“计算路线”；路线出现后点击底部“开始回放”。
 
+只验证地图、A*/FMM 和导航仪表盘、暂时没有语音资源时，可在首次配置命令末尾加
+`-DP1_BUILD_VOICE=OFF`。此时“语音助手”入口禁用，其他导航功能不受影响；默认仍构建完整语音模块。
+
 ## 统一开发环境
 
 五人统一在 **Linux 桌面虚拟机**中开发和验证：Ubuntu Desktop **24.04 LTS（noble，amd64）**、Qt **6.4.2**、GCC/G++ **13.3.0**、CMake **3.28.3**（C++17）。安装、版本核对与复现步骤见 [统一开发环境](docs/development-environment.md)。1 号本机已完成虚拟机安装、版本核对、Qt 桌面窗口与 Qt Creator 构建验证；其他成员待复现，见 [实测记录](docs/environment/member-1-2026-10-26.md)。

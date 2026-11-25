@@ -14,7 +14,10 @@ add_subdirectory(src/data/import)
 add_subdirectory(src/data/osmx)
 add_subdirectory(src/pal/linux/renderer)
 # 1 号：LinuxVoiceAdapter（libp1_voice.so，C ABI/FFI）。
-add_subdirectory(src/pal/linux/voice)
+option(P1_BUILD_VOICE "Build LinuxVoiceAdapter and the voice-assistant page" ON)
+if(P1_BUILD_VOICE)
+    add_subdirectory(src/pal/linux/voice)
+endif()
 
 add_library(p1_ui_common STATIC
     src/ui/common/Theme.cpp
@@ -23,6 +26,16 @@ target_include_directories(p1_ui_common PUBLIC src include)
 target_link_libraries(p1_ui_common PUBLIC Qt6::Widgets)
 add_subdirectory(src/app)
 
+set(P1_UI_VOICE_SOURCES)
+if(P1_BUILD_VOICE)
+    list(APPEND P1_UI_VOICE_SOURCES
+        src/app/voice/VoiceService.cpp
+        src/app/voice/VoiceService.h
+        src/app/voice/VoiceNavigationBridge.cpp
+        src/app/voice/VoiceNavigationBridge.h
+        src/app/voice/VoicePage.cpp
+        src/app/voice/VoicePage.h)
+endif()
 add_library(p1_ui STATIC
     src/ui/map/MapDemoWidget.cpp
     src/ui/map/MapDemoWidget.h
@@ -41,15 +54,15 @@ add_library(p1_ui STATIC
     src/app/RoutingProfile.cpp
     src/app/RoutingProfile.h
     src/app/NavigationWorkflow.h
-    src/app/voice/VoiceService.cpp
-    src/app/voice/VoiceService.h
-    src/app/voice/VoiceNavigationBridge.cpp
-    src/app/voice/VoiceNavigationBridge.h
-    src/app/voice/VoicePage.cpp
-    src/app/voice/VoicePage.h
+    ${P1_UI_VOICE_SOURCES}
     src/app/MainWindow.cpp)
 target_include_directories(p1_ui PUBLIC src)
-target_link_libraries(p1_ui PUBLIC p1_ui_common p1_import_page Qt6::Widgets p1_renderer p1_voice PRIVATE Qt6::Concurrent)
+set(P1_UI_VOICE_LIBRARIES)
+if(P1_BUILD_VOICE)
+    set(P1_UI_VOICE_LIBRARIES p1_voice)
+    target_compile_definitions(p1_ui PUBLIC P1_VOICE_AVAILABLE=1)
+endif()
+target_link_libraries(p1_ui PUBLIC p1_ui_common p1_import_page Qt6::Widgets p1_renderer ${P1_UI_VOICE_LIBRARIES} PRIVATE Qt6::Concurrent)
 target_compile_options(p1_ui PRIVATE
     "$<$<CXX_COMPILER_ID:GNU,Clang>:-Wall;-Wextra;-Wpedantic>"
     "$<$<CXX_COMPILER_ID:MSVC>:/utf-8>")
@@ -66,11 +79,13 @@ if(BUILD_TESTING)
     target_link_libraries(p1-ui-tests PRIVATE p1_ui Qt6::Test)
     add_test(NAME ui-contracts COMMAND p1-ui-tests)
     set_tests_properties(ui-contracts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-    # 1 号：语音服务与导航桥接（真实 LinuxVoiceAdapter，WAV 输入输出，无需声卡）。
-    qt_add_executable(p1-voice-bridge-tests tests/VoiceBridgeTests.cpp)
-    target_link_libraries(p1-voice-bridge-tests PRIVATE p1_ui Qt6::Test)
-    add_test(NAME voice-bridge COMMAND p1-voice-bridge-tests)
-    set_tests_properties(voice-bridge PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 300)
+    if(P1_BUILD_VOICE)
+        # 1 号：语音服务与导航桥接（真实 LinuxVoiceAdapter，WAV 输入输出，无需声卡）。
+        qt_add_executable(p1-voice-bridge-tests tests/VoiceBridgeTests.cpp)
+        target_link_libraries(p1-voice-bridge-tests PRIVATE p1_ui Qt6::Test)
+        add_test(NAME voice-bridge COMMAND p1-voice-bridge-tests)
+        set_tests_properties(voice-bridge PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" TIMEOUT 300)
+    endif()
 endif()
 
 # 模块装配必须位于 include(CTest) 之后，统一注册各模块已有测试。

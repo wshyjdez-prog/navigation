@@ -2,7 +2,7 @@
 
 最后更新：2026-11-25（Asia/Shanghai）。组员：1、2、3、4、5。
 
-当前导航展示增量（2026-11-25，5 号，第 3 次作业本人部分）：地图页已消费 `NavigationWorkflow` 中的真实 A* 路线，生成来源强制为 `mock` 的 `NavigationSnapshot`，用于第三次作业模拟回放演示。当前位置沿路线移动并显示方向标记；LinuxRenderer 同步展示转向、速度、剩余距离和预计剩余时间；底部控制栏支持开始、暂停/继续、停止及 1×/2×/4× 回放，到达后可重新回放。新增 `src/ui/map/NavigationSimulation.*` 与导航模拟测试。Windows Qt 6.12 / MinGW 13.1 下相关源码编译和测试通过；统一 Ubuntu 24.04 / Qt 6.4.2 桌面运行截图待补。用户明确本次不需要 A/B 性能比较，未新增比较入口或性能结论。详见 [导航仪表盘说明](docs/assignment-3-navigation-ui.md)。
+当前导航展示增量（2026-11-25，5 号，第 3 次作业本人部分）：地图页已消费 `NavigationWorkflow` 中的真实 A* 路线，生成来源强制为 `mock` 的 `NavigationSnapshot`，用于第三次作业模拟回放演示。当前位置沿路线移动并显示方向标记；LinuxRenderer 同步展示转向、速度、剩余距离和预计剩余时间；底部控制栏支持开始、暂停/继续、停止及 1×/2×/4× 回放，到达后可重新回放。新增 `src/ui/map/NavigationSimulation.*` 与导航模拟测试。Windows Qt 6.12 / MinGW 13.1 下相关源码编译和测试通过；统一 Ubuntu 24.04 / Qt 6.4.2 桌面运行截图待补。为无法下载语音资源的单模块验证增加 `P1_BUILD_VOICE=OFF`，默认仍构建完整语音模块。用户明确本次不需要 A/B 性能比较，未新增比较入口或性能结论。详见 [导航仪表盘说明](docs/assignment-3-navigation-ui.md)。
 
 当前语音增量（2026-11-23，1 号，第 3 次作业本人部分）：新增语音 PAL **LinuxVoiceAdapter**——`libp1_voice.so` 只导出纯 C ABI（`include/contracts/VoiceFfi.h`，10 个 `p1_voice_*` 函数），speak() 调本地 **Piper** 中文 TTS、listen() 调本地 **Vosk** 普通话 ASR，回调只在分发线程串行送达核心层，销毁后零回调；Qt 侧 `VoiceService`/`VoiceNavigationBridge` 把引导播报、偏航/到达打断、语音指令接到 4 号 `NavigationController` 契约；新增“语音助手”页面、麦克风探测与应用内同意、Flatpak 权限声明模板、离线语音资源安装（`share/p1-navigation/voice`）。G10（X09）无接口，按组员 1 要求以开源本地语音代替。后端按 `DEC-20261123-1-voice-backend-01` 对 espeak-ng+Vosk / speech-dispatcher+Vosk / Piper+whisper.cpp 实测后，组员 1 选定 **Piper+Vosk**，其余已清理。根 CTest 22/22。**虚拟机无声卡/麦克风，真人语音与扬声器听感未测；4 号状态机尚未实现，桥接用契约 Fake 验证**；Navit 对标部分完成（`NAVIT-20261123-1-voice-01`）。详见 [语音适配说明](docs/voice-adapter.md) 与下方 2026-11-23 记录。
 
