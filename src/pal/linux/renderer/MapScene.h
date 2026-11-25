@@ -51,6 +51,8 @@ struct MapMarker {
     QString label;
     qreal radius = 10.0;
     int zOrder = 20;
+    // Clockwise degrees from north. Only CurrentPosition uses it for the arrow.
+    qreal headingDeg = 0.0;
 };
 
 // LinuxRenderer 的模块内输入契约。当前使用 Mock；2/3/4 号的数据通过适配层转换后填入。

@@ -30,6 +30,7 @@
 | 24 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、用临时程序在湖北数据上复现诊断、本机代码编辑、统一基线虚拟机内构建/CTest | 修复“无法规划”：规划区域不可达时自动扩大重试 |
 | 25 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、截图诊断、本机代码编辑、统一基线虚拟机内构建/CTest、湖北远距离实测 | 跨城远距离规划：仿 Navit route_depth 的分级路网 |
 | 26 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、下载并校验开源语音依赖、本机代码编辑、本机 Hyper-V Ubuntu 24.04.5 虚拟机内构建/CTest、三种语音组合实测与 Navit 0.5.7 对照 | 第三次作业 LinuxVoiceAdapter：C ABI/FFI、Piper+Vosk 本地中文 TTS/ASR、语音页与导航桥接、麦克风权限与离线资源分发 |
+| 27 | 5 | Codex 桌面应用 | 具体模型及应用版本未记录 | 桌面对话、本地代码编辑、Windows Qt 6.12 / MinGW 独立编译检查、离屏渲染预览 | 第三次作业地图导航仪表盘、当前位置/转向/速度/剩余信息与模拟回放控制 |
 
 ## 1. AI使用详情
 
@@ -1551,3 +1552,40 @@ AI回答：
 是否采用，以及原因：已实现于本机工作区（未提交）；试验组合选择原文“A: espeak-ng + Vosk,B: speech-dispatcher + Vosk（推荐）,C: Piper + whisper.cpp”，最终选择原文“D: Piper + Vosk（推荐）”，见 DEC-20261123-1-voice-backend-01；采用原因待用户自己填写。
 
 对本组的实际价值：新增语音 PAL `libp1_voice.so`（纯 C ABI `include/contracts/VoiceFfi.h`，三线程模型，回调只在分发线程串行送达，销毁后零回调）、Piper 中文播报与 Vosk 中文识别、Qt `VoiceService`/`VoiceNavigationBridge`（引导去重、偏航/到达打断、语音指令驱动 `NavigationController` 契约）、“语音助手”页面、麦克风探测与应用内同意、Flatpak 权限声明模板、离线资源安装与 `tools/fetch-voice-deps.sh`（SHA256 校验）。根 CTest 22/22。限制：虚拟机无声卡/麦克风，真人语音与扬声器听感未测，识别质量用合成语音测得；4 号状态机未实现，桥接用契约 Fake 验证；Flatpak 未构建；Navit espeak-ng 命令行配置未测（NAVIT-20261123-1-voice-01）。
+
+### 对话 27：第三次作业导航仪表盘与模拟回放
+
+对话编号：27（组员 5；记录 ID：`20261125-member5-assignment3-navigation-ui-01`）
+
+日期：2026-11-25（Asia/Shanghai）。
+
+场景：组员 5 完成第三次作业本人部分；基于队友更新后的 `main`，在独立作业分支消费真实 A* 路线，实现地图导航展示和模拟回放，不改队友导航、算法和数据代码。
+
+工具：Codex 桌面应用；模型与应用版本未记录。
+
+提示词：
+
+```text
+完成第三次作业我是五号，\
+21:44:08 Running in "D:\navigation\navigation": "C:\Program Files\Git\cmd\git.exe" pull\
+From https\://github.com/wshyjdez-prog/navigation\
+&#x20;\* [new branch]      claude/nice-brahmagupta-rrnz67 -> origin/claude/nice-brahmagupta-rrnz67\
+&#x20;\* [new branch]      codex/member-1/map-poi-labels-route-mode -> origin/codex/member-1/map-poi-labels-route-mode\
+&#x20;\* [new branch]      codex/member-4/assignment2-real-planner -> origin/codex/member-4/assignment2-real-planner\
+&#x20;  c7ee852..a2792ad  feature/member3-open-source-integration -> origin/feature/member3-open-source-integration\
+&#x20;  e3ec3c0..3091c8b  main       -> origin/main\
+Already up to date.\
+The command "C:\Program Files\Git\cmd\git.exe pull" finished successfully.\我刚在qtpull了，显示这个
+```
+
+AI回答（关键片段）：
+
+> 最新主线已经包含真实路网、A* 路线和地图渲染；我现在补的是第三次作业缺的一段：让当前位置沿真实路线前进，并把速度、剩余距离、转向提示接到现有地图上。演示数据会明确标成“模拟”，不会冒充真实定位。
+
+> Windows Qt 6.12 / MinGW 13.1 独立检查中，NavigationSimulation.cpp、MapView.cpp、LinuxRenderer.cpp 均编译通过。
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：代码已落在独立分支工作区，待用户确认后提交；采用原因待用户自己填写。
+
+对本组的实际价值：新增 `src/ui/map/NavigationSimulation.*`、导航控制栏、当前位置方向标记和导航卡，消费真实 `NavigationWorkflow::state().route` 生成 `mock` 快照；支持开始、暂停/继续、停止、1×/2×/4×、到达与重新回放。导航模拟测试 4/4、原有渲染测试和 MapView 编译检查通过。限制：统一 Ubuntu 24.04 / Qt 6.4.2 桌面运行截图待补，OpenGL ES 未使用/未验证；用户明确本次不需要 A/B 性能比较。

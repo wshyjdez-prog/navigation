@@ -1,6 +1,8 @@
 # P1 Linux 导航应用：总体规划与实现状态
 
-最后更新：2026-11-23（Asia/Shanghai）。组员：1、2、3、4、5。
+最后更新：2026-11-25（Asia/Shanghai）。组员：1、2、3、4、5。
+
+当前导航展示增量（2026-11-25，5 号，第 3 次作业本人部分）：地图页已消费 `NavigationWorkflow` 中的真实 A* 路线，生成来源强制为 `mock` 的 `NavigationSnapshot`，用于第三次作业模拟回放演示。当前位置沿路线移动并显示方向标记；LinuxRenderer 同步展示转向、速度、剩余距离和预计剩余时间；底部控制栏支持开始、暂停/继续、停止及 1×/2×/4× 回放，到达后可重新回放。新增 `src/ui/map/NavigationSimulation.*` 与导航模拟测试。Windows Qt 6.12 / MinGW 13.1 下相关源码编译和测试通过；统一 Ubuntu 24.04 / Qt 6.4.2 桌面运行截图待补。用户明确本次不需要 A/B 性能比较，未新增比较入口或性能结论。详见 [导航仪表盘说明](docs/assignment-3-navigation-ui.md)。
 
 当前语音增量（2026-11-23，1 号，第 3 次作业本人部分）：新增语音 PAL **LinuxVoiceAdapter**——`libp1_voice.so` 只导出纯 C ABI（`include/contracts/VoiceFfi.h`，10 个 `p1_voice_*` 函数），speak() 调本地 **Piper** 中文 TTS、listen() 调本地 **Vosk** 普通话 ASR，回调只在分发线程串行送达核心层，销毁后零回调；Qt 侧 `VoiceService`/`VoiceNavigationBridge` 把引导播报、偏航/到达打断、语音指令接到 4 号 `NavigationController` 契约；新增“语音助手”页面、麦克风探测与应用内同意、Flatpak 权限声明模板、离线语音资源安装（`share/p1-navigation/voice`）。G10（X09）无接口，按组员 1 要求以开源本地语音代替。后端按 `DEC-20261123-1-voice-backend-01` 对 espeak-ng+Vosk / speech-dispatcher+Vosk / Piper+whisper.cpp 实测后，组员 1 选定 **Piper+Vosk**，其余已清理。根 CTest 22/22。**虚拟机无声卡/麦克风，真人语音与扬声器听感未测；4 号状态机尚未实现，桥接用契约 Fake 验证**；Navit 对标部分完成（`NAVIT-20261123-1-voice-01`）。详见 [语音适配说明](docs/voice-adapter.md) 与下方 2026-11-23 记录。
 
@@ -176,7 +178,7 @@ FFI 是 PDF 明确要求，不能因主体为 C++ 就静默省略；1、4 号与
 | 数据导入/StorageAdapter/离线包 | 2（1 号整合） | 进行中 | 标准 OSM/PBF 与 OSMX 均进入根工程，Ubuntu 导入/缓存/重开测试通过；真实 OSMX 样例本次缺失跳过，完整存储及 G7/X07 离线包仍待办。**2026-11-11**：标准 OSM 改为 libosmium 提取 POI/道路/面（schema 2，POI 不上图），云端容器根 CTest 19/19；统一虚拟机复验、真实 PBF、Navit 对标（NAVIT-20261111-1-osm-feature-import-01）未完成，旧缓存需重新导入，见 docs/osm-import.md |
 | C++ A*/HMM/性能页 | 3（1/4 号整合） | 进行中 | 算法源码已合并，真实 A* 与4号桥共建回归通过；FMM 适配层已编译/调度测试，当前 VM 真实 FMM 未复验。算法页/监控/生产转换仍待完成 |
 | LocationAdapter/导航/G6 联调 | 4 | 进行中 | 位置源契约、固定轨迹读取与 Mock 回放已完成；main（`9cc04b1`）Linux 复验通过（ctest 7/7）。**第二次作业对接层已交付（2026-11-01）**：`AsyncPlannerBridge`（QThread+Worker 线程化对接，落实契约"计算不阻塞 UI"）、`StubRoutePlanner`（确定性桩，延迟/失败/取消可注入）、`RecordingController`（验证桩）、`p1-planner-demo` 与 7 例集成测试；虚拟机实测 configure/build 零警告、全量 ctest **9/9**（新增 navigation-integration、navigation-planner-demo）。接口选择见 DEC-20261101-4-planner-bridge-interface-01（契约先行，3 号真实 A*/HMM 实现既定 `RoutePlanner` 接口即插即换）、DEC-20261101-4-async-model-01（本次忽略）。Navit 对标受阻未测（NAVIT-20261101-4-planner-bridge-01）。导航状态机、偏航/重算去重、GeoClue2、权限与 X06 联调未完成（第 3 次作业） |
-| LinuxRenderer/地图/仪表盘 | 5（1 号整合复验） | 进行中 | 异步 Qt 渲染与 MapPage 在统一 Ubuntu 测试和真实 Wayland 首帧/截图通过；输入仍为 Mock，真实数据、仪表盘及 OpenGL ES 未验收。**2026-11-11**：金字塔瓦片增加分级面名称（方案 A，DEC-20261111-1-area-labels-01），根 CTest 19/19；Navit 渲染对标受阻（NAVIT-20261111-1-area-labels-01）；同日修复拖动/缩放边缘空白（方案 A 外扩帧+渐进+粗底图，DEC-20261111-1-edge-loading-01）；新增地图清晰度高/中/低（NAVIT-20261111-1-map-clarity-01） |
+| LinuxRenderer/地图/仪表盘 | 5（1 号整合复验） | 进行中 | 异步 Qt 渲染与 MapPage 在统一 Ubuntu 测试和真实 Wayland 首帧/截图通过；真实 A* 路线和模拟导航快照已接入，速度/剩余距离/转向/回放控制已编码。**2026-11-25**：Windows Qt 6.12 下 `NavigationSimulation`、`MapView`、LinuxRenderer 编译通过，导航模拟测试 4/4 与渲染回归通过；统一 Ubuntu 桌面鼠标操作与截图待补。OpenGL ES 未使用/未验证。历史金字塔、地图清晰度和路线模式能力保留；用户明确不追加 A/B 性能比较 |
 | LinuxVoiceAdapter/用户页面 | 1，2/4 配合 | 进行中（语音 PAL 已实现并测试） | 2026-11-23：Piper+Vosk、C ABI/FFI、生命周期、麦克风探测/同意、语音页、导航桥接，CTest voice-* 3 项通过（DEC-20261123-1-voice-backend-01）。待：真人语音/扬声器实测、接入 4 号真实状态机、Navit espeak-ng 命令行补测（NAVIT-20261123-1-voice-01）、Flatpak 构建；用户页面（收藏/历史/偏好）属第 4 次 |
 | Linux 发布与最终材料 | 全员，1 汇总 | 未开始 | 逐次收集运行证据、G6 报告和 3–5 分钟视频 |
 
@@ -504,3 +506,13 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 未实现/未验证内容、下一步与涉及组员：真人语音识别与扬声器听感（需带麦克风的机器，1 号）；4 号 NavigationController 实现后调用 VoiceNavigationBridge::attach() 接入并补端到端测试（1/4 号）；开始导航/重新规划/导航到等指令的应用层处理需 3/4 号规划入口；Flatpak 构建与沙箱授权实测（1 号）；zh_CN-huayan 音色许可核实；G6 联调确认 FFI 形状（4 号牵头）。
 关联日志 / 已有提交：ai_log 对话 26；未提交。
 ```
+
+### 2026-11-25：第三次作业导航仪表盘与模拟回放
+
+- 日期 / 模块 / 负责人 / 状态：2026-11-25 / LinuxRenderer、地图导航仪表盘与模拟回放 / 5 / 进行中（代码完成，Windows 编译检查通过；统一 Ubuntu 桌面运行与截图待补）。
+- 已实现能力与正式入口：`src/ui/map/NavigationSimulation.*` 消费 `NavigationWorkflow::state().route` 的真实 A* 路线，沿折线计算 WGS84 位置、航向、剩余距离、预计时间和左/右/直行/到达引导；来源强制为 `mock`。`src/ui/map/MapView.cpp` 增加地图内模拟导航控制栏（开始、暂停/继续、停止、1×/2×/4×），100 ms 更新并复制快照到后台渲染。`src/pal/linux/renderer/LinuxRenderer.*` 绘制当前位置方向标记和导航卡；`MapScene::MapMarker` 增加航向字段。路线变化或清除时重置会话，不覆盖队友算法和导航代码。
+- 接口、数据约定与边界：路线元素仍为 WGS84 `{经度, 纬度}`；快照使用公共 `contracts::NavigationSnapshot`；当前位置标记 `MarkerKind::CurrentPosition`；`renderer::LinuxRenderer::render()` 接收只读快照。模拟回放只演示 5 号展示层，不替代 4 号状态机、GeoClue2 真实定位或 G6 联调。采用 Qt Widgets/QPainter，不声称 OpenGL ES 已实现或验证。
+- 验证：Windows Qt 6.12 / MinGW 13.1 独立检查中，`NavigationSimulation.cpp`、`MapView.cpp`、`LinuxRenderer.cpp` 均编译通过；新增模拟导航测试 4/4 通过，覆盖推进、暂停/继续、倍速、到达和非法路线；原有 LinuxRenderer 测试通过。离屏预览确认路线、起终点、当前位置方向标记和转向卡出现在同一帧。当前宿主 WSL 服务不可访问，尚未运行统一 Ubuntu/Qt 6.4.2 完整程序。
+- 性能比较：用户明确本次不需要 A/B 性能比较；没有新增比较按钮、基准流程或虚构成绩。渲染性能/内存留待第 4 次按团队要求处理。
+- 下一步：在统一 Ubuntu 24.04 / Qt 6.4.2 中构建，导入地图、设置起终点、计算真实 A* 路线并点击“开始回放”，补 Wayland 截图和 3–5 分钟演示录像素材；4 号状态机完成后，把同一 `NavigationSnapshot` 入口从模拟快照替换为真实导航快照。
+- 关联日志：ai_log 对话 27。

@@ -28,6 +28,8 @@ add_library(p1_ui STATIC
     src/ui/map/MapDemoWidget.h
     src/ui/map/MapPage.cpp
     src/ui/map/MapView.cpp
+    src/ui/map/NavigationSimulation.cpp
+    src/ui/map/NavigationSimulation.h
     src/ui/map/AreaLabels.cpp
     src/ui/map/AreaLabels.h
     src/ui/map/TilePyramid.cpp
@@ -102,4 +104,7 @@ if(BUILD_TESTING)
     target_link_libraries(p1-business-tests PRIVATE p1_ui Qt6::Test)
     add_test(NAME business-workflow COMMAND p1-business-tests regionalRoads routeAndCancel uiPipeline automaticMapRegions clarityMenu drivingModeExcludesNonCarRoads routeModeMenu poiSearchGoHere planningExpandsAreaWhenRouteLeavesIt longRouteUsesTieredNetwork panZoomKeepsVisibleMapBeforeWorkerReturns newestMapRegionWins malformedTrajectory)
     set_tests_properties(business-workflow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    qt_add_executable(p1-navigation-sim-tests tests/NavigationSimulationTests.cpp)
+    target_link_libraries(p1-navigation-sim-tests PRIVATE p1_ui Qt6::Test)
+    add_test(NAME navigation-simulation COMMAND p1-navigation-sim-tests)
 endif()
