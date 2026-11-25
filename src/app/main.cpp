@@ -46,12 +46,20 @@ int main(int argc, char* argv[]) {
             QTimer::singleShot(250,&window,[&window,&theme,&app,capture,ok]() mutable {
                 ok = capture("components-light") && ok;
                 // 语音页显示时按需启动语音服务，留出加载识别模型的时间再截图。
+#ifdef P1_VOICE_AVAILABLE
                 window.setCurrentPage("voice");
+#else
+                window.setCurrentPage("components");
+#endif
                 QTimer::singleShot(3000,&window,[&window,&theme,&app,capture,ok]() mutable {
+#ifdef P1_VOICE_AVAILABLE
                     ok = capture("voice-light") && ok;
+#endif
                     theme.setDark(true);
                     QTimer::singleShot(250,&window,[&window,&theme,&app,capture,ok]() mutable {
+#ifdef P1_VOICE_AVAILABLE
                         ok = capture("voice-dark") && ok;
+#endif
                         window.setCurrentPage("import");
                         QTimer::singleShot(250,&window,[&window,&theme,&app,capture,ok]() mutable {
                             ok = capture("import-dark") && ok;

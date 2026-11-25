@@ -118,7 +118,11 @@ private slots:
         auto* replacement = new QWidget;
         QVERIFY(window_->registerPage("import","已接入页面","测试模块替换",replacement));
         QCOMPARE(stack->currentWidget(),replacement);
+#ifdef P1_VOICE_AVAILABLE
         QCOMPARE(stack->count(),6);
+#else
+        QCOMPARE(stack->count(),5);
+#endif
         QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);
         QVERIFY(oldPage.isNull());
         QVERIFY(window_->registerPage("map","地图模块","测试注册",new QWidget));
