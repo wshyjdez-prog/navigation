@@ -1,0 +1,197 @@
+// Trial benchmark (DEC-20261126-1-road-model-01), removed with the unselected
+// candidate. Component comparison on the same OSMX snapshot:
+//   legacy = previous code path (equirectangular GraphData, grid nearestNode /
+//            linear driving scan, per-query adjacency_list rebuild + h=0 A*),
+//   A / B  = road model candidates.
+// usage: p1-roadmodel-bench <imported.sqlite> <legacy|A|B> [radiusKm...]
+#include "algorithms/core/BoostAStar.h"
+#include "algorithms/roadmodel/RoadModel.h"
+#include "app/NavigationWorkflow.h"
+#include "app/RoutingProfile.h"
+#include "contracts/ImportedDataset.h"
+
+#include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QFile>
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <cstdio>
+#include <random>
+
+using namespace p1;
+using Clock = std::chrono::steady_clock;
+namespace rm = algorithms::roadmodel;
+
+namespace {
+double ms(Clock::time_point a) { return std::chrono::duration<double, std::milli>(Clock::now() - a).count(); }
+double rssMiB(const char* key) {
+    QFile f("/proc/self/status");
+    if (!f.open(QIODevice::ReadOnly)) return -1;
+    for (const auto& l : f.readAll().split('\n'))
+        if (l.startsWith(key)) return l.mid(int(qstrlen(key))).trimmed().split(' ').first().toDouble() / 1024;
+    return -1;
+}
+struct Stats { double median = 0, p95 = 0; size_t n = 0; };
+Stats stats(std::vector<double> v) {
+    if (v.empty()) return {};
+    std::sort(v.begin(), v.end());
+    auto at = [&](double q) { return v[std::min(v.size() - 1, size_t(std::ceil(q * double(v.size())) - 1))]; };
+    return {v.size() % 2 ? v[v.size() / 2] : (v[v.size() / 2 - 1] + v[v.size() / 2]) / 2, at(0.95), v.size()};
+}
+data::OsmxBounds around(double lat, double lon, double km) {
+    const double dy = km * 1000 / 111195.08, dx = dy / std::cos(lat * M_PI / 180);
+    return {lat - dy, lon - dx, lat + dy, lon + dx, true};
+}
+
+// ---- legacy replica of the pre-change NavigationWorkflow code -------------
+struct Legacy {
+    std::shared_ptr<const data::OsmxDataset> roads;
+    algorithms::model::GraphData graph;
+    double lat0 = 0, lon0 = 0, mLat = 0, mLon = 0;
+};
+Legacy legacyBuild(std::shared_ptr<const data::OsmxDataset> roads) {
+    Legacy n;
+    n.roads = std::move(roads);
+    QCryptographicHash subset(QCryptographicHash::Sha256); // same version hash as the old buildNetwork
+    subset.addData(n.roads->info().sourceSha256.toUtf8());
+    for (quint32 wi = 0; wi < n.roads->wayCount(); ++wi) subset.addData(QByteArray::number(n.roads->wayAt(wi).id) + ',');
+    const auto version = subset.result().toHex().toStdString();
+    n.lat0 = n.roads->bounds().centerLat();
+    n.lon0 = n.roads->bounds().centerLon();
+    n.mLat = data::kOsmxEarthRadiusMeters * M_PI / 180;
+    n.mLon = n.mLat * std::cos(n.lat0 * M_PI / 180);
+    n.graph.metadata = {"bench", version, "OSM road snapshot",
+                        {algorithms::model::CoordinateSystem::LocalCartesian, algorithms::model::LengthUnit::Metres, "equirectangular"}};
+    for (quint32 i = 0; i < n.roads->nodeCount(); ++i) {
+        const auto& node = n.roads->nodeAt(i);
+        n.graph.nodes.push_back({algorithms::model::NodeId(i + 1), {(node.lon - n.lon0) * n.mLon, (node.lat - n.lat0) * n.mLat}});
+    }
+    for (int i = 0; i < n.roads->edges().size(); ++i) {
+        const auto& e = n.roads->edgeAt(quint32(i));
+        if (e.from == e.to || e.lengthMeters <= 0) continue;
+        n.graph.edges.push_back({algorithms::model::EdgeId(quint64(i) + 1), algorithms::model::NodeId(e.from + 1),
+                                 algorithms::model::NodeId(e.to + 1), {n.graph.nodes[e.from].position, n.graph.nodes[e.to].position},
+                                 e.lengthMeters, e.lengthMeters});
+    }
+    return n;
+}
+algorithms::model::GraphData legacyDriving(const Legacy& n) {
+    algorithms::model::GraphData g; g.metadata = n.graph.metadata; g.nodes = n.graph.nodes;
+    std::vector<signed char> allowed(n.roads->wayCount(), -1);
+    for (const auto& e : n.graph.edges) {
+        const auto way = n.roads->edgeAt(quint32(e.id.value - 1)).way;
+        if (allowed[way] < 0) allowed[way] = app::carAllowed(*n.roads, way) ? 1 : 0;
+        if (allowed[way]) g.edges.push_back(e);
+    }
+    return g;
+}
+std::optional<quint32> legacySnap(const Legacy& n, double lat, double lon, bool origin) {
+    const auto index = n.roads->nearestNode(lat, lon, 500);
+    if (!index) return std::nullopt;
+    bool routable = false;
+    for (auto way : n.roads->incidentWays(*index)) if (n.roads->wayAt(way).attributes.isRoutable()) routable = true;
+    if (!routable || (origin && n.roads->outgoingEdgeCount(*index) == 0)) return std::nullopt;
+    return *index;
+}
+std::optional<quint32> legacySnapDriving(const Legacy& n, const algorithms::model::GraphData& g, double lat, double lon, bool origin) {
+    std::vector<char> usable(n.roads->nodeCount(), 0);
+    for (const auto& e : g.edges) usable[size_t((origin ? e.from : e.to).value - 1)] = 1;
+    double best = 500; std::optional<quint32> found;
+    for (quint32 i = 0; i < n.roads->nodeCount(); ++i) {
+        if (!usable[i]) continue;
+        const auto& node = n.roads->nodeAt(i);
+        const double d = data::osmxDistanceMeters(lat, lon, node.lat, node.lon);
+        if (d <= best) { best = d; found = i; }
+    }
+    return found;
+}
+} // namespace
+
+int main(int argc, char** argv) {
+    QCoreApplication app(argc, argv);
+    if (argc < 3) { std::fprintf(stderr, "usage: %s <cache.sqlite> <legacy|A|B> [radiusKm...]\n", argv[0]); return 2; }
+    const QString cache = argv[1], which = argv[2];
+    const bool legacy = which == "legacy";
+    if (!legacy) qputenv("P1_ROAD_MODEL", which.toUtf8());
+    std::vector<double> radii;
+    for (int i = 3; i < argc; ++i) radii.push_back(std::atof(argv[i]));
+    if (radii.empty()) radii = {1, 3, 5, 10};
+    const double lat = 30.5530, lon = 114.3200; // Wuhan Wuchang, same centre as earlier reports
+    constexpr int kWarmup = 1, kRepeat = 5, kPairs = 200;
+    std::string backendName = "legacy";
+    std::printf("impl,radius_km,nodes,edges,load_ms,build_med_ms,build_p95_ms,build_n,rss_delta_mib,"
+                "mode,pairs,ok,unreach,snapfail,query_med_ms,query_p95_ms,query_n,qps,len_sum_km,cost_mismatch\n");
+    for (const double r : radii) {
+        const auto t0 = Clock::now();
+        const auto ds = data::ImportedDataset(cache).roads(around(lat, lon, r));
+        const double loadMs = ms(t0);
+        std::vector<double> build;
+        std::shared_ptr<const app::RoadNetwork> net;
+        std::optional<Legacy> old;
+        double rssDelta = 0; // first build in this radius (nothing to reuse yet)
+        for (int i = 0; i < kWarmup + kRepeat; ++i) {
+            net.reset(); old.reset();
+            const double rssBefore = rssMiB("VmRSS:");
+            const auto t = Clock::now();
+            if (legacy) old = legacyBuild(ds); else net = app::NavigationWorkflow::buildNetwork(ds, {}, 1000000, 2000000);
+            if (i >= kWarmup) build.push_back(ms(t));
+            if (i == 0) rssDelta = rssMiB("VmRSS:") - rssBefore;
+        }
+        const auto b = stats(build);
+        if (net) backendName = net->model->backend();
+        const auto& graph = legacy ? old->graph : net->graph();
+        double lenSum = 0;
+        for (const auto& e : graph.edges) lenSum += e.length_m;
+        for (const bool driving : {false, true}) {
+            std::mt19937 rng(20261126);
+            std::uniform_real_distribution<double> u(-0.8, 0.8);
+            const double dy = r * 1000 / 111195.08, dx = dy / std::cos(lat * M_PI / 180);
+            std::vector<double> query;
+            int ok = 0, unreachable = 0, snapFail = 0, mismatch = 0;
+            const auto all = Clock::now();
+            for (int i = 0; i < kPairs; ++i) {
+                const double aLat = lat + u(rng) * dy, aLon = lon + u(rng) * dx, bLat = lat + u(rng) * dy, bLon = lon + u(rng) * dx;
+                const auto t = Clock::now();
+                algorithms::RoutePath path;
+                if (legacy) {
+                    // Per request, exactly as the old plan(): driving subgraph,
+                    // snapping, then findRoute (which validates and converts).
+                    const auto car = driving ? legacyDriving(*old) : algorithms::model::GraphData{};
+                    const auto& g = driving ? car : old->graph;
+                    const auto sa = driving ? legacySnapDriving(*old, car, aLat, aLon, true) : legacySnap(*old, aLat, aLon, true);
+                    const auto sb = driving ? legacySnapDriving(*old, car, bLat, bLon, false) : legacySnap(*old, bLat, bLon, false);
+                    if (!sa || !sb) { ++snapFail; query.push_back(ms(t)); continue; }
+                    path = algorithms::findRoute(g, algorithms::model::NodeId(*sa + 1), algorithms::model::NodeId(*sb + 1));
+                } else {
+                    const auto profile = driving ? rm::Profile::Driving : rm::Profile::General;
+                    const auto sa = net->model->snap({aLat, aLon}, profile, true, 500);
+                    const auto sb = net->model->snap({bLat, bLon}, profile, false, 500);
+                    if (!sa || !sb) { ++snapFail; query.push_back(ms(t)); continue; }
+                    path = net->model->route(*sa, *sb, profile);
+                    query.push_back(ms(t));
+                    // Optimality: same graph, exhaustive h=0 A* (outside timing).
+                    if (!driving && path.status == algorithms::RouteStatus::Success) {
+                        const auto ref = algorithms::findRoute(graph, algorithms::model::NodeId(*sa + 1), algorithms::model::NodeId(*sb + 1));
+                        if (std::abs(ref.total_cost_m - path.total_cost_m) > 1e-6 * (1 + ref.total_cost_m)) ++mismatch;
+                    }
+                    if (path.status == algorithms::RouteStatus::Success) ++ok; else ++unreachable;
+                    continue;
+                }
+                query.push_back(ms(t));
+                if (path.status == algorithms::RouteStatus::Success) ++ok; else ++unreachable;
+            }
+            double total = 0;
+            for (double v : query) total += v; // excludes the reference check
+            (void)all;
+            const auto q = stats(query);
+            std::printf("%s,%.0f,%zu,%zu,%.1f,%.2f,%.2f,%zu,%.1f,%s,%d,%d,%d,%d,%.3f,%.3f,%zu,%.1f,%.3f,%d\n",
+                        legacy ? "legacy" : qPrintable(which), r, graph.nodes.size(), graph.edges.size(), loadMs,
+                        b.median, b.p95, b.n, rssDelta, driving ? "driving" : "general", kPairs, ok,
+                        unreachable, snapFail, q.median, q.p95, q.n, kPairs / (total / 1000), lenSum / 1000, mismatch);
+            std::fflush(stdout);
+        }
+    }
+    std::printf("# peak VmHWM %.1f MiB, backend %s\n", rssMiB("VmHWM:"), backendName.c_str());
+    return 0;
+}

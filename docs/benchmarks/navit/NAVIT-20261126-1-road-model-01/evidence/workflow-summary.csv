@@ -1,0 +1,13 @@
+file,group,mode,runs,ok,plan_med_ms,plan_p95_ms,alg_med_ms,len_ratio_med,len_ratio_min,len_ratio_max
+workflow-baseline.csv,city,general,60,54,54.8,161.2,4.50,1.00000,1.00000,1.00000
+workflow-baseline.csv,city,driving,60,51,64.1,128.7,5.30,1.00000,1.00000,1.00000
+workflow-baseline.csv,long,general,24,24,369.9,640.5,50.15,1.00000,1.00000,1.00000
+workflow-baseline.csv,long,driving,24,24,387.1,733.1,49.70,1.00000,1.00000,1.00000
+workflow-A.csv,city,general,60,57,62.2,168.0,1.00,1.00000,1.00000,1.00000
+workflow-A.csv,city,driving,60,51,64.3,130.9,0.70,1.00000,1.00000,1.00000
+workflow-A.csv,long,general,24,24,388.2,690.5,9.20,1.00000,1.00000,1.00000
+workflow-A.csv,long,driving,24,24,376.6,706.5,8.55,1.00000,1.00000,1.00000
+workflow-B.csv,city,general,60,57,82.9,252.7,4.50,0.99874,0.99815,1.00107
+workflow-B.csv,city,driving,60,51,83.0,198.6,3.30,0.99888,0.99815,1.00107
+workflow-B.csv,long,general,24,24,497.1,941.2,46.35,1.00052,0.99759,1.00128
+workflow-B.csv,long,driving,24,24,489.0,948.4,41.80,1.00051,0.99761,1.00128

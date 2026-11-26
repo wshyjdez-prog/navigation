@@ -1,6 +1,8 @@
 # P1 Linux 导航应用：总体规划与实现状态
 
-最后更新：2026-11-23（Asia/Shanghai）。组员：1、2、3、4、5。
+最后更新：2026-11-26（Asia/Shanghai）。组员：1、2、3、4、5。
+
+当前路网建模增量（2026-11-26，1 号授权跨模块修改；主责 3 号，影响 2、4 号）：`NavigationWorkflow` 中自写的路网建模（等距圆柱投影、GraphData 转换、网格/线性扫描吸附、每次查询都要重建的 Boost 图）改为开源实现：新模块 `src/algorithms/roadmodel/`，用 **Boost.Graph `compressed_sparse_row_graph`**（每个路网建一次；行车模式用 `filtered_graph`）、**Boost.Geometry R*-tree** 吸附（按模式和方向过滤）、Boost.Geometry srs 横轴墨卡托投影与 haversine 边长，`astar_search` 以地表直线距离为下界。数据导入模块与 `OsmxDataset`/`ImportedDataset` 契约不变。按 `DEC-20261126-1-road-model-01` 实测了 A（Boost 一体）和 B（Boost+GeographicLib），组员 1 选 A，B 已清理，不新增依赖。根 CTest 23/23。湖北 10 km 路网单次查询中位 43.3→1.47 ms，建网 14→65 ms；端到端规划与旧实现持平（−2% 至 +18%）；Navit 对标受阻（`NAVIT-20261126-1-road-model-01`）。需 3、4 号评审，模块保持进行中。详见下方 2026-11-26 记录。
 
 当前语音增量（2026-11-23，1 号，第 3 次作业本人部分）：新增语音 PAL **LinuxVoiceAdapter**——`libp1_voice.so` 只导出纯 C ABI（`include/contracts/VoiceFfi.h`，10 个 `p1_voice_*` 函数），speak() 调本地 **Piper** 中文 TTS、listen() 调本地 **Vosk** 普通话 ASR，回调只在分发线程串行送达核心层，销毁后零回调；Qt 侧 `VoiceService`/`VoiceNavigationBridge` 把引导播报、偏航/到达打断、语音指令接到 4 号 `NavigationController` 契约；新增“语音助手”页面、麦克风探测与应用内同意、Flatpak 权限声明模板、离线语音资源安装（`share/p1-navigation/voice`）。G10（X09）无接口，按组员 1 要求以开源本地语音代替。后端按 `DEC-20261123-1-voice-backend-01` 对 espeak-ng+Vosk / speech-dispatcher+Vosk / Piper+whisper.cpp 实测后，组员 1 选定 **Piper+Vosk**，其余已清理。根 CTest 22/22。**虚拟机无声卡/麦克风，真人语音与扬声器听感未测；4 号状态机尚未实现，桥接用契约 Fake 验证**；Navit 对标部分完成（`NAVIT-20261123-1-voice-01`）。详见 [语音适配说明](docs/voice-adapter.md) 与下方 2026-11-23 记录。
 
@@ -467,7 +469,7 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 
 - 负责人：1（用户授权的跨模块修改）；路径规划主责 3、导航 4，**需提示 3、4 号评审**。状态：**进行中**。功能与自动化测试完成；组员 1 确认不补做第 7 节方案对比（原文“不用，就这样”）；Navit 规划耗时对比受阻。
 - 能力：地图菜单“路线模式”。一般模式为原行为；行车模式参照 Navit 0.5.7 car 车辆配置，只用机动车可通行的道路规划。
-- 代码/入口：`src/app/RoutingProfile.{h,cpp}`（`RouteMode`、`carAllowed()`）；`NavigationWorkflow::setRouteMode()/routeMode()/drivingGraph()` 与 `plan()` 中的行车分支（子图 + 车行道吸附）；`MapView.cpp` 菜单 `mapRouteModeMenu` / `routeModeGeneral` / `routeModeDriving`。A* 与 `RoutePlanner` 契约未改，FMM 匹配仍用全网。
+- 代码/入口：`src/app/RoutingProfile.{h,cpp}`（`RouteMode`、`carAllowed()`）；`NavigationWorkflow::setRouteMode()/routeMode()` 与 `plan()` 中的行车分支（子图 + 车行道吸附；2026-11-26 起子图与吸附改由路网模型的 `filtered_graph` 与 R*-tree 提供，`drivingGraph()` 已删除，规则 `carAllowed()` 不变）；`MapView.cpp` 菜单 `mapRouteModeMenu` / `routeModeGeneral` / `routeModeDriving`。A* 与 `RoutePlanner` 契约未改，FMM 匹配仍用全网。
 - 规则：允许 motorway…tertiary（含 link）、unclassified、residential、living_street、service、track（grade4/5、ground/grass 除外）、ferry；排除 pedestrian、footway、path、cycleway、steps、bridleway、construction 及其他类型；`motorcar/motor_vehicle/vehicle` 取 no/private/agricultural/forestry/delivery/destination 时排除。逐项对照见 `NAVIT-20261111-1-route-mode-01`。
 - 测试：`drivingModeExcludesNonCarRoads`、`routeModeMenu`；根 CTest 19/19。
 - 湖北实测（武汉中心 3 km，40 对随机起终点）：一般模式 35 条成功路线中 19 条经过非机动车道路（中位 180 m）；行车模式全部避开，距离中位 1.001 倍、最大 1.352 倍；A* 中位 3.49 → 2.43 ms，构建子图约 1.1 ms。
@@ -504,3 +506,17 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 未实现/未验证内容、下一步与涉及组员：真人语音识别与扬声器听感（需带麦克风的机器，1 号）；4 号 NavigationController 实现后调用 VoiceNavigationBridge::attach() 接入并补端到端测试（1/4 号）；开始导航/重新规划/导航到等指令的应用层处理需 3/4 号规划入口；Flatpak 构建与沙箱授权实测（1 号）；zh_CN-huayan 音色许可核实；G6 联调确认 FFI 形状（4 号牵头）。
 关联日志 / 已有提交：ai_log 对话 26；未提交。
 ```
+
+### 2026-11-26：路网建模改用开源算法（Boost.Graph CSR + Boost.Geometry R*-tree）
+
+- 负责人：1（用户授权的跨模块修改）；路网建模主责 3，数据契约 2（未改），规划调用 4。**需提示 3、4 号评审。** 状态：**进行中**。功能、回归、方案抉择与清理已完成；Navit 对标受阻，3、4 号尚未评审。
+- 能力：每个加载的路网建一次不可变的 `RoadModel`，提供投影/反投影、地表距离、按模式和方向的吸附、带下界的 A*，并导出 `GraphData`（供 FMM 与旧 `findRoute`）。
+- 代码/入口：`src/algorithms/roadmodel/RoadModel.h`（契约，`build(Input, cancel)`）、`BoostCsrModel.cpp`（Boost.Geometry srs `tmerc` + haversine R=6371008.8 m + CSR 图）、`detail/ModelImpl.h`（`filtered_graph` 行车视图、`astar_search` 直线下界、R*-tree 打包加载）；CMake 目标 `p1_algorithms_roadmodel`（只依赖 Boost 1.83）。`NavigationWorkflow::buildNetwork()` 组装输入，按道路缓存 `carAllowed()`；`RoadNetwork` 改为持有 `model`，`graph()` 改为访问器，删除 `lat0/lon0/metresLat/metresLon` 与 `drivingGraph()`。
+- 接口与数据约定：节点索引即 OSMX 节点索引；`NodeId = 索引 + 1`，`EdgeId = OSMX 边索引 + 1`（与旧版相同，FMM shapefile 不变）。坐标系为局部横轴墨卡托（原点为路网中心，单位米），定义写在 `GraphData.metadata.frame.definition`。吸附半径 500 m；起点要求有出边，终点要求有入边，行车模式要求机动车边。模型不可变、查询为 const，可在 worker 并发调用；GUI 线程只调用 project/unproject。
+- 行为变化：一般模式吸附不再因为“最近节点不能作为端点”而直接失败，会取最近的可用节点（湖北城区 20 对中多成功 1 对）；路线长度与旧版相同（边长口径一致）。
+- 测试：`member3-roadmodel` 7/7（投影往返 < 1e-6 m、单行线、行车过滤、方向吸附、与穷举 A* 代价一致、取消、非法输入）；`BusinessTests` 增加模型路线与导出 GraphData 一致的断言；根 CTest 23/23（统一基线 Ubuntu 24.04.5 虚拟机，全新 Release 构建）。
+- 实测（湖北缓存，武昌）：10 km 路网（15.5 万节点）一般模式查询中位/P95 43.3/53.2 → 1.47/6.50 ms，建网 14.3 → 65.2 ms；端到端城区一般 54.8 → 64.5 ms、跨城一般 369.9 → 392.2 ms、跨城行车 387.1 → 379.6 ms；进程峰值 RSS 309 → 265 MiB。
+- 方案：`DEC-20261126-1-road-model-01`（A Boost 一体 / B Boost+GeographicLib，组员 1 选 A；B、GeographicLib 探测、试验开关与测试程序已清理）。课程算法说明：A* 仍是 3 号接入的 Boost.Graph `astar_search`（`DEC-20261101-3-open-source-01`），本次只是换成持久图与可采纳启发式；全部开源组件均来自 Boost 1.83.0（BSL-1.0），没有修改其源码。
+- 未实现 / 限制：建网成本约为旧实现的 4.5 倍，在每次规划都重建路网（终点超出已加载区域、分级路网）的场景下端到端没有变快；没有速度剖面和转向限制；Navit 同口径耗时未测。
+- 下一步：3、4 号评审；可考虑缓存最近一次的路网模型或扩大预加载范围以减少重建；补 Navit 0.5.7 `route_graph_build`/`route_path_new` 计时对比。
+- 记录：`DEC-20261126-1-road-model-01`、`NAVIT-20261126-1-road-model-01`、AI 日志 27；未提交。

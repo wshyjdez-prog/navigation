@@ -57,10 +57,14 @@ private slots:
     void regionalRoads(){data::ImportedDataset cache(imported_.cachePath);auto ds=cache.roads({30.59,114.30,30.60,114.31,true});
         QCOMPARE(ds->wayCount(),quint32(2));QCOMPARE(ds->nodeCount(),quint32(5));QCOMPARE(ds->edges().size(),4);
         QCOMPARE(ds->displayName(*ds->wayIndex(10)),QString("真实数据测试路"));
-        auto n=app::NavigationWorkflow::buildNetwork(ds);QCOMPARE(n->graph.edges.size(),size_t(4));
-        auto path=algorithms::findRoute(n->graph,algorithms::model::NodeId(1),algorithms::model::NodeId(3));
+        auto n=app::NavigationWorkflow::buildNetwork(ds);QCOMPARE(n->graph().edges.size(),size_t(4));
+        auto path=algorithms::findRoute(n->graph(),algorithms::model::NodeId(1),algorithms::model::NodeId(3));
         QCOMPARE(path.status,algorithms::RouteStatus::Success);QVERIFY(path.total_distance_m>180&&path.total_distance_m<200);
-        QCOMPARE(algorithms::findRoute(n->graph,algorithms::model::NodeId(3),algorithms::model::NodeId(1)).status,algorithms::RouteStatus::Unreachable);
+        QCOMPARE(algorithms::findRoute(n->graph(),algorithms::model::NodeId(3),algorithms::model::NodeId(1)).status,algorithms::RouteStatus::Unreachable);
+        // The persistent road model gives the same answer as the exported GraphData.
+        const auto modelled=n->model->route(0,2,algorithms::roadmodel::Profile::General);
+        QCOMPARE(modelled.status,algorithms::RouteStatus::Success);QVERIFY(std::abs(modelled.total_distance_m-path.total_distance_m)<1e-6);
+        QCOMPARE(n->model->route(2,0,algorithms::roadmodel::Profile::General).status,algorithms::RouteStatus::Unreachable);
         auto c=std::make_shared<std::atomic_bool>(true);QVERIFY_EXCEPTION_THROWN(cache.roads({30.59,114.30,30.60,114.31,true},c),std::runtime_error);}
     void routeAndCancel(){app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);
         flow.load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);QVERIFY(flow.state().network);
@@ -271,7 +275,7 @@ private slots:
         {   // The old fixed 1 km margin alone has no path.
             const double dy=1000./111195.08,dx=dy/std::cos(30.5*std::acos(-1.)/180);
             auto ds=data::ImportedDataset(entry.cachePath).roads({30.5-dy,114.30-dx,30.5+dy,114.31+dx,true});auto n=app::NavigationWorkflow::buildNetwork(ds);
-            QCOMPARE(algorithms::findRoute(n->graph,algorithms::model::NodeId(*ds->nearestNode(30.5,114.30,10)+1),algorithms::model::NodeId(*ds->nearestNode(30.5,114.31,10)+1)).status,algorithms::RouteStatus::Unreachable);
+            QCOMPARE(n->model->route(*ds->nearestNode(30.5,114.30,10),*ds->nearestNode(30.5,114.31,10),algorithms::roadmodel::Profile::General).status,algorithms::RouteStatus::Unreachable);
         }
         flow.plan({114.30,30.5},{114.31,30.5});QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);
         QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
@@ -420,8 +424,8 @@ private slots:
             if(i>=0)redraws.append(QJsonObject{{"request_to_frame_ms",clock.nsecsElapsed()/1e6},
                 {"worker_ms",canvas->property("renderElapsedMs").toDouble()},{"base_cache_hit",canvas->property("cacheHit").toBool()}});}
         const auto network=flow.state().network;const auto bounds=network->roads->bounds();
-        double width=(bounds.maxLon-bounds.minLon)*network->metresLon*1.1;
-        double height=(bounds.maxLat-bounds.minLat)*network->metresLat*1.1;
+        double width=(network->project({bounds.maxLon,bounds.centerLat()}).x()-network->project({bounds.minLon,bounds.centerLat()}).x())*1.1;
+        double height=(network->project({bounds.centerLon(),bounds.maxLat}).y()-network->project({bounds.centerLon(),bounds.minLat}).y())*1.1;
         const double aspect=double(canvas->width())/canvas->height();width=std::max(width,height*aspect);height=width/aspect;
         const QJsonObject viewport{{"width_px",canvas->width()},{"height_px",canvas->height()},
             {"width_m",width},{"height_m",height},{"center_lon",bounds.centerLon()},{"center_lat",bounds.centerLat()}};

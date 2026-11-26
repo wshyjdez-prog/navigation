@@ -1,0 +1,66 @@
+// Trial benchmark (DEC-20261126-1-road-model-01), removed after the choice.
+// End-to-end planning through NavigationWorkflow, the same flow as the map:
+// load 1 km around the start, then plan. Uses only the public workflow API,
+// so the same file also builds against the pre-change baseline.
+// usage: p1-workflow-bench <imported.sqlite> [repeats]
+#include "app/NavigationWorkflow.h"
+#include "contracts/ImportedDataset.h"
+
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QEventLoop>
+#include <QFile>
+#include <QSignalSpy>
+#include <QTimer>
+#include <cmath>
+#include <cstdio>
+#include <random>
+
+using namespace p1;
+static void waitDone(QSignalSpy& s, int n) {
+    QEventLoop l; QTimer t;
+    QObject::connect(&t, &QTimer::timeout, &l, [&] { if (s.count() >= n) l.quit(); });
+    t.start(2); QTimer::singleShot(600000, &l, &QEventLoop::quit); l.exec();
+}
+static double hwmMiB() {
+    QFile f("/proc/self/status");
+    if (!f.open(QIODevice::ReadOnly)) return -1;
+    for (const auto& l : f.readAll().split('\n'))
+        if (l.startsWith("VmHWM:")) return l.mid(6).trimmed().split(' ').first().toDouble() / 1024;
+    return -1;
+}
+
+int main(int argc, char** argv) {
+    QCoreApplication app(argc, argv);
+    const auto entry = data::ImportedDataset(argv[1]).summary();
+    const int repeats = argc > 2 ? std::atoi(argv[2]) : 3;
+    struct Case { QString name; double lat, lon, toLat, toLon; };
+    const double fLat = 30.5530, fLon = 114.3200;
+    QVector<Case> cases{{"黄州商场", fLat, fLon, 30.4499096, 114.8652227}, {"鄂州", fLat, fLon, 30.3910, 114.8950},
+                        {"孝感", fLat, fLon, 30.9240, 113.9170}, {"咸宁", fLat, fLon, 29.8410, 114.3220},
+                        {"荆州", fLat, fLon, 30.3350, 112.2400}, {"襄阳", fLat, fLon, 32.0090, 112.1220},
+                        {"宜昌", fLat, fLon, 30.6920, 111.2860}, {"十堰", fLat, fLon, 32.6290, 110.7980}};
+    std::mt19937 rng(20261126);
+    std::uniform_real_distribution<double> u(-1, 1);
+    for (int i = 0; i < 20; ++i) // city pairs within ~12 km of the centre
+        cases.append({QString("城区%1").arg(i + 1), fLat + u(rng) * 0.1, fLon + u(rng) * 0.12, fLat + u(rng) * 0.1, fLon + u(rng) * 0.12});
+    std::printf("case,mode,repeat,ok,straight_km,route_km,plan_ms,algorithm_ms,edges,status\n");
+    for (const auto& c : cases)
+        for (bool driving : {false, true})
+            for (int r = 0; r < repeats; ++r) {
+                app::NavigationWorkflow flow;
+                QSignalSpy done(&flow, &app::NavigationWorkflow::completed);
+                flow.load(entry, c.lat, c.lon, 1); waitDone(done, 1);
+                flow.setRouteMode(driving ? app::RouteMode::Driving : app::RouteMode::General);
+                QElapsedTimer t; t.start();
+                flow.plan({c.lon, c.lat}, {c.toLon, c.toLat}); waitDone(done, 2);
+                const double planMs = t.nsecsElapsed() / 1e6;
+                const bool ok = done.count() >= 2 && done.last()[1].toBool();
+                std::printf("%s,%s,%d,%d,%.2f,%.3f,%.1f,%.1f,%d,%s\n", qPrintable(c.name), driving ? "driving" : "general", r,
+                            int(ok), data::osmxDistanceMeters(c.lat, c.lon, c.toLat, c.toLon) / 1000,
+                            ok ? flow.state().distanceM / 1000 : 0., planMs, ok ? flow.lastResult().algorithmMs : 0.,
+                            ok ? flow.lastResult().count : 0, qPrintable(flow.status().replace(',', ';').left(80)));
+                std::fflush(stdout);
+            }
+    std::printf("# peak VmHWM %.1f MiB\n", hwmMiB());
+}

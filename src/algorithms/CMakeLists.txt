@@ -36,6 +36,12 @@ if(P1_ALGORITHMS_BUILD_ASTAR)
     target_link_libraries(p1_algorithms_astar PUBLIC p1_algorithms_model PRIVATE Boost::headers)
     set_target_properties(p1_algorithms_astar PROPERTIES
         CXX_EXTENSIONS OFF AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+    # Road network model (DEC-20261126-1-road-model-01, scheme A; Boost only).
+    add_library(p1_algorithms_roadmodel STATIC
+        roadmodel/BoostCsrModel.cpp roadmodel/RoadModel.h roadmodel/detail/ModelImpl.h)
+    target_link_libraries(p1_algorithms_roadmodel PUBLIC p1_algorithms_astar PRIVATE Boost::headers)
+    set_target_properties(p1_algorithms_roadmodel PROPERTIES
+        CXX_EXTENSIONS OFF AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
     add_executable(p1_algorithms_astar_demo demo/AStarDemo.cpp)
     target_link_libraries(p1_algorithms_astar_demo PRIVATE p1_algorithms_astar Boost::headers)
     set_target_properties(p1_algorithms_astar_demo PROPERTIES
@@ -46,6 +52,11 @@ if(P1_ALGORITHMS_BUILD_ASTAR)
         set_target_properties(p1_algorithms_astar_tests PROPERTIES
             CXX_EXTENSIONS OFF AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
         add_test(NAME member3-astar COMMAND p1_algorithms_astar_tests)
+        add_executable(p1_algorithms_roadmodel_tests tests/RoadModelTests.cpp)
+        target_link_libraries(p1_algorithms_roadmodel_tests PRIVATE p1_algorithms_roadmodel)
+        set_target_properties(p1_algorithms_roadmodel_tests PROPERTIES
+            CXX_EXTENSIONS OFF AUTOMOC OFF AUTOUIC OFF AUTORCC OFF)
+        add_test(NAME member3-roadmodel COMMAND p1_algorithms_roadmodel_tests)
     endif()
 endif()
 
@@ -124,6 +135,7 @@ endif()
 
 foreach(model_target p1_algorithms_model p1_algorithms_model_tests
         p1_algorithms_astar p1_algorithms_astar_tests p1_algorithms_astar_demo
+        p1_algorithms_roadmodel p1_algorithms_roadmodel_tests
         p1_algorithms_route_planner p1_algorithms_route_planner_tests
         p1_algorithms_fmm p1_algorithms_fmm_tests p1_algorithms_fmm_process_fixture)
     if(TARGET ${model_target})
