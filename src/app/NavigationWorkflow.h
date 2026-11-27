@@ -44,7 +44,20 @@ public:
     // Applies to the next plan(); matching keeps the full network.
     void setRouteMode(RouteMode mode);
     RouteMode routeMode() const { return routeMode_; }
+    // Matches a WGS84 trajectory CSV ("latitude,longitude") with the real FMM.
     void match(const QString& csvPath);
+    // Track points set on the map (x=longitude, y=latitude), kept in order.
+    // Changing them clears the previous matching result.
+    static constexpr int kMaxTrackPoints=256;
+    void addTrackPoint(QPointF geo);
+    void clearTrackPoints();
+    const QVector<QPointF>& trackPoints() const { return trackPoints_; }
+    // Writes the track points as the CSV match() reads; returns an error text,
+    // empty on success. GUI thread (at most kMaxTrackPoints lines).
+    QString exportTrackPoints(const QString& path) const;
+    // FMM/HMM matching of the track points (2..kMaxTrackPoints); a regional
+    // network is reloaded around them when they leave the loaded area.
+    void matchTrackPoints();
     void cancel();
     void beginMapPick(bool start);
     void acceptMapPoint(QPointF geo);
@@ -71,6 +84,7 @@ signals:
     void endpointSelected(bool start, QPointF geo);
 private:
     void run(const QString& kind, std::function<WorkflowResult(std::shared_ptr<std::atomic_bool>)>);
+    void runMatch(QVector<QPointF> points, QString csvPath);
     QThreadPool pool_;
     QVector<std::shared_ptr<std::atomic_bool>> cancellations_;
     quint64 generation_=0;
@@ -81,6 +95,7 @@ private:
     WorkflowResult lastResult_;
     std::optional<ImportResult> activeDataset_, pendingDataset_;
     std::optional<QPointF> startPoint_, endPoint_;
+    QVector<QPointF> trackPoints_;
     quint64 datasetRevision_=0;
     RouteMode routeMode_=RouteMode::General;
 };

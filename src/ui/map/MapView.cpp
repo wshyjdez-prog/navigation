@@ -14,6 +14,8 @@
 #include "ui/common/Theme.h"
 #include <QtConcurrent>
 #include <QContextMenuEvent>
+#include <QDir>
+#include <QFileDialog>
 #include <QElapsedTimer>
 #include <QFutureWatcher>
 #include <QGridLayout>
@@ -132,7 +134,7 @@ QString poiShortName(const QString& name) {
 Prepared draw(const app::WorkflowResult& state,std::shared_ptr<const app::RoadNetwork> projection,
     quint64 roadsRevision,QRectF view,QSize size,MapColors colors,
     std::optional<QPointF> start,std::optional<QPointF> end,QImage cache,QString key,QImage previousTile,QString previousTileKey,QImage pyramidBase,QRectF pyramidView,
-    QVector<QPair<QPointF,QString>> pois,int selectedPoi) {
+    QVector<QPair<QPointF,QString>> pois,int selectedPoi,QVector<QPointF> track) {
     QElapsedTimer timer;timer.start();Prepared out;renderer::MapScene scene;
     scene.logicalSize=size;scene.source=renderer::MapSource::Real;
     scene.dataVersion=projection?projection->version:"empty";
@@ -155,7 +157,10 @@ Prepared draw(const app::WorkflowResult& state,std::shared_ptr<const app::RoadNe
         for(const auto& pt:points) route.points.append(screen(pt));
         scene.routes.append(route);
     };
-    line(state.observations,"trajectory",colors.track,2,10);
+    // Track points set on the map are drawn below as a 3 px line with numbered
+    // dots; a CSV trajectory (different points) keeps the thin observation line.
+    if(state.observations!=track) line(state.observations,"trajectory",colors.track,2,10);
+    line(track,"trackPoints",colors.track,3,11);
     line(state.route,"astar",colors.route,6,12);
     line(state.matched,"fmm",QColor("#C16A1A"),5,14);
     if(projection&&start) scene.markers.append({"start",screen(*start),renderer::MarkerKind::Start,QColor("#23875B"),"A",10,20});
@@ -203,6 +208,31 @@ Prepared draw(const app::WorkflowResult& state,std::shared_ptr<const app::RoadNe
             names.append(*spot);QPainterPath text;text.addText(QPointF(spot->left()+2,baseline),font,label);
             p.setBrush(Qt::NoBrush);p.setPen(QPen(colors.labelHalo,3,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));p.drawPath(text);
             p.setPen(Qt::NoPen);p.setBrush(i==selectedPoi?colors.poiSelected:colors.poi);p.drawPath(text);
+        }
+        // Track points: numbered dots on top of the matched path.
+        for(int i=0;i<track.size();++i){
+            const auto c=screen(track[i]);const QString number=QString::number(i+1);const double r=number.size()>2?11:9;
+            p.setPen(QPen(colors.labelHalo,1.5));p.setBrush(colors.track);p.drawEllipse(c,r,r);
+            QFont font=p.font();font.setPixelSize(number.size()>2?9:11);font.setBold(true);p.setFont(font);p.setPen(colors.land);
+            p.drawText(QRectF(c.x()-r,c.y()-r,2*r,2*r),Qt::AlignCenter,number);
+        }
+        p.setFont(QFont());
+        // Legend (bottom-right) while track points or a matched path are shown.
+        if(track.size()>0||state.matched.size()>1){
+            QFont font=p.font();font.setPixelSize(12);p.setFont(font);const QFontMetricsF fm(font);
+            QVector<std::tuple<QColor,QString,bool>> rows;
+            if(!track.isEmpty()) rows.append({colors.track,QString("轨迹点（%1 个）").arg(track.size()),true});
+            if(state.matched.size()>1) rows.append({QColor("#C16A1A"),QStringLiteral("地图匹配路径（FMM/HMM）"),false});
+            double y=size.height()-16-(rows.size()-1)*20.;
+            for(const auto& [color,text,dot]:rows){
+                const double x=size.width()-20-fm.horizontalAdvance(text);
+                if(dot){p.setPen(QPen(colors.labelHalo,1.5));p.setBrush(color);p.drawEllipse(QPointF(x-14,y-fm.ascent()/2+1),5,5);}
+                else{p.setPen(QPen(color,4,Qt::SolidLine,Qt::RoundCap));p.drawLine(QPointF(x-24,y-fm.ascent()/2+1),QPointF(x-6,y-fm.ascent()/2+1));}
+                QPainterPath path;path.addText(QPointF(x,y),font,text);
+                p.setBrush(Qt::NoBrush);p.setPen(QPen(colors.labelHalo,3,Qt::SolidLine,Qt::RoundCap,Qt::RoundJoin));p.drawPath(path);
+                p.setPen(Qt::NoPen);p.setBrush(colors.label);p.drawPath(path);y+=20;
+            }
+            p.setFont(QFont());
         }
         p.setBrush(Qt::NoBrush);p.setPen(QPen(colors.label,2));
         const auto center=mapUnproject(view.center());const double metresPerPixel=view.width()/size.width()*std::cos(center.y()*std::acos(-1.)/180.);
@@ -293,11 +323,19 @@ public:
             connect(action,&QAction::triggered,this,[this,level=level]{pyramid_.setClarity(level);if(projection_)loadVisible();});
         }
         connect(menu_->addAction("清除起终点与路线"),&QAction::triggered,flow_,&app::NavigationWorkflow::clearEndpoints);
+        // Track points (right-click "设为轨迹点"): export as CSV, or FMM/HMM map matching.
+        menu_->addSeparator();
+        exportTrack_=menu_->addAction("导出轨迹点…");exportTrack_->setObjectName("exportTrackPoints");
+        connect(exportTrack_,&QAction::triggered,this,&MapPage::exportTrack);
+        matchTrack_=menu_->addAction("进行地图匹配");matchTrack_->setObjectName("matchTrackPoints");
+        connect(matchTrack_,&QAction::triggered,flow_,&app::NavigationWorkflow::matchTrackPoints);
+        clearTrack_=menu_->addAction("清除轨迹点");clearTrack_->setObjectName("clearTrackPoints");
+        connect(clearTrack_,&QAction::triggered,flow_,&app::NavigationWorkflow::clearTrackPoints);
         cancel_=menu_->addAction("取消当前计算");connect(cancel_,&QAction::triggered,flow_,&app::NavigationWorkflow::cancel);
         menu_->addSeparator();onlyMap_=menu_->addAction("仅显示地图　Ctrl+M");onlyMap_->setCheckable(true);
         connect(onlyMap_,&QAction::triggered,this,&MapPage::toggleMapOnlyRequested);
         connect(menu_->addAction("切换明暗主题"),&QAction::triggered,this,[this]{theme_.setDark(!theme_.isDark());});
-        connect(menu_,&QMenu::aboutToShow,this,[this]{onlyMap_->setChecked(window()->property("mapOnly").toBool());refreshDatasets();});
+        connect(menu_,&QMenu::aboutToShow,this,[this]{onlyMap_->setChecked(window()->property("mapOnly").toBool());refreshDatasets();updateTrackActions();});
         connect(plan_,&QPushButton::clicked,this,&MapPage::plan);
         auto* planShortcut=new QShortcut(QKeySequence("Ctrl+Return"),this);planShortcut->setContext(Qt::WidgetWithChildrenShortcut);
         connect(planShortcut,&QShortcut::activated,this,&MapPage::plan);
@@ -355,7 +393,8 @@ private:
             pyramid_.setDataset(*flow_->activeDataset(),projection_->roads);pyramidBase_={};regionStatus_.clear();fit();
         }
         plan_->setVisible(flow_->startPoint().has_value()&&flow_->endPoint().has_value());
-        plan_->setEnabled(!flow_->busy());cancel_->setEnabled(flow_->busy());
+        plan_->setEnabled(!flow_->busy());cancel_->setEnabled(flow_->busy());updateTrackActions();
+        canvas_->setProperty("trackPointCount",int(flow_->trackPoints().size()));
         if(lastStatus_!=flow_->status()) {
             lastStatus_=flow_->status();workflowStatus_=lastStatus_;noticeTimer_.stop();
             if(!flow_->busy()&&flow_->lastResult().ok) noticeTimer_.start();
@@ -364,6 +403,23 @@ private:
         schedule();
     }
     void plan() {if(!flow_->busy()&&flow_->startPoint()&&flow_->endPoint()) flow_->plan(*flow_->startPoint(),*flow_->endPoint());}
+    void updateTrackActions() {
+        const auto count=flow_->trackPoints().size();
+        exportTrack_->setEnabled(count>0);clearTrack_->setEnabled(count>0||flow_->state().matched.size()>1);
+        matchTrack_->setEnabled(projection_&&count>=2&&!flow_->busy());
+        matchTrack_->setText(count>=2?QString("进行地图匹配（%1 个轨迹点）").arg(count):QStringLiteral("进行地图匹配（至少 2 个轨迹点）"));
+    }
+    void exportTrack() {
+        if(flow_->trackPoints().isEmpty()) return;
+        // Tests set "trackExportPath" to skip the file dialog.
+        auto path=property("trackExportPath").toString();
+        if(path.isEmpty()) path=QFileDialog::getSaveFileName(this,"导出轨迹点",QDir::home().filePath("track-points.csv"),"CSV (*.csv)");
+        if(path.isEmpty()) return;
+        if(!path.endsWith(".csv",Qt::CaseInsensitive)) path+=".csv";
+        const auto error=flow_->exportTrackPoints(path);
+        workflowStatus_=error.isEmpty()?QString("已导出 %1 个轨迹点：%2").arg(flow_->trackPoints().size()).arg(QDir::toNativeSeparators(path)):"导出轨迹点失败："+error;
+        noticeTimer_.start();updateNotice();
+    }
     void showPointMenu(QPoint position) {
         if(!projection_) return;
         const QPointF point=geoPoint({double(position.x())/canvas_->width(),double(position.y())/canvas_->height()});
@@ -371,6 +427,9 @@ private:
         auto* menu=new QMenu(canvas_);menu->setObjectName("mapPointMenu");menu->setAttribute(Qt::WA_DeleteOnClose);
         auto* start=menu->addAction("设为起点");start->setObjectName("setMapStart");
         auto* end=menu->addAction("设为终点");end->setObjectName("setMapEnd");
+        auto* track=menu->addAction(QString("设为轨迹点（第 %1 个）").arg(flow_->trackPoints().size()+1));track->setObjectName("setTrackPoint");
+        track->setEnabled(flow_->trackPoints().size()<app::NavigationWorkflow::kMaxTrackPoints);
+        connect(track,&QAction::triggered,this,[this,point]{flow_->addTrackPoint(point);});
         connect(start,&QAction::triggered,this,[this,point]{flow_->setEndpoint(true,point);});
         connect(end,&QAction::triggered,this,[this,point]{flow_->setEndpoint(false,point);});
         menu->addSeparator();auto* route=menu->addAction("计算路线");route->setObjectName("planMapRoute");
@@ -488,7 +547,7 @@ private:
     }
     void fitResults() {
         if(!projection_) return;
-        QVector<QPointF> points=flow_->state().route;points+=flow_->state().matched;
+        QVector<QPointF> points=flow_->state().route;points+=flow_->state().matched;points+=flow_->trackPoints();
         if(points.isEmpty()) return;
         const auto first=mapProject(points.front());double left=first.x(),right=left,top=first.y(),bottom=top;
         for(const auto& geo:points) {const auto p=mapProject(geo);left=std::min(left,p.x());right=std::max(right,p.x());top=std::min(top,p.y());bottom=std::max(bottom,p.y());}
@@ -545,6 +604,7 @@ private:
         const auto pyramidBase=pyramidBase_;const auto pyramidView=pyramidView_;const bool complete=pyramidComplete_;
         const auto start=flow_->startPoint(),end=flow_->endPoint();
         QVector<QPair<QPointF,QString>> pois;for(const auto& hit:pois_)pois.append({QPointF(hit.poi.longitude,hit.poi.latitude),hit.poi.name});const int selectedPoi=selectedPoi_;
+        const auto track=flow_->trackPoints();
         auto* watcher=new QFutureWatcher<Prepared>(this);watcher_=watcher;
         connect(watcher,&QFutureWatcher<Prepared>::finished,this,[this,watcher,revision,view,complete] {
             const auto result=watcher->result();watcher_=nullptr;watcher->deleteLater();
@@ -560,12 +620,12 @@ private:
             }
             if(pending_||revision!=revision_) {pending_=false;debounce_.start();}
         });
-        watcher->setFuture(QtConcurrent::run([state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi] {
-            return draw(state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi);
+        watcher->setFuture(QtConcurrent::run([state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi,track] {
+            return draw(state,projection,roadsRevision,view,size,colors,start,end,image,key,tile,tileKey,pyramidBase,pyramidView,pois,selectedPoi,track);
         }));
     }
     Theme& theme_;app::NavigationWorkflow* flow_;QString directory_;
-    MapCanvas* canvas_;QPushButton* plan_;QMenu *menu_,*datasets_;QAction *onlyMap_,*cancel_;
+    MapCanvas* canvas_;QPushButton* plan_;QMenu *menu_,*datasets_;QAction *onlyMap_,*cancel_,*exportTrack_=nullptr,*matchTrack_=nullptr,*clearTrack_=nullptr;
     TilePyramid pyramid_;QImage pyramidBase_;QRectF pyramidView_;quint64 pyramidRevision_=0;bool pyramidComplete_=false;
     std::shared_ptr<const app::RoadNetwork> projection_;
     QRectF view_;QTimer debounce_,regionTimer_,noticeTimer_;

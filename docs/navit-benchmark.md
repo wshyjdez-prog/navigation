@@ -65,6 +65,7 @@ Navit 是否支持某项任务、能否在相同计时边界观测，须在实�
 | `NAVIT-20261111-1-long-route-01` / 2026-11-11 | 远距离路线规划（分级路网）/ 1 授权，主责 2、3、4 | 本组本地未提交工作区；Navit 0.5.7 car `route_depth` | 湖北，武昌到 8 个城市（53–406 km），两种模式 | 部分（本组已测；Navit 受阻） | 16/16 成功，0.33–0.74 s；与全量相比长度比中位 1.0004，最大 2.33 | [报告](benchmarks/navit/NAVIT-20261111-1-long-route-01.md) |
 | `NAVIT-20261123-1-voice-01` / 2026-11-23 | LinuxVoiceAdapter 本地 TTS/ASR / 1 | 本组 a6d13cf + 本轮修改；Navit 0.5.7 speech_cmdline | 20 句普通话导航文本，Piper 合成语音作识别输入 | 部分（播报总耗时已比较；首音/打断/ASR 不适用；espeak-ng 命令行未测） | 最终 Piper+Vosk 播报中位 1704 ms vs Navit spd-say 2763 ms（音色不同，不作效率结论）；试验期同后端 B 2757 vs 2763 ms 持平；Navit 无 ASR | [报告](benchmarks/navit/NAVIT-20261123-1-voice-01.md) |
 | `NAVIT-20261126-1-road-model-01` / 2026-11-26 | 路网建模开源化（Boost.Graph CSR + R*-tree）/ 1 授权，主责 3 | 本组 6b2fc50 + 本轮未提交修改；Navit 本机未安装 | 湖北缓存，武昌 1–10 km 区域 200 对；8 条跨城 + 20 对城区端到端 | 部分（本组前后与 A/B 已测；Navit 受阻） | 10 km 查询中位 43.3→1.47 ms，建网 14→65 ms；端到端与基线持平（−2% 至 +18%）；选 A | [报告](benchmarks/navit/NAVIT-20261126-1-road-model-01.md) |
+| `NAVIT-20261127-1-track-matching-01` / 2026-11-27 | 地图轨迹点导出与地图匹配 / 1（匹配算法 3 号，未改） | 本组 05edcd4 + 本轮未提交修改；Navit 本机未安装 | 湖北缓存，武昌 22 / 38 个轨迹点，FMM 19ef34e | 本组已测；Navit 不适用（无离线 HMM 匹配）/ 实时吸附受阻 | 6/6 成功，偏离中位 0 m、最大 13.5 m；单次请求约 47 s（约 80% 为 ubodt_gen） | [报告](benchmarks/navit/NAVIT-20261127-1-track-matching-01.md) |
 
 每次完成或受阻时更新索引和 `project.md` 的模块记录；算法试验还需在 `decision_log.md` 引用报告，将候选与正式方案区分。重要 AI 成果在 `ai_log.md` 记录摘要和报告 ID。阶段交付汇总全部模块，包括退化、未测和不适用项。
 
@@ -110,3 +111,4 @@ project.md / decision_log.md / ai_log.md 的引用与下一步：
 - 2026-11-11：[远距离路线规划](benchmarks/navit/NAVIT-20261111-1-long-route-01.md)，NAVIT-20261111-1-long-route-01：仿 Navit `route_depth` 分级加载，湖北 53–406 km 16/16 成功；Navit 同起终点耗时受阻未测。
 - 2026-11-23：[LinuxVoiceAdapter](benchmarks/navit/NAVIT-20261123-1-voice-01.md)，NAVIT-20261123-1-voice-01：三种语音组合与 Navit 0.5.7 speech_cmdline 等价路径实测，最终 Piper+Vosk 复测；Navit 无 ASR/打断/首音回调，espeak-ng 命令行配置未测。
 - 2026-11-26：[路网建模开源化](benchmarks/navit/NAVIT-20261126-1-road-model-01.md)，NAVIT-20261126-1-road-model-01：A/B 与旧实现在湖北同源数据上实测，选 A；查询快约 30 倍，建网慢约 4.5 倍，端到端持平；Navit 本机未安装，受阻未测。
+- 2026-11-27：[地图轨迹点与地图匹配](benchmarks/navit/NAVIT-20261127-1-track-matching-01.md)，NAVIT-20261127-1-track-matching-01：真实 FMM 在湖北数据上 6/6 成功；Navit 没有离线轨迹 HMM 匹配（不适用），实时吸附未测。

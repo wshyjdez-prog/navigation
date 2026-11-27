@@ -1,0 +1,13 @@
+date: 2026-11-27 16:53:24 CST
+Ubuntu 24.04.5 LTS
+CPU(s):                                  8
+Model name:                              13th Gen Intel(R) Core(TM) i7-13620H
+Mem:            9938        2859        2686         275        4947        7079
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+CMAKE_BUILD_TYPE:STRING=Release
+branch: codex/member-1/road-model-open-source @ 05edcd4 + uncommitted track-point changes
+fmm: cyang-kth/fmm 19ef34e1f57ff2f2484231aa0d01dfffea986ec1, built by tools/build-fmm-backend.sh into ~/fmm-backend
+libboost-serialization-dev:amd64 1.83.0.1ubuntu2
+libgdal-dev 3.8.4+dfsg-3ubuntu3
+dataset sha256 05b67d42f80733661a191bb7d91bc451470f45a9a8de37ecf06c75b56b939025
+navit: not installed

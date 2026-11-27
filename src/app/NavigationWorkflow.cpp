@@ -8,6 +8,7 @@
 #include <QFutureWatcher>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QSaveFile>
 #include <QTextStream>
 #include <QTemporaryDir>
 #include <QCoreApplication>
@@ -198,7 +199,9 @@ void NavigationWorkflow::run(const QString& kind,std::function<WorkflowResult(st
                 if(r.network) state_.network=r.network;
                 if(r.loadedArea.valid) state_.loadedArea=r.loadedArea;
             }
-            else { state_.observations=r.observations; state_.matched=r.matched; } }
+            else { state_.observations=r.observations; state_.matched=r.matched;
+                // Matching may have reloaded the roads around the track points.
+                if(r.network) { state_.network=r.network; if(r.loadedArea.valid) state_.loadedArea=r.loadedArea; } } }
         emit changed(); emit completed(kind,r.ok);
     });
     w->setFuture(QtConcurrent::run(&pool_,[fn=std::move(fn),token] {
@@ -325,23 +328,72 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
         return r;
     });
 }
-void NavigationWorkflow::match(const QString& path) {
-    auto n=state_.network;
-    run("FMM 匹配",[n,path](auto c) {
+void NavigationWorkflow::match(const QString& path) { runMatch({},path); }
+void NavigationWorkflow::addTrackPoint(QPointF geo) {
+    if(!std::isfinite(geo.x())||!std::isfinite(geo.y())||std::abs(geo.x())>180||std::abs(geo.y())>85) return;
+    if(trackPoints_.size()>=kMaxTrackPoints) {
+        status_=QString("轨迹点最多 %1 个；可先导出或清除").arg(kMaxTrackPoints);emit changed();return;}
+    if(busy_) cancel();
+    trackPoints_.append(geo);state_.observations.clear();state_.matched.clear();
+    status_=trackPoints_.size()<2?QString("已设第 1 个轨迹点；至少 2 个才能进行地图匹配")
+        :QString("已设第 %1 个轨迹点；可从菜单导出或进行地图匹配").arg(trackPoints_.size());
+    emit changed();
+}
+void NavigationWorkflow::clearTrackPoints() {
+    if(busy_) cancel();
+    trackPoints_.clear();state_.observations.clear();state_.matched.clear();
+    status_="已清除轨迹点与匹配结果";emit changed();
+}
+QString NavigationWorkflow::exportTrackPoints(const QString& path) const {
+    if(trackPoints_.isEmpty()) return QStringLiteral("没有可导出的轨迹点");
+    QSaveFile f(path);
+    if(!f.open(QIODevice::WriteOnly|QIODevice::Text)) return QString("无法写入：%1").arg(f.errorString());
+    QByteArray csv("latitude,longitude\n");
+    for(const auto& p:trackPoints_) csv+=QByteArray::number(p.y(),'f',9)+','+QByteArray::number(p.x(),'f',9)+'\n';
+    if(f.write(csv)!=csv.size()||!f.commit()) return QString("写入失败：%1").arg(f.errorString());
+    return {};
+}
+void NavigationWorkflow::matchTrackPoints() {
+    if(trackPoints_.size()<2) {status_="地图匹配至少需要 2 个轨迹点，请右键地图“设为轨迹点”";emit changed();return;}
+    runMatch(trackPoints_,{});
+}
+void NavigationWorkflow::runMatch(QVector<QPointF> geoPoints,QString path) {
+    auto n=state_.network;const auto entry=activeDataset_;
+    run("FMM 匹配",[n,entry,geoPoints=std::move(geoPoints),path](auto c) mutable {
         if(!n) throw std::runtime_error("请先加载路网");
-        QFile f(path); if(!f.open(QIODevice::ReadOnly)||f.size()>1024*1024) throw std::runtime_error("轨迹文件不可读或超过 1 MiB");
-        QTextStream in(&f); if(in.readLine().trimmed()!="latitude,longitude")
-            throw std::runtime_error("CSV 首行须为 latitude,longitude，坐标为 WGS84 度");
-        WorkflowResult r; std::vector<algorithms::FmmPoint> points;
-        while(!in.atEnd()) { check(c); const auto line=in.readLine().trimmed(); if(line.isEmpty()) continue;
-            const auto a=line.split(','); bool ok1=false,ok2=false;
-            const double lat=a.value(0).toDouble(&ok1),lon=a.value(1).toDouble(&ok2);
-            if(a.size()!=2||!ok1||!ok2||!std::isfinite(lat)||!std::isfinite(lon)||!n->roads->bounds().contains(lat,lon))
-                throw std::runtime_error("轨迹有非法坐标或位于已加载工作区域之外");
-            r.observations.append({lon,lat}); const auto p=n->project({lon,lat}); points.push_back({p.x(),p.y()});
-            if(points.size()>256) throw std::runtime_error("本次匹配支持 2–256 个轨迹点，请裁剪轨迹");
+        auto valid=[](double lat,double lon){return std::isfinite(lat)&&std::isfinite(lon)&&std::abs(lat)<=85&&std::abs(lon)<=180;};
+        if(!path.isEmpty()) {
+            QFile f(path); if(!f.open(QIODevice::ReadOnly)||f.size()>1024*1024) throw std::runtime_error("轨迹文件不可读或超过 1 MiB");
+            QTextStream in(&f); if(in.readLine().trimmed()!="latitude,longitude")
+                throw std::runtime_error("CSV 首行须为 latitude,longitude，坐标为 WGS84 度");
+            while(!in.atEnd()) { check(c); const auto line=in.readLine().trimmed(); if(line.isEmpty()) continue;
+                const auto a=line.split(','); bool ok1=false,ok2=false;
+                const double lat=a.value(0).toDouble(&ok1),lon=a.value(1).toDouble(&ok2);
+                if(a.size()!=2||!ok1||!ok2||!valid(lat,lon)) throw std::runtime_error("轨迹有非法坐标");
+                geoPoints.append({lon,lat});
+                if(geoPoints.size()>kMaxTrackPoints) throw std::runtime_error("本次匹配支持 2–256 个轨迹点，请裁剪轨迹");
+            }
         }
-        if(points.size()<2) throw std::runtime_error("匹配至少需要 2 个轨迹点");
+        if(geoPoints.size()<2) throw std::runtime_error("匹配至少需要 2 个轨迹点");
+        if(geoPoints.size()>kMaxTrackPoints) throw std::runtime_error("本次匹配支持 2–256 个轨迹点，请裁剪轨迹");
+        WorkflowResult r;
+        // Points outside the loaded area: a standard-OSM dataset reloads the
+        // roads of the points' box + 1 km (same regional adapter as planning).
+        auto inside=[&](const RoadNetwork& net){for(const auto& p:geoPoints)if(!net.roads->bounds().contains(p.y(),p.x()))return false;return true;};
+        if(!inside(*n)) {
+            if(!entry||entry->sourceFormat=="osmx") throw std::runtime_error("轨迹有点位于已加载工作区域之外");
+            double minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+            for(const auto& p:geoPoints){minLat=std::min(minLat,p.y());maxLat=std::max(maxLat,p.y());minLon=std::min(minLon,p.x());maxLon=std::max(maxLon,p.x());}
+            const double dy=1000/111195.08,dx=dy/std::cos((minLat+maxLat)*.5*std::acos(-1.)/180.);
+            const data::OsmxBounds area{std::max(-85.,minLat-dy),std::max(-180.,minLon-dx),std::min(85.,maxLat+dy),std::min(180.,maxLon+dx),true};
+            try { n=buildNetwork(data::ImportedDataset(entry->cachePath).roads(area,c),c); }
+            catch(const std::exception& e) { if(c&&c->load()) throw;
+                throw std::runtime_error(("无法加载轨迹所在区域的路网："+QString::fromUtf8(e.what())).toStdString()); }
+            if(!inside(*n)) throw std::runtime_error("轨迹有点位于导入数据范围之外");
+            r.network=n; r.loadedArea=area;
+        }
+        std::vector<algorithms::FmmPoint> points;
+        for(const auto& g:geoPoints) { r.observations.append(g); const auto p=n->project(g); points.push_back({p.x(),p.y()}); }
         const QString fmm=backend("fmm"),ubodt=backend("ubodt_gen");
         if(fmm.isEmpty()) throw std::runtime_error("找不到真实 FMM 后端，请检查安装");
         QTemporaryDir temp; if(!temp.isValid()) throw std::runtime_error("临时目录创建失败");

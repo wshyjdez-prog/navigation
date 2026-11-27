@@ -1,6 +1,8 @@
 # P1 Linux 导航应用：总体规划与实现状态
 
-最后更新：2026-11-26（Asia/Shanghai）。组员：1、2、3、4、5。
+最后更新：2026-11-27（Asia/Shanghai）。组员：1、2、3、4、5。
+
+当前轨迹点增量（2026-11-27，1 号；匹配算法属 3 号，未改）：地图右键新增“设为轨迹点（第 N 个）”，地图菜单新增“导出轨迹点…”（`latitude,longitude` CSV）、“进行地图匹配”、“清除轨迹点”。匹配复用真实 FMM/HMM；轨迹点超出已加载区域时，自动加载其外框 + 1 km 的道路。湖北真实数据 6/6 成功，偏离真实路线中位 0 m；单次约 47 s，主要是 UBODT 预计算。`map.track` 改回 design.md 的绿色。根 CTest 23/23。详见下方 2026-11-27 记录。
 
 当前路网建模增量（2026-11-26，1 号授权跨模块修改；主责 3 号，影响 2、4 号）：`NavigationWorkflow` 中自写的路网建模（等距圆柱投影、GraphData 转换、网格/线性扫描吸附、每次查询都要重建的 Boost 图）改为开源实现：新模块 `src/algorithms/roadmodel/`，用 **Boost.Graph `compressed_sparse_row_graph`**（每个路网建一次；行车模式用 `filtered_graph`）、**Boost.Geometry R*-tree** 吸附（按模式和方向过滤）、Boost.Geometry srs 横轴墨卡托投影与 haversine 边长，`astar_search` 以地表直线距离为下界。数据导入模块与 `OsmxDataset`/`ImportedDataset` 契约不变。按 `DEC-20261126-1-road-model-01` 实测了 A（Boost 一体）和 B（Boost+GeographicLib），组员 1 选 A，B 已清理，不新增依赖。根 CTest 23/23。湖北 10 km 路网单次查询中位 43.3→1.47 ms，建网 14→65 ms；端到端规划与旧实现持平（−2% 至 +18%）；Navit 对标受阻（`NAVIT-20261126-1-road-model-01`）。需 3、4 号评审，模块保持进行中。详见下方 2026-11-26 记录。
 
@@ -520,3 +522,15 @@ Navit 对标报告 ID、双方基线、主要差异、限制/未测或不适用�
 - 未实现 / 限制：建网成本约为旧实现的 4.5 倍，在每次规划都重建路网（终点超出已加载区域、分级路网）的场景下端到端没有变快；没有速度剖面和转向限制；Navit 同口径耗时未测。
 - 下一步：3、4 号评审；可考虑缓存最近一次的路网模型或扩大预加载范围以减少重建；补 Navit 0.5.7 `route_graph_build`/`route_path_new` 计时对比。
 - 记录：`DEC-20261126-1-road-model-01`、`NAVIT-20261126-1-road-model-01`、AI 日志 27；未提交。
+
+### 2026-11-27：地图轨迹点、导出与地图匹配
+
+- 负责人：1（地图页面与工作流装配）；匹配算法为 3 号的 FMM 适配（`DEC-20261101-3-open-source-01`，本次未改）。状态：**进行中**。功能、自动化测试与真实 FMM 实测已完成；匹配耗时偏高，Navit 不适用 / 受阻。
+- 能力：地图右键“设为轨迹点（第 N 个）”，按顺序追加，最多 256 个，以 `map.track` 绿色连线和带序号的圆点显示，右下角显示图例。地图菜单：“导出轨迹点…”另存为 `latitude,longitude` CSV，可被算法页“选择轨迹并运行 FMM”读回；“进行地图匹配（N 个轨迹点）”少于 2 个点时禁用；“清除轨迹点”。匹配结果为橙色线；“查看路线”会把轨迹点也纳入视野。
+- 代码/入口：`NavigationWorkflow::addTrackPoint()/clearTrackPoints()/trackPoints()/exportTrackPoints()/matchTrackPoints()`。CSV 匹配 `match()` 与轨迹点匹配共用 `runMatch()`：区域外的点（标准 OSM）先加载外框 + 1 km 的道路；结果带新路网时，会更新 `state().network/loadedArea`。地图：`MapView.cpp` 中的 `setTrackPoint`（右键）、`exportTrackPoints` / `matchTrackPoints` / `clearTrackPoints`（菜单），以及 `draw()` 的轨迹点与图例。
+- 行为变化：CSV 轨迹超出已加载区域时，原先直接报错，现在会先加载其区域（OSMX 仍报错）。`Theme.cpp` 的 `map.track` 由灰色改为 design.md 规定的 `#21684F` / `#90DBB8`，算法页图例改为“绿线：原始轨迹”。修正 `tools/build-fmm-backend.sh`：上游许可证文件名为 `LICENSE.TXT`。
+- 测试：`trackPointsExportAndMatch`（右键加点、菜单启用状态、导出往返、后端缺失时如实失败并保留点、区域外先加载道路、清除），已加入根 CTest 的 business-workflow。真实验收 `realTrackMatching` 为可选测试（需 `P1_REAL_MAP_CACHE` 与 `P1_FMM_*`）。根 CTest 23/23；`voice-adapter` 在 `ctest -j4` 下偶发失败，单独运行 3/3 通过，与本次改动无关。
+- 实测：湖北，FMM 19ef34e，两种场景各 3 次，全部成功。匹配偏离真实路线中位 / P95 为 0 m，最大 13.5 m；单次请求 46–48 s（fmm 约 9.5 s，其余主要是 ubodt_gen）；峰值 RSS 1.53 GiB（含子进程）。见 `NAVIT-20261127-1-track-matching-01`。
+- 限制：匹配慢且占内存，原因是每次都按 2000 m delta 重新生成整个区域的 UBODT；点间道路距离须在 2000 m 内；轨迹点不跨重启保存；没有拖动或删除单个点的功能。
+- 下一步：3 号评审，是否按路网版本缓存 UBODT，或缩小匹配范围 / delta；4 号可考虑把轨迹点用于模拟回放。
+- 记录：`NAVIT-20261127-1-track-matching-01`、AI 日志 28；design.md v1.3；未提交。
