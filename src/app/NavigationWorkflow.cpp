@@ -4,11 +4,11 @@
 #include "data/osmx/OsmxStore.h"
 #include "algorithms/core/BoostAStar.h"
 #include "algorithms/fmm/FmmClient.h"
-#include "navigation/GeoProjector.h"
 #include <QtConcurrent>
 #include <QFutureWatcher>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QSaveFile>
 #include <QTextStream>
 #include <QTemporaryDir>
 #include <QCoreApplication>
@@ -35,27 +35,15 @@ QString rss() {
 #endif
     return QStringLiteral("进程内存：当前平台未测");
 }
-quint32 snap(const RoadNetwork& n,QPointF geo,bool origin) {
+// Nearest node within 500 m that can start (origin) or end a route in the
+// selected mode: R*-tree nearest query filtered by out/in edges of that profile.
+quint32 snap(const RoadNetwork& n,QPointF geo,bool driving,bool origin) {
     if(!std::isfinite(geo.x())||!std::isfinite(geo.y())||std::abs(geo.x())>180||std::abs(geo.y())>90)
         throw std::runtime_error("起终点必须是有效 WGS84 经纬度");
-    const auto index=n.roads->nearestNode(geo.y(),geo.x(),500);
-    if(!index) throw std::runtime_error("选点 500 m 内没有路网节点，请靠近道路重选");
-    bool routable=false;
-    for(auto way:n.roads->incidentWays(*index)) if(n.roads->wayAt(way).attributes.isRoutable()) routable=true;
-    if(!routable || (origin&&n.roads->outgoingEdgeCount(*index)==0)) throw std::runtime_error("选点不能作为当前方向的路网端点，请重选");
-    return *index;
-}
-// Driving snap: nearest node (500 m) that a car can leave (origin) or reach.
-quint32 snapDriving(const RoadNetwork& n,const algorithms::model::GraphData& g,QPointF geo,bool origin) {
-    if(!std::isfinite(geo.x())||!std::isfinite(geo.y())||std::abs(geo.x())>180||std::abs(geo.y())>90)
-        throw std::runtime_error("起终点必须是有效 WGS84 经纬度");
-    std::vector<char> usable(n.roads->nodeCount(),0);
-    for(const auto& e:g.edges) usable[size_t((origin?e.from:e.to).value-1)]=1;
-    double best=500;std::optional<quint32> found;
-    for(quint32 i=0;i<n.roads->nodeCount();++i){if(!usable[i])continue;const auto& node=n.roads->nodeAt(i);
-        const double d=data::osmxDistanceMeters(geo.y(),geo.x(),node.lat,node.lon);if(d<=best){best=d;found=i;}}
-    if(!found) throw std::runtime_error("行车模式：选点 500 m 内没有机动车可通行道路，请靠近车行道重选");
-    return *found;
+    const auto hit=n.model->snap({geo.y(),geo.x()},driving?algorithms::roadmodel::Profile::Driving:algorithms::roadmodel::Profile::General,origin,500);
+    if(!hit) throw std::runtime_error(driving?"行车模式：选点 500 m 内没有机动车可通行道路，请靠近车行道重选"
+        :origin?"选点 500 m 内没有可出发的路网节点，请靠近道路重选":"选点 500 m 内没有可到达的路网节点，请靠近道路重选");
+    return *hit;
 }
 QString backend(const QString& name) {
     const auto env=qEnvironmentVariable(name=="fmm" ? "P1_FMM_EXECUTABLE":"P1_UBODT_EXECUTABLE");
@@ -67,14 +55,14 @@ QString backend(const QString& name) {
 // fields; two projected metre coordinates per directed edge. No GDAL dependency
 // leaks into the application. Files are ephemeral, owned by the matching task.
 void writeShape(const RoadNetwork& n,const QString& stem,const std::shared_ptr<std::atomic_bool>& c) {
-    const auto count=int(n.graph.edges.size());
+    const auto& graph=n.graph();const auto count=int(graph.edges.size());
     auto header=[&](QDataStream& s,int words) {
         s.setByteOrder(QDataStream::BigEndian); s<<qint32(9994);
         for(int i=0;i<5;++i) { s<<qint32(0); }
         s<<qint32(words);
         s.setByteOrder(QDataStream::LittleEndian); s<<qint32(1000)<<qint32(3);
         double xmin=1e100,ymin=1e100,xmax=-1e100,ymax=-1e100;
-        for(const auto& v:n.graph.nodes) { xmin=std::min(xmin,v.position.x_m); xmax=std::max(xmax,v.position.x_m);
+        for(const auto& v:graph.nodes) { xmin=std::min(xmin,v.position.x_m); xmax=std::max(xmax,v.position.x_m);
             ymin=std::min(ymin,v.position.y_m); ymax=std::max(ymax,v.position.y_m); }
         s<<xmin<<ymin<<xmax<<ymax<<0.0<<0.0<<0.0<<0.0;
     };
@@ -92,7 +80,7 @@ void writeShape(const RoadNetwork& n,const QString& stem,const std::shared_ptr<s
     h[128]=13; dbf.write(h);
     for(int i=0;i<count;++i) {
         if(i%1024==0) check(c);
-        const auto& e=n.graph.edges[size_t(i)]; const auto& a=e.geometry.front(); const auto& b=e.geometry.back();
+        const auto& e=graph.edges[size_t(i)]; const auto& a=e.geometry.front(); const auto& b=e.geometry.back();
         s.setByteOrder(QDataStream::BigEndian); s<<qint32(i+1)<<qint32(40);
         s.setByteOrder(QDataStream::LittleEndian); s<<qint32(3)<<std::min(a.x_m,b.x_m)<<std::min(a.y_m,b.y_m)
             <<std::max(a.x_m,b.x_m)<<std::max(a.y_m,b.y_m)<<qint32(1)<<qint32(2)<<qint32(0)<<a.x_m<<a.y_m<<b.x_m<<b.y_m;
@@ -120,59 +108,40 @@ void generateUbodt(const QString& executable,const QString& stem,const QString& 
         throw std::runtime_error(("UBODT 生成失败："+QString::fromUtf8(log+p.readAll()).right(800)).toStdString());
 }
 }
-QPointF RoadNetwork::project(QPointF g) const { return {(g.x()-lon0)*metresLon,(g.y()-lat0)*metresLat}; }
-QPointF RoadNetwork::unproject(QPointF m) const { return {lon0+m.x()/metresLon,lat0+m.y()/metresLat}; }
+QPointF RoadNetwork::project(QPointF g) const { const auto m=model->project({g.y(),g.x()}); return {m.x_m,m.y_m}; }
+QPointF RoadNetwork::unproject(QPointF m) const { const auto g=model->unproject({m.x(),m.y()}); return {g.lon_deg,g.lat_deg}; }
 std::shared_ptr<const RoadNetwork> NavigationWorkflow::buildNetwork(std::shared_ptr<const data::OsmxDataset> roads,
     const std::shared_ptr<std::atomic_bool>& cancel, quint32 maxNodes, int maxEdges) {
     if(!roads || roads->edges().isEmpty() || !roads->bounds().valid) throw std::runtime_error("数据集没有可规划的有向边");
     if(roads->nodeCount()>maxNodes||roads->edges().size()>maxEdges) throw std::runtime_error("路网过大，请使用区域加载");
+    if(std::abs(roads->bounds().centerLat())>85) throw std::runtime_error("当前局部投影不支持极地区域");
     auto n=std::make_shared<RoadNetwork>(); n->roads=std::move(roads);
-    n->lat0=n->roads->bounds().centerLat(); n->lon0=n->roads->bounds().centerLon();
-    n->metresLat=data::kOsmxEarthRadiusMeters*std::acos(-1.0)/180;
-    n->metresLon=n->metresLat*std::cos(n->lat0*std::acos(-1.0)/180);
-    if(n->metresLon<1000) throw std::runtime_error("当前局部投影不支持极地区域");
     QCryptographicHash subset(QCryptographicHash::Sha256);
     subset.addData(n->roads->info().sourceSha256.toUtf8());
     for(quint32 wi=0;wi<n->roads->wayCount();++wi) {
         subset.addData(QByteArray::number(n->roads->wayAt(wi).id)+',');
     }
     n->version=QString::fromLatin1(subset.result().toHex());
-    n->graph.metadata={n->roads->info().datasetId.toStdString(),n->version.toStdString(),"OSM road snapshot",
-        {algorithms::model::CoordinateSystem::LocalCartesian,algorithms::model::LengthUnit::Metres,
-         QString("equirectangular WGS84 origin=%1,%2; scales=%3,%4 m/deg").arg(n->lat0,0,'g',17)
-            .arg(n->lon0,0,'g',17).arg(n->metresLat,0,'g',17).arg(n->metresLon,0,'g',17).toStdString()}};
-    navigation::GeoProjector projector(n->lat0,n->lon0,n->metresLat,n->metresLon);
-    n->graph.nodes.reserve(n->roads->nodeCount());
-    n->graph.edges.reserve(size_t(n->roads->edges().size()));
+    algorithms::roadmodel::Input in;
+    in.metadata={n->roads->info().datasetId.toStdString(),n->version.toStdString(),"OSM road snapshot",{}};
+    in.origin={n->roads->bounds().centerLat(),n->roads->bounds().centerLon()};
+    in.nodes.reserve(n->roads->nodeCount());
     for(quint32 i=0;i<n->roads->nodeCount();++i) {
-        if(i%1024==0) { check(cancel); }
-        const auto& node=n->roads->nodeAt(i);
-        contracts::GeoCoordinate geo; geo.crs=contracts::CoordinateSystem::WGS84;
-        geo.latitudeDeg=node.lat; geo.longitudeDeg=node.lon;
-        const auto point=projector(geo);
-        if(!point || std::abs(node.lat)>90 || std::abs(node.lon)>180) throw std::runtime_error("路网包含非法 WGS84 坐标");
-        n->graph.nodes.push_back({algorithms::model::NodeId(i+1),*point});
+        if(i%4096==0) { check(cancel); }
+        const auto& node=n->roads->nodeAt(i); in.nodes.push_back({node.lat,node.lon});
     }
+    // Car rule per way (Navit car profile, DEC-20261111-1-route-mode-01).
+    std::vector<signed char> car(n->roads->wayCount(),-1);
+    in.edges.reserve(size_t(n->roads->edges().size()));
     for(int i=0;i<n->roads->edges().size();++i) {
-        if(i%1024==0) { check(cancel); }
+        if(i%4096==0) { check(cancel); }
         const auto& e=n->roads->edgeAt(quint32(i));
         if(e.from==e.to||e.lengthMeters<=0) continue;
-        n->graph.edges.push_back({algorithms::model::EdgeId(quint64(i)+1),algorithms::model::NodeId(e.from+1),
-            algorithms::model::NodeId(e.to+1),{n->graph.nodes[e.from].position,n->graph.nodes[e.to].position},
-            e.lengthMeters,e.lengthMeters});
+        if(car[e.way]<0) car[e.way]=carAllowed(*n->roads,e.way)?1:0;
+        in.edges.push_back({algorithms::model::EdgeId(quint64(i)+1),e.from,e.to,car[e.way]==1});
     }
-    if(n->graph.edges.empty()) throw std::runtime_error("路网没有有效的非零长度边");
+    n->model=algorithms::roadmodel::build(std::move(in),cancel);
     return n;
-}
-algorithms::model::GraphData NavigationWorkflow::drivingGraph(const RoadNetwork& n) {
-    algorithms::model::GraphData g;g.metadata=n.graph.metadata;g.nodes=n.graph.nodes;
-    std::vector<signed char> allowed(n.roads->wayCount(),-1);
-    for(const auto& e:n.graph.edges) {
-        const auto way=n.roads->edgeAt(quint32(e.id.value-1)).way;
-        if(allowed[way]<0) allowed[way]=carAllowed(*n.roads,way)?1:0;
-        if(allowed[way]) g.edges.push_back(e);
-    }
-    return g;
 }
 void NavigationWorkflow::setRouteMode(RouteMode mode) {
     if(mode==routeMode_) return;
@@ -230,7 +199,9 @@ void NavigationWorkflow::run(const QString& kind,std::function<WorkflowResult(st
                 if(r.network) state_.network=r.network;
                 if(r.loadedArea.valid) state_.loadedArea=r.loadedArea;
             }
-            else { state_.observations=r.observations; state_.matched=r.matched; } }
+            else { state_.observations=r.observations; state_.matched=r.matched;
+                // Matching may have reloaded the roads around the track points.
+                if(r.network) { state_.network=r.network; if(r.loadedArea.valid) state_.loadedArea=r.loadedArea; } } }
         emit changed(); emit completed(kind,r.ok);
     });
     w->setFuture(QtConcurrent::run(&pool_,[fn=std::move(fn),token] {
@@ -292,12 +263,11 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
         }
         const bool driving=mode==RouteMode::Driving;
         auto attempt=[&](const RoadNetwork& net,quint32& a,quint32& b){
-            const auto car=driving?drivingGraph(net):algorithms::model::GraphData{};
-            if(driving&&car.edges.empty()) throw std::runtime_error("行车模式：当前工作区域没有机动车可通行道路");
-            const auto& graph=driving?car:net.graph;
-            a=driving?snapDriving(net,car,start,true):snap(net,start,true);
-            b=driving?snapDriving(net,car,end,false):snap(net,end,false);
-            return algorithms::findRoute(graph,algorithms::model::NodeId(a+1),algorithms::model::NodeId(b+1),c);};
+            const auto profile=driving?algorithms::roadmodel::Profile::Driving:algorithms::roadmodel::Profile::General;
+            if(driving&&net.model->edge_count(profile)==0) throw std::runtime_error("行车模式：当前工作区域没有机动车可通行道路");
+            a=snap(net,start,driving,true);
+            b=snap(net,end,driving,false);
+            return net.model->route(a,b,profile,c);};
         quint32 a=0,b=0;algorithms::RoutePath path;
         if(n) path=attempt(*n,a,b); else path.status=algorithms::RouteStatus::Unreachable;
         // A route may have to leave the loaded rectangle (round a lake, to a
@@ -358,23 +328,72 @@ void NavigationWorkflow::plan(QPointF start,QPointF end) {
         return r;
     });
 }
-void NavigationWorkflow::match(const QString& path) {
-    auto n=state_.network;
-    run("FMM 匹配",[n,path](auto c) {
+void NavigationWorkflow::match(const QString& path) { runMatch({},path); }
+void NavigationWorkflow::addTrackPoint(QPointF geo) {
+    if(!std::isfinite(geo.x())||!std::isfinite(geo.y())||std::abs(geo.x())>180||std::abs(geo.y())>85) return;
+    if(trackPoints_.size()>=kMaxTrackPoints) {
+        status_=QString("轨迹点最多 %1 个；可先导出或清除").arg(kMaxTrackPoints);emit changed();return;}
+    if(busy_) cancel();
+    trackPoints_.append(geo);state_.observations.clear();state_.matched.clear();
+    status_=trackPoints_.size()<2?QString("已设第 1 个轨迹点；至少 2 个才能进行地图匹配")
+        :QString("已设第 %1 个轨迹点；可从菜单导出或进行地图匹配").arg(trackPoints_.size());
+    emit changed();
+}
+void NavigationWorkflow::clearTrackPoints() {
+    if(busy_) cancel();
+    trackPoints_.clear();state_.observations.clear();state_.matched.clear();
+    status_="已清除轨迹点与匹配结果";emit changed();
+}
+QString NavigationWorkflow::exportTrackPoints(const QString& path) const {
+    if(trackPoints_.isEmpty()) return QStringLiteral("没有可导出的轨迹点");
+    QSaveFile f(path);
+    if(!f.open(QIODevice::WriteOnly|QIODevice::Text)) return QString("无法写入：%1").arg(f.errorString());
+    QByteArray csv("latitude,longitude\n");
+    for(const auto& p:trackPoints_) csv+=QByteArray::number(p.y(),'f',9)+','+QByteArray::number(p.x(),'f',9)+'\n';
+    if(f.write(csv)!=csv.size()||!f.commit()) return QString("写入失败：%1").arg(f.errorString());
+    return {};
+}
+void NavigationWorkflow::matchTrackPoints() {
+    if(trackPoints_.size()<2) {status_="地图匹配至少需要 2 个轨迹点，请右键地图“设为轨迹点”";emit changed();return;}
+    runMatch(trackPoints_,{});
+}
+void NavigationWorkflow::runMatch(QVector<QPointF> geoPoints,QString path) {
+    auto n=state_.network;const auto entry=activeDataset_;
+    run("FMM 匹配",[n,entry,geoPoints=std::move(geoPoints),path](auto c) mutable {
         if(!n) throw std::runtime_error("请先加载路网");
-        QFile f(path); if(!f.open(QIODevice::ReadOnly)||f.size()>1024*1024) throw std::runtime_error("轨迹文件不可读或超过 1 MiB");
-        QTextStream in(&f); if(in.readLine().trimmed()!="latitude,longitude")
-            throw std::runtime_error("CSV 首行须为 latitude,longitude，坐标为 WGS84 度");
-        WorkflowResult r; std::vector<algorithms::FmmPoint> points;
-        while(!in.atEnd()) { check(c); const auto line=in.readLine().trimmed(); if(line.isEmpty()) continue;
-            const auto a=line.split(','); bool ok1=false,ok2=false;
-            const double lat=a.value(0).toDouble(&ok1),lon=a.value(1).toDouble(&ok2);
-            if(a.size()!=2||!ok1||!ok2||!std::isfinite(lat)||!std::isfinite(lon)||!n->roads->bounds().contains(lat,lon))
-                throw std::runtime_error("轨迹有非法坐标或位于已加载工作区域之外");
-            r.observations.append({lon,lat}); const auto p=n->project({lon,lat}); points.push_back({p.x(),p.y()});
-            if(points.size()>256) throw std::runtime_error("本次匹配支持 2–256 个轨迹点，请裁剪轨迹");
+        auto valid=[](double lat,double lon){return std::isfinite(lat)&&std::isfinite(lon)&&std::abs(lat)<=85&&std::abs(lon)<=180;};
+        if(!path.isEmpty()) {
+            QFile f(path); if(!f.open(QIODevice::ReadOnly)||f.size()>1024*1024) throw std::runtime_error("轨迹文件不可读或超过 1 MiB");
+            QTextStream in(&f); if(in.readLine().trimmed()!="latitude,longitude")
+                throw std::runtime_error("CSV 首行须为 latitude,longitude，坐标为 WGS84 度");
+            while(!in.atEnd()) { check(c); const auto line=in.readLine().trimmed(); if(line.isEmpty()) continue;
+                const auto a=line.split(','); bool ok1=false,ok2=false;
+                const double lat=a.value(0).toDouble(&ok1),lon=a.value(1).toDouble(&ok2);
+                if(a.size()!=2||!ok1||!ok2||!valid(lat,lon)) throw std::runtime_error("轨迹有非法坐标");
+                geoPoints.append({lon,lat});
+                if(geoPoints.size()>kMaxTrackPoints) throw std::runtime_error("本次匹配支持 2–256 个轨迹点，请裁剪轨迹");
+            }
         }
-        if(points.size()<2) throw std::runtime_error("匹配至少需要 2 个轨迹点");
+        if(geoPoints.size()<2) throw std::runtime_error("匹配至少需要 2 个轨迹点");
+        if(geoPoints.size()>kMaxTrackPoints) throw std::runtime_error("本次匹配支持 2–256 个轨迹点，请裁剪轨迹");
+        WorkflowResult r;
+        // Points outside the loaded area: a standard-OSM dataset reloads the
+        // roads of the points' box + 1 km (same regional adapter as planning).
+        auto inside=[&](const RoadNetwork& net){for(const auto& p:geoPoints)if(!net.roads->bounds().contains(p.y(),p.x()))return false;return true;};
+        if(!inside(*n)) {
+            if(!entry||entry->sourceFormat=="osmx") throw std::runtime_error("轨迹有点位于已加载工作区域之外");
+            double minLat=90,maxLat=-90,minLon=180,maxLon=-180;
+            for(const auto& p:geoPoints){minLat=std::min(minLat,p.y());maxLat=std::max(maxLat,p.y());minLon=std::min(minLon,p.x());maxLon=std::max(maxLon,p.x());}
+            const double dy=1000/111195.08,dx=dy/std::cos((minLat+maxLat)*.5*std::acos(-1.)/180.);
+            const data::OsmxBounds area{std::max(-85.,minLat-dy),std::max(-180.,minLon-dx),std::min(85.,maxLat+dy),std::min(180.,maxLon+dx),true};
+            try { n=buildNetwork(data::ImportedDataset(entry->cachePath).roads(area,c),c); }
+            catch(const std::exception& e) { if(c&&c->load()) throw;
+                throw std::runtime_error(("无法加载轨迹所在区域的路网："+QString::fromUtf8(e.what())).toStdString()); }
+            if(!inside(*n)) throw std::runtime_error("轨迹有点位于导入数据范围之外");
+            r.network=n; r.loadedArea=area;
+        }
+        std::vector<algorithms::FmmPoint> points;
+        for(const auto& g:geoPoints) { r.observations.append(g); const auto p=n->project(g); points.push_back({p.x(),p.y()}); }
         const QString fmm=backend("fmm"),ubodt=backend("ubodt_gen");
         if(fmm.isEmpty()) throw std::runtime_error("找不到真实 FMM 后端，请检查安装");
         QTemporaryDir temp; if(!temp.isValid()) throw std::runtime_error("临时目录创建失败");
@@ -382,8 +401,8 @@ void NavigationWorkflow::match(const QString& path) {
         writeShape(*n,stem,c); generateUbodt(ubodt,stem,table,c); check(c);
         algorithms::FmmConfig config; config.executable=fmm; config.networkFile=stem+".shp"; config.ubodtFile=table;
         config.datasetId=n->roads->info().datasetId; config.networkVersion=n->version; config.ubodtNetworkVersion=n->version;
-        config.coordinateDefinition=QString::fromStdString(n->graph.metadata.frame.definition); config.timeoutMs=120000;
-        for(const auto& e:n->graph.edges) config.p0EdgeIds.emplace(qint64(e.id.value),e.id);
+        config.coordinateDefinition=QString::fromStdString(n->graph().metadata.frame.definition); config.timeoutMs=120000;
+        for(const auto& e:n->graph().edges) config.p0EdgeIds.emplace(qint64(e.id.value),e.id);
         const auto matched=algorithms::runFmm(config,points,c);
         if(matched.status!=algorithms::FmmStatus::Matched) throw std::runtime_error((matched.message+" "+matched.processLog.right(500)).toStdString());
         for(const auto& p:matched.matchedGeometry) r.matched.append(n->unproject({p.x,p.y}));

@@ -30,6 +30,8 @@
 | 24 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、用临时程序在湖北数据上复现诊断、本机代码编辑、统一基线虚拟机内构建/CTest | 修复“无法规划”：规划区域不可达时自动扩大重试 |
 | 25 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、截图诊断、本机代码编辑、统一基线虚拟机内构建/CTest、湖北远距离实测 | 跨城远距离规划：仿 Navit route_depth 的分级路网 |
 | 26 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、下载并校验开源语音依赖、本机代码编辑、本机 Hyper-V Ubuntu 24.04.5 虚拟机内构建/CTest、三种语音组合实测与 Navit 0.5.7 对照 | 第三次作业 LinuxVoiceAdapter：C ABI/FFI、Piper+Vosk 本地中文 TTS/ASR、语音页与导航桥接、麦克风权限与离线资源分发 |
+| 27 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、统一基线 Ubuntu 24.04.5 虚拟机内构建/CTest、两种组合与旧实现在湖北数据上实测 | 路网建模改用开源算法：Boost.Graph CSR + Boost.Geometry R*-tree/投影，选 A 并清理 B |
+| 28 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、编译外部 FMM 19ef34e、统一基线 Ubuntu 24.04.5 虚拟机内构建/CTest、湖北真实数据匹配实测 | 地图右键设为轨迹点、导出轨迹点、进行地图匹配 |
 
 ## 1. AI使用详情
 
@@ -1551,3 +1553,59 @@ AI回答：
 是否采用，以及原因：已实现于本机工作区（未提交）；试验组合选择原文“A: espeak-ng + Vosk,B: speech-dispatcher + Vosk（推荐）,C: Piper + whisper.cpp”，最终选择原文“D: Piper + Vosk（推荐）”，见 DEC-20261123-1-voice-backend-01；采用原因待用户自己填写。
 
 对本组的实际价值：新增语音 PAL `libp1_voice.so`（纯 C ABI `include/contracts/VoiceFfi.h`，三线程模型，回调只在分发线程串行送达，销毁后零回调）、Piper 中文播报与 Vosk 中文识别、Qt `VoiceService`/`VoiceNavigationBridge`（引导去重、偏航/到达打断、语音指令驱动 `NavigationController` 契约）、“语音助手”页面、麦克风探测与应用内同意、Flatpak 权限声明模板、离线资源安装与 `tools/fetch-voice-deps.sh`（SHA256 校验）。根 CTest 22/22。限制：虚拟机无声卡/麦克风，真人语音与扬声器听感未测，识别质量用合成语音测得；4 号状态机未实现，桥接用契约 Fake 验证；Flatpak 未构建；Navit espeak-ng 命令行配置未测（NAVIT-20261123-1-voice-01）。
+
+### 对话 27：路网建模改用开源算法
+
+对话编号：27（组员 1；记录 ID：20261126-member1-road-model-01）
+
+日期：2026-11-26（Asia/Shanghai）。
+
+场景：组员 1 要求把路网建模改为开源实现，数据导入模块不变。属于跨模块修改（主责 3 号，影响 2、4 号）。按 AGENTS 第 7 节展示 A Boost 一体、B Boost+GeographicLib、C RoutingKit 三种组合，组员选 A、B 试验；B 的依赖由组员自行用 sudo 安装。实测后组员选 A，B 已清理。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+将本项目中路网建模的部分(数据导入模块不变)改为使用开源算法实现
+```
+
+AI回答：
+
+> Both candidates pass the full root suite (23/23 each).
+
+> The post-cleanup numbers match the trial's A within noise (10 km query median 1.47 ms, 0 cost mismatches), so the formal path really is A.
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已实现于本机工作区（分支 `codex/member-1/road-model-open-source`，未提交）。试验组合选择原文“A Boost 一体（推荐）,B Boost+GeographicLib（推荐）”，最终选择原文“A Boost 一体（推荐）”，见 DEC-20261126-1-road-model-01；采用原因待用户自己填写。
+
+对本组的实际价值：新增 `src/algorithms/roadmodel/`（Boost.Graph CSR 持久图 + `filtered_graph` 行车视图 + 直线下界 A* + Boost.Geometry R*-tree 吸附 + srs 横轴墨卡托/haversine），替换 `NavigationWorkflow` 中自写的投影、建图和吸附；新增测试 `member3-roadmodel` 7/7，根 CTest 23/23。湖北 10 km 路网单次查询中位 43.3→1.47 ms，建网 14→65 ms，端到端规划与旧实现持平，峰值内存下降。限制：建网更贵，每次规划都重建路网时没有提速；Navit 对标受阻（NAVIT-20261126-1-road-model-01）；需 3、4 号评审。
+
+### 对话 28：地图轨迹点、导出与地图匹配
+
+对话编号：28（组员 1；记录 ID：20261127-member1-track-points-01）
+
+日期：2026-11-26 至 2026-11-27（Asia/Shanghai）。
+
+场景：组员 1 在地图页新增轨迹点功能。匹配复用 3 号的真实 FMM 适配，未改算法。本机原来没有 FMM 后端：组员 1 用 sudo 安装 GDAL / Boost Serialization 开发包，并允许下载固定提交 19ef34e 编译到仓库外，之后在湖北真实数据上实测。
+
+工具：Claude Code（Claude 桌面应用 Code 标签页）；模型 Claude Opus 5.5（claude-opus-5-5）；应用版本未记录。
+
+提示词：
+
+```text
+新添加功能：鼠标右键新增设为轨迹点选项，在地图展开的列表中新增导出轨迹点与进行地图匹配两个功能。
+```
+
+AI回答：
+
+> Real matching works on Hubei data. Both cases succeed, the outside-area case reloads roads around the points, and the median deviation from the true route is 0 m.
+
+> One honest problem: a request takes about 46 s.
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已实现于本机工作区（分支 `codex/member-1/road-model-open-source`，未提交）；采用原因待用户自己填写。
+
+对本组的实际价值：地图上可以直接右键设轨迹点、导出 CSV，并用真实 FMM/HMM 做地图匹配；超出已加载区域的点会自动加载道路；`map.track` 与 design.md 一致。新增测试 `trackPointsExportAndMatch` 与可选真实验收 `realTrackMatching`，根 CTest 23/23；湖北 6/6 成功、偏离中位 0 m。限制：单次匹配约 47 s、峰值约 1.5 GiB（UBODT 预计算）；Navit 不适用 / 受阻（NAVIT-20261127-1-track-matching-01）；需 3 号评审性能改进。

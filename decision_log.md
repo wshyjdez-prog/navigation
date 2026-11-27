@@ -32,6 +32,93 @@
 | `DEC-20261101-3-open-source-01` | A*/HMM 来源与 Qt 适配 / 3 | 本次忽略多方案比较；独立验收通过，Navit 待测 | Boost.Graph A*、固定 FMM HMM | h=0 有向图、外部 CLI 与有限窗口，公共契约不变 | project.md 三号汇总；ai_log：A* 对话 12，FMM/HMM 对话 13（原 ID 保留） |
 | `DEC-20261111-1-osm-feature-import-01` | 标准 OSM 要素导入（POI/道路/面）/ 1 授权，主责 2 | 用户指定单方案；未做 2–3 种试验对比，也未选择“忽略”，待用户确认是否补做 | 不适用 | libosmium 两遍读取 + Assembler 组面 + SQLite schema 2 | project.md 2026-11-11 记录；ai_log 对话 18；NAVIT-20261111-1-osm-feature-import-01 |
 | `DEC-20261123-1-voice-backend-01` | LinuxVoiceAdapter 本地 TTS/ASR 后端 / 1（X09：G10 无接口，按组员要求用开源代替） | 已完成（清理与复验完成；真人语音/扬声器、Navit espeak-ng 命令行待补测） | A espeak-ng+Vosk、B speech-dispatcher+Vosk、C Piper+whisper.cpp（三种全选） | D Piper+Vosk（由 C 的 TTS 与 A/B 的 ASR 组成，组员明确选择）；espeak-ng、speech-dispatcher、whisper.cpp 已清理 | project.md 2026-11-23 语音记录；ai_log 对话 26；NAVIT-20261123-1-voice-01 |
+| `DEC-20261126-1-road-model-01` | 路网建模（投影/边长、有向图、吸附索引、行车子图）开源化 / 1 授权，主责 3，影响 2、4 | 已完成（Navit 对标受阻待补） | A Boost 一体、B Boost+GeographicLib | A；B、试验开关与试验目标已清理 | project.md 2026-11-26 路网建模记录；NAVIT-20261126-1-road-model-01 |
+
+### DEC-20261126-1-road-model-01：路网建模改用开源算法
+
+#### 1. 背景与约束
+
+- 发起：2026-11-26（Asia/Shanghai），组员 1（对话中确认“1 号”）。状态：**已完成**（Navit 对标受阻待补）。跨模块修改：路网建模主责 3 号；数据契约属 2 号（本次不改）；规划调用影响 4 号。
+- 任务原文：“将本项目中路网建模的部分(数据导入模块不变)改为使用开源算法实现”。
+- 范围：`NavigationWorkflow` 里自写的路网建模。原来有四部分：等距圆柱投影；把 OSMX 边转成 `GraphData`；吸附（一般模式用 `OsmxDataset::nearestNode` 网格，行车模式线性扫描全部节点）；按次生成行车子图。另外，A* 每次查询都要重建 Boost `adjacency_list`。
+- 不变：导入模块、`OsmxDataset`/`ImportedDataset` 契约、行车道路规则 `carAllowed()`（`DEC-20261111-1-route-mode-01`）、分级远距离加载（`DEC-20261111-1-long-route-01`）、`findRoute(GraphData)`（3 号 A*，仍供测试与 RealPlannerBridge 使用）、FMM 导出（改为取模型导出的 `GraphData`）。
+- 基线：分支 `codex/member-1/map-poi-labels-route-mode` @ `6b2fc50`，工作区干净；试验在新分支 `codex/member-1/road-model-open-source` 上进行。改动前根 CTest 22 项。
+- 跨组接口：X02（G2 有向路网，条件依赖）仍未对接，本次不涉及；不使用外部组交付物。
+- 关联：`DEC-20261101-3-open-source-01`（Boost.Graph A* 选型，当时 h=0，原因是 P0 未给出几何下界）。新模型的边长与启发式用同一种地表距离，可以作下界，所以两个候选都改用直线距离启发式。
+
+#### 2. 全部候选与第一次选择
+
+| 组合 | 算法 + 数据结构/索引 + 依赖 | 预期利弊（展示时，非实测） | 与已有模块关系 | 是否入选 |
+| --- | --- | --- | --- | --- |
+| A Boost 一体 | Boost.Graph `compressed_sparse_row_graph`（每个路网建一次，A* 直接复用）+ `filtered_graph` 行车视图 + Boost.Geometry R*-tree 吸附 + Boost.Geometry srs 横轴墨卡托投影 + haversine 边长 | 不新增依赖，查询快；球面边长有约 0.1–0.3% 的系统差 | 只用已装的 Boost 1.83 | 入选（AI 推荐） |
+| B Boost+GeographicLib | Boost.Graph `adjacency_list<vecS>`（建一次）+ `filtered_graph` + R*-tree + GeographicLib LocalCartesian 投影 + WGS84 大地线边长（Karney） | 椭球精度最好；新增 libgeographiclib-dev，大地线计算慢 | 新依赖不在统一基线内，须登记 | 入选（AI 推荐） |
+| C RoutingKit | KIT RoutingKit（BSD-2，需下载源码）CSR + GeoPositionToNode + 其 car 规则 | 成熟的路由图；但会改变已确认的行车规则，并且要引入外部源码 | 冲突 `DEC-20261111-1-route-mode-01` | 未入选 |
+
+- 同时展示“忽略：仅本次跳过方案对比规则”。组员 1 于 2026-11-26 选择：“A Boost 一体（推荐）,B Boost+GeographicLib（推荐）”。
+- B 的依赖：AI 没有 sudo 权限，由组员 1 在终端执行 `sudo apt install -y libgeographiclib-dev`（noble 2.3-1build1）后回复“已安装”。
+
+#### 3. 实现范围与实测方法
+
+- 公共契约：`src/algorithms/roadmodel/RoadModel.{h,cpp}`（投影/反投影、地表距离、按模式和方向吸附、路线、导出 `GraphData`）。公共模板 `roadmodel/detail/ModelImpl.h`：图容器、`filtered_graph`、带下界的 `astar_search`、R*-tree 打包加载。
+- 试验专属文件（未选方案清理依据）：`roadmodel/trial/BoostCsrModel.cpp`（A）、`roadmodel/trial/GeographicLibModel.cpp`（B）、`roadmodel/trial/RoadModelBench.cpp`、`roadmodel/trial/WorkflowBench.cpp`；CMake 中 GeographicLib 的 pkg-config 探测、`P1_HAVE_GEOGRAPHICLIB`、`p1-roadmodel-bench` / `p1-workflow-bench` 目标；`NavigationWorkflow.cpp` 的 `P1_ROAD_MODEL` 试验开关。
+- 接入改动：`RoadNetwork` 改为持有 `model`，`graph()` 改为访问器；删除 `drivingGraph()`、`lat0/metresLon` 等字段；`snap()` 改用模型。新增测试 `src/algorithms/tests/RoadModelTests.cpp`（CTest `member3-roadmodel`，每个已编入的后端各跑 7 项）；`tests/BusinessTests.cpp` 适配新访问器。
+- 环境：Ubuntu 24.04.5，8 vCPU（i7-13620H 宿主），9.7 GiB；GCC 13.3.0、CMake 3.28.3、Qt 6.4.2、Boost 1.83.0、GeographicLib 2.3；Release/Ninja；测时无其他计算负载。见 `docs/benchmarks/navit/NAVIT-20261126-1-road-model-01/evidence/environment.txt`。
+- 数据：本机湖北导入缓存（sqlite SHA256 `05b67d42…039025`），中心为武昌 30.5530,114.3200，与以往报告一致。
+- 组件测试（`p1-roadmodel-bench`）：半径 1/3/5/10 km 的同一区域。建网预热 1 次、正式 5 次。查询为 200 对随机点（种子 20261126），计时含吸附与路线，旧实现另含每次的行车子图构建。正确性：一般模式下，每条成功路线都与同一图上的穷举 h=0 A* 比较代价（相对误差 ≤1e-6）。旧实现是改动前代码的等价复刻（含版本哈希）。
+- 端到端测试（`p1-workflow-bench`）：流程与地图一致，先加载起点 1 km，再规划。8 条跨城路线 + 20 对城区路线（种子 20261126），两种模式，每组 3 次。基线为 `6b2fc50` 的 Release 构建，在 worktree 中编译同一测试文件。峰值内存由 `/usr/bin/time -v` 记录。
+
+#### 4. 实测指标与契合度
+
+组件（半径 10 km：155,223 节点 / 273,147 有向边；中位/P95，n=5 次建网，200 次查询）：
+
+| 实现 | 建网 ms | 建网增加 RSS MiB | 一般 查询 ms | 行车 查询 ms | 一般 吞吐 次/s | 一般 成功/路不通/吸附失败 | 代价不一致 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 旧实现 | 14.3 / 19.4 | 29.0 | 43.3 / 53.2 | 48.7 / 55.0 | 27.6 | 158 / 3 / 39 | 0 |
+| A | 68.4 / 68.8 | 53.9 | 1.45 / 7.22 | 0.97 / 4.47 | 399.5 | 171 / 7 / 22 | 0 / 171 |
+| B | 171.2 / 171.6 | 66.1 | 4.74 / 26.7 | 3.33 / 18.1 | 105.1 | 171 / 7 / 22 | 0 / 171 |
+
+- 其他半径（1/3/5 km）的趋势相同，见 `evidence/component-*.csv`。3 km 时一般模式查询中位：旧 6.20、A 0.21、B 0.76 ms。
+- 边长总和（10 km）：旧/A 均为 8306.509 km（与导入时的长度一致），B 为 8303.315 km（椭球大地线，差 −0.04%）。
+- 吸附失败减少：旧实现在“最近节点不能出发”时直接报错，新模型取最近的可用节点。
+- 组件测试进程峰值 RSS：旧 148.4、A 139.1、B 149.4 MiB。
+
+端到端（`evidence/workflow-summary.csv`；规划请求到结果，中位/P95 ms）：
+
+| 实现 | 城区 一般（成功/60） | 城区 行车（成功/60） | 跨城 一般（成功/24） | 跨城 行车（成功/24） | 算法耗时中位（城区/跨城 一般） | 路线长度比（对基线） | 进程峰值 RSS |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 基线 6b2fc50 | 54.8 / 161.2（54） | 64.1 / 128.7（51） | 369.9 / 640.5（24） | 387.1 / 733.1（24） | 4.5 / 50.2 | 1 | 309.1 MiB |
+| A | 62.2 / 168.0（57） | 64.3 / 130.9（51） | 388.2 / 690.5（24） | 376.6 / 706.5（24） | 1.0 / 9.2 | 1.00000（共同成功样本） | 233.7 MiB |
+| B | 82.9 / 252.7（57） | 83.0 / 198.6（51） | 497.1 / 941.2（24） | 489.0 / 948.4（24） | 4.5 / 46.4 | 0.9982–1.0013 | 290.0 MiB |
+
+- 端到端时间主要花在区域读取（2 号 SQLite）和每次规划重建的路网上：起终点超出已加载区域时会重建，跨城时还要建分级路网。A 的算法耗时降为约 1/5，但建网变贵，端到端与基线大致持平（城区一般 +13%，跨城一般 +5%，跨城行车 −3%）。B 在各项上都比 A 慢。
+- 城区一般模式成功 54→57：基线中城区 7、8 因“选点不能作为当前方向的路网端点”失败（各 3 次）；新吸附能找到最近的可用节点，城区 8 成功（26.2 km）。城区 7 的终点 500 m 内没有可到达节点，A、B 都如实报错。
+
+契合度（标准：既有回归通过数、必需改动范围、线程/资源、依赖）：
+
+| 组合 | 回归 | 必需改动 | 线程/资源 | 依赖 | 结论 |
+| --- | --- | --- | --- | --- | --- |
+| A | 根 CTest 23/23；roadmodel 7/7 | `NavigationWorkflow`、`BusinessTests`；公共契约不变 | 模型不可变、const 查询，可在 worker 并发；GUI 只调用 project/unproject | 仅 Boost 1.83（已在基线中） | 高 |
+| B | 根 CTest 23/23（`P1_ROAD_MODEL=B`）；roadmodel 7/7 | 同 A | 同 A | 新增 libgeographiclib-dev，统一基线之外，五人环境都需安装 | 中（依赖） |
+
+- AI 推荐最终方案：**A**。理由：查询比 B 快约 3 倍，建网约快 2.5 倍；内存最低；不新增依赖。B 的椭球精度只带来约 0.04–0.2% 的长度差，对选路影响可以忽略。限制：A 的建网成本约为旧实现的 4.8 倍，在“每次规划都重建路网”的场景下端到端没有变快；后续可以考虑缓存路网或扩大一次加载的范围。
+- Navit：本机未安装 Navit，`route_graph_build` 计时受阻，见 `NAVIT-20261126-1-road-model-01`。
+- 未做综合评分。展示时间：2026-11-26。
+
+#### 5. 最终确认
+
+- 选定：**A Boost 一体**。组员 1，2026-11-26，确认原文：“A Boost 一体（推荐）”。
+- 理由（AI 依据实测）：查询最快、内存最低、不新增依赖；正确性与 B 相同（代价与穷举 A* 0 不一致，根 CTest 23/23）。限制：建网比旧实现贵约 4.8 倍，端到端与旧实现持平；球面边长与导入长度口径一致，相对 WGS84 椭球约有 0.04% 差。
+- 正式入口：`algorithms::roadmodel::build(Input, cancel)`（`src/algorithms/roadmodel/RoadModel.h`）；实现在 `roadmodel/BoostCsrModel.cpp` + `roadmodel/detail/ModelImpl.h`。由 `NavigationWorkflow::buildNetwork()` 调用，参数：吸附半径 500 m，R*-tree 节点容量 16，启发式系数 (1−1e-9)。
+
+#### 6. 清理与复验
+
+- 保留：`roadmodel/RoadModel.h`、`roadmodel/BoostCsrModel.cpp`（由 `trial/` 移出）、`roadmodel/detail/ModelImpl.h`、`tests/RoadModelTests.cpp`（改为单后端 7 项）、`NavigationWorkflow`/`BusinessTests` 的接入改动。
+- 删除：`roadmodel/trial/GeographicLibModel.cpp`、`trial/RoadModelBench.cpp`、`trial/WorkflowBench.cpp`、`trial/` 目录；`roadmodel/RoadModel.cpp`（只剩后端分派，`build()` 并入 `BoostCsrModel.cpp`）；`Backend` 枚举与 `available()`；CMake 的 GeographicLib pkg-config 探测与 `P1_HAVE_GEOGRAPHICLIB`；根 CMake 的 `p1-roadmodel-bench`/`p1-workflow-bench` 目标；`NavigationWorkflow.cpp` 的 `P1_ROAD_MODEL` 开关。
+- 依赖：项目不再引用 GeographicLib；本机已装的 libgeographiclib-dev 不影响构建，组员可以自行 `sudo apt remove libgeographiclib-dev`，其他四人不需要安装。Boost 1.83 本来就在统一基线中。
+- 保留证据：两个测试程序的源码存档为 `evidence/*.cpp.txt`，另有原始 CSV、`/usr/bin/time` 输出、`summarize.py`、`environment.txt`。
+- 残留检查：在 `src`、`tests` 和 CMake 中搜索 `GeographicLib|P1_ROAD_MODEL|P1_HAVE|trial/|Backend::`，无残留（其余 “backend” 命中均属语音/瓦片模块）。
+- 复验（2026-11-26）：在全新 Release 目录配置和构建，CMakeCache 中无 GeographicLib；根 CTest 23/23；`member3-roadmodel` 7/7。用存档的测试程序对正式代码复测：组件 10 km 一般模式查询中位/P95 1.47 / 6.50 ms，建网 65.2 / 68.4 ms，代价不一致 0；端到端城区一般 64.5 / 176.2 ms（57/60），跨城一般 392.2 / 708.9 ms（24/24），与试验时的 A 一致（`evidence/post-*`）。端到端进程峰值 RSS 为 264.5 MiB（试验时 233.7 MiB，两次运行有波动，仍低于基线 309.1 MiB）。
+- 当前项目只保留 A。`project.md` 2026-11-26 路网建模记录；`ai_log.md` 对话 27；未提交（用户未授权提交）。
 
 ### DEC-20261123-1-voice-backend-01：LinuxVoiceAdapter 本地 TTS/ASR 后端
 

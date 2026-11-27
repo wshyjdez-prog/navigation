@@ -40,7 +40,7 @@ cmake --build "$prefix/build" --target fmm ubodt_gen --parallel 1
 mkdir -p "$prefix/bin" "$prefix/lib"
 cp "$source_dir/build/fmm" "$source_dir/build/ubodt_gen" "$prefix/bin/"
 cp "$prefix/build/libFMMLIB.so" "$prefix/lib/"
-cp "$source_dir/LICENSE" "$prefix/"
+cp "$source_dir"/LICENSE* "$prefix/"  # upstream ships LICENSE.TXT
 printf 'FMM source: https://github.com/cyang-kth/fmm/tree/%s\n' "$commit"
 printf 'Set P1_FMM_EXECUTABLE=%s/bin/fmm and P1_UBODT_EXECUTABLE=%s/bin/ubodt_gen\n' "$prefix" "$prefix"
 printf 'Include %s/lib in LD_LIBRARY_PATH when required. Preserve upstream third_party licences.\n' "$prefix"

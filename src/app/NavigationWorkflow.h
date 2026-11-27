@@ -2,6 +2,7 @@
 #include "app/ImportTypes.h"
 #include "data/osmx/OsmxDataset.h"
 #include "algorithms/model/Types.h"
+#include "algorithms/roadmodel/RoadModel.h"
 #include "app/RoutingProfile.h"
 #include <QObject>
 #include <QPointF>
@@ -13,11 +14,14 @@
 namespace p1::app {
 // GUI-owned coordinator. All parsing, graph conversion and external processes
 // run on workers over immutable snapshots. Geo points use x=longitude,y=latitude.
+// The routable model (projection, directed graph, snapping index, car
+// profile) is built once per network by the open-source road model
+// (DEC-20261126-1-road-model-01); node index = OSMX node index.
 struct RoadNetwork {
     std::shared_ptr<const data::OsmxDataset> roads;
-    algorithms::model::GraphData graph;
-    double lat0=0, lon0=0, metresLat=0, metresLon=0;
+    std::shared_ptr<const algorithms::roadmodel::RoadModel> model;
     QString version;
+    const algorithms::model::GraphData& graph() const { return model->graph(); }
     QPointF project(QPointF geo) const;
     QPointF unproject(QPointF metric) const;
 };
@@ -40,9 +44,20 @@ public:
     // Applies to the next plan(); matching keeps the full network.
     void setRouteMode(RouteMode mode);
     RouteMode routeMode() const { return routeMode_; }
-    // Car-only subgraph (same node/edge ids) used by RouteMode::Driving.
-    static algorithms::model::GraphData drivingGraph(const RoadNetwork& network);
+    // Matches a WGS84 trajectory CSV ("latitude,longitude") with the real FMM.
     void match(const QString& csvPath);
+    // Track points set on the map (x=longitude, y=latitude), kept in order.
+    // Changing them clears the previous matching result.
+    static constexpr int kMaxTrackPoints=256;
+    void addTrackPoint(QPointF geo);
+    void clearTrackPoints();
+    const QVector<QPointF>& trackPoints() const { return trackPoints_; }
+    // Writes the track points as the CSV match() reads; returns an error text,
+    // empty on success. GUI thread (at most kMaxTrackPoints lines).
+    QString exportTrackPoints(const QString& path) const;
+    // FMM/HMM matching of the track points (2..kMaxTrackPoints); a regional
+    // network is reloaded around them when they leave the loaded area.
+    void matchTrackPoints();
     void cancel();
     void beginMapPick(bool start);
     void acceptMapPoint(QPointF geo);
@@ -69,6 +84,7 @@ signals:
     void endpointSelected(bool start, QPointF geo);
 private:
     void run(const QString& kind, std::function<WorkflowResult(std::shared_ptr<std::atomic_bool>)>);
+    void runMatch(QVector<QPointF> points, QString csvPath);
     QThreadPool pool_;
     QVector<std::shared_ptr<std::atomic_bool>> cancellations_;
     quint64 generation_=0;
@@ -79,6 +95,7 @@ private:
     WorkflowResult lastResult_;
     std::optional<ImportResult> activeDataset_, pendingDataset_;
     std::optional<QPointF> startPoint_, endPoint_;
+    QVector<QPointF> trackPoints_;
     quint64 datasetRevision_=0;
     RouteMode routeMode_=RouteMode::General;
 };

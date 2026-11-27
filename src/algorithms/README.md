@@ -2,6 +2,8 @@
 
 P0 部分实现 C++17 图、轨迹、基础校验和只读快照。命名空间为 `p1::algorithms::model`，仅依赖标准库；类型是第三位组员的内部表示。依据《第三位组员技术架构与分阶段开发方案-2026-10-28.md》修订审核版第 9 节实施。
 
+2026-11-26（1 号授权，`DEC-20261126-1-road-model-01`）：新增 `roadmodel/` 路网模型，供应用规划使用。它用 Boost.Graph `compressed_sparse_row_graph`（每个路网建一次，行车模式用 `filtered_graph`）、Boost.Geometry R*-tree 吸附、srs 横轴墨卡托投影与 haversine 边长，`astar_search` 以直线距离为下界；测试 `member3-roadmodel`。`core/BoostAStar.h` 的 `findRoute(GraphData)` 与 P0 契约不变，仍供 RoutePlanner 适配器和测试使用。
+
 2026-11-01：按用户新授权新增可选 Boost.Graph A* 核心、固定样例、测试和 RoutePlanner 后台适配器。详见 [A* 接入说明](ASTAR_INTEGRATION.md)，包括来源/许可证、坐标和契约边界、实际 Windows 检查以及 Ubuntu 构建命令。两个新构建开关默认 OFF；以下保留 P0 的数据规则与历史验证记录，后续 P1 授权限制描述属于当时阶段记录。
 
 同日审核收尾：修复重算期间旧路线保留与交接后显式释放；A* 增加独立于 P0 的道路数值域校验。P0 用例全部保留，仅共用重复辅助代码；A* 及 Qt 测试合并重复流程，CTest 精简为模型、A*、RoutePlanner 三项，demo 单独运行。修复后的 Windows 非 Qt 目标文件编译通过，Qt/Ubuntu 验证仍待用户执行；前后数量和理由见接入说明。

@@ -1,0 +1,17 @@
+date: 2026-11-26 20:03:13 CST
+Ubuntu 24.04.5 LTS
+7.0.0-43-generic
+CPU(s):                                  8
+Model name:                              13th Gen Intel(R) Core(TM) i7-13620H
+Mem:            9938        3640        2300         181        4482        6298
+gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+cmake version 3.28.3
+libboost1.83-dev:amd64 1.83.0-2.1ubuntu3.2
+libgeographiclib-dev 2.3-1build1
+libosmium2-dev 2.20.0-1
+qt6-base-dev:amd64 6.4.2+dfsg-21.1build5
+CMAKE_BUILD_TYPE:STRING=Release
+baseline commit: 6b2fc50 (worktree build, Release)
+trial branch: codex/member-1/road-model-open-source @ 6b2fc50 + uncommitted trial files
+dataset cache: imports/d08fd759-…sqlite sha256 05b67d42f80733661a191bb7d91bc451470f45a9a8de37ecf06c75b56b939025
+navit: not installed; dpkg navit: 

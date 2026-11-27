@@ -15,6 +15,7 @@
 #include <QDirIterator>
 #include <QTemporaryDir>
 #include <QFile>
+#include <random>
 #include <QLabel>
 #include <QPushButton>
 #include <QTabWidget>
@@ -57,10 +58,14 @@ private slots:
     void regionalRoads(){data::ImportedDataset cache(imported_.cachePath);auto ds=cache.roads({30.59,114.30,30.60,114.31,true});
         QCOMPARE(ds->wayCount(),quint32(2));QCOMPARE(ds->nodeCount(),quint32(5));QCOMPARE(ds->edges().size(),4);
         QCOMPARE(ds->displayName(*ds->wayIndex(10)),QString("真实数据测试路"));
-        auto n=app::NavigationWorkflow::buildNetwork(ds);QCOMPARE(n->graph.edges.size(),size_t(4));
-        auto path=algorithms::findRoute(n->graph,algorithms::model::NodeId(1),algorithms::model::NodeId(3));
+        auto n=app::NavigationWorkflow::buildNetwork(ds);QCOMPARE(n->graph().edges.size(),size_t(4));
+        auto path=algorithms::findRoute(n->graph(),algorithms::model::NodeId(1),algorithms::model::NodeId(3));
         QCOMPARE(path.status,algorithms::RouteStatus::Success);QVERIFY(path.total_distance_m>180&&path.total_distance_m<200);
-        QCOMPARE(algorithms::findRoute(n->graph,algorithms::model::NodeId(3),algorithms::model::NodeId(1)).status,algorithms::RouteStatus::Unreachable);
+        QCOMPARE(algorithms::findRoute(n->graph(),algorithms::model::NodeId(3),algorithms::model::NodeId(1)).status,algorithms::RouteStatus::Unreachable);
+        // The persistent road model gives the same answer as the exported GraphData.
+        const auto modelled=n->model->route(0,2,algorithms::roadmodel::Profile::General);
+        QCOMPARE(modelled.status,algorithms::RouteStatus::Success);QVERIFY(std::abs(modelled.total_distance_m-path.total_distance_m)<1e-6);
+        QCOMPARE(n->model->route(2,0,algorithms::roadmodel::Profile::General).status,algorithms::RouteStatus::Unreachable);
         auto c=std::make_shared<std::atomic_bool>(true);QVERIFY_EXCEPTION_THROWN(cache.roads({30.59,114.30,30.60,114.31,true},c),std::runtime_error);}
     void routeAndCancel(){app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);
         flow.load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);QVERIFY(flow.state().network);
@@ -271,7 +276,7 @@ private slots:
         {   // The old fixed 1 km margin alone has no path.
             const double dy=1000./111195.08,dx=dy/std::cos(30.5*std::acos(-1.)/180);
             auto ds=data::ImportedDataset(entry.cachePath).roads({30.5-dy,114.30-dx,30.5+dy,114.31+dx,true});auto n=app::NavigationWorkflow::buildNetwork(ds);
-            QCOMPARE(algorithms::findRoute(n->graph,algorithms::model::NodeId(*ds->nearestNode(30.5,114.30,10)+1),algorithms::model::NodeId(*ds->nearestNode(30.5,114.31,10)+1)).status,algorithms::RouteStatus::Unreachable);
+            QCOMPARE(n->model->route(*ds->nearestNode(30.5,114.30,10),*ds->nearestNode(30.5,114.31,10),algorithms::roadmodel::Profile::General).status,algorithms::RouteStatus::Unreachable);
         }
         flow.plan({114.30,30.5},{114.31,30.5});QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);
         QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
@@ -353,6 +358,49 @@ private slots:
         const auto empty=data::ImportedDataset(imported_.cachePath).roads({32.,116.,32.01,116.01,true},{},true);
         QCOMPARE(empty->wayCount(),quint32(0));
     }
+    void trackPointsExportAndMatch(){
+        ui::Theme theme;theme.apply(*qApp);app::MainWindow window(theme,nullptr,dir_->filePath("track-cache"));window.resize(1200,800);window.show();window.setCurrentPage("map");
+        auto* flow=window.findChild<app::NavigationWorkflow*>();QSignalSpy done(flow,&app::NavigationWorkflow::completed);
+        flow->load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
+        auto* canvas=window.findChild<QWidget*>("mapRenderCanvas");auto* map=window.findChild<QWidget*>("mapPage");
+        QTRY_VERIFY_WITH_TIMEOUT(canvas->property("regionRevision").toULongLong()>1&&canvas->property("tilesComplete").toBool(),10000);
+        auto* menu=window.findChild<QMenu*>("mapMainMenu");auto* exportAction=menu->findChild<QAction*>("exportTrackPoints");
+        auto* matchAction=menu->findChild<QAction*>("matchTrackPoints");auto* clearAction=menu->findChild<QAction*>("clearTrackPoints");
+        QVERIFY(exportAction&&matchAction&&clearAction);QVERIFY(!exportAction->isEnabled()&&!matchAction->isEnabled());
+        auto addTrack=[&](QPointF geo){
+            const auto point=mapPixel(canvas,*flow->state().network,geo);
+            QContextMenuEvent event(QContextMenuEvent::Mouse,point,canvas->mapToGlobal(point));QApplication::sendEvent(canvas,&event);
+            auto* popup=canvas->findChild<QMenu*>("mapPointMenu");if(!popup) return false;
+            auto* action=popup->findChild<QAction*>("setTrackPoint");if(!action||!action->text().startsWith("设为轨迹点")) return false;
+            action->trigger();popup->close();QCoreApplication::sendPostedEvents(nullptr,QEvent::DeferredDelete);return true;};
+        QVERIFY(addTrack({114.3052,30.5931}));QCOMPARE(flow->trackPoints().size(),1);QVERIFY(exportAction->isEnabled()&&!matchAction->isEnabled());
+        QVERIFY(addTrack({114.3062,30.5931}));QCOMPARE(flow->trackPoints().size(),2);QVERIFY(matchAction->isEnabled());
+        QVERIFY(std::abs(flow->trackPoints()[0].x()-114.3052)<.00001&&std::abs(flow->trackPoints()[1].y()-30.5931)<.00001);
+        QTRY_COMPARE_WITH_TIMEOUT(canvas->property("trackPointCount").toInt(),2,10000);
+        // Export writes the CSV that "选择轨迹并运行 FMM" reads.
+        const auto csv=dir_->filePath("exported-track");map->setProperty("trackExportPath",csv);exportAction->trigger();
+        QFile f(csv+".csv");QVERIFY(f.open(QIODevice::ReadOnly));const auto lines=QString::fromUtf8(f.readAll()).split('\n',Qt::SkipEmptyParts);
+        QCOMPARE(lines.size(),3);QCOMPARE(lines[0],QString("latitude,longitude"));
+        QVERIFY(std::abs(lines[1].split(',')[0].toDouble()-flow->trackPoints()[0].y())<1e-8&&std::abs(lines[2].split(',')[1].toDouble()-flow->trackPoints()[1].x())<1e-8); // 9 decimals
+        QVERIFY(canvas->property("mapNotice").toString().contains("已导出 2 个轨迹点"));
+        if(const auto captures=qEnvironmentVariable("P1_BUSINESS_CAPTURE_DIR");!captures.isEmpty()){
+            flow->addTrackPoint({114.3058,30.5938});QTRY_COMPARE_WITH_TIMEOUT(canvas->property("trackPointCount").toInt(),3,10000);
+            window.findChild<QAction*>("fitNavigationResult")->trigger();QTest::qWait(600);
+            QVERIFY(QDir().mkpath(captures));QVERIFY(window.grab().save(QDir(captures).filePath("track-points-light.png")));
+            theme.setDark(true);QTest::qWait(600);QVERIFY(window.grab().save(QDir(captures).filePath("track-points-dark.png")));theme.setDark(false);
+            flow->clearTrackPoints();flow->addTrackPoint({114.3052,30.5931});flow->addTrackPoint({114.3062,30.5931});}
+        // Matching runs on a worker; without a real backend it fails honestly and keeps the points.
+        qputenv("P1_FMM_EXECUTABLE",dir_->filePath("missing-fmm").toUtf8());qputenv("P1_UBODT_EXECUTABLE",dir_->filePath("missing-ubodt").toUtf8());
+        matchAction->trigger();QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);QCOMPARE(done.last()[0].toString(),QString("FMM 匹配"));
+        QVERIFY(!done.last()[1].toBool());QCOMPARE(flow->trackPoints().size(),2);QVERIFY(flow->state().matched.isEmpty());
+        // Points outside the loaded 1 km area: the roads around them are loaded first
+        // (the error is then about the backend, not about the area).
+        flow->clearTrackPoints();QVERIFY(flow->trackPoints().isEmpty()&&!exportAction->isEnabled());
+        flow->addTrackPoint({115.5002,31.5002});flow->addTrackPoint({115.5008,31.5008});
+        flow->matchTrackPoints();QTRY_COMPARE_WITH_TIMEOUT(done.count(),3,10000);QVERIFY(!done.last()[1].toBool());
+        QVERIFY2(!flow->status().contains("区域之外")&&!flow->status().contains("无法加载"),qPrintable(flow->status()));
+        qunsetenv("P1_FMM_EXECUTABLE");qunsetenv("P1_UBODT_EXECUTABLE");
+        flow->clearTrackPoints();flow->matchTrackPoints();QVERIFY(flow->status().contains("至少需要 2 个轨迹点"));}
     void malformedTrajectory(){app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);flow.load(imported_,30.593,114.305,1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,10000);
         const auto csv=dir_->filePath("bad.csv");write(csv,"lat,lon\n30.593,114.305\n");flow.match(csv);QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,10000);QVERIFY(!done.last()[1].toBool());QVERIFY(flow.state().matched.isEmpty());}
     void realHubei(){const auto cache=qEnvironmentVariable("P1_REAL_MAP_CACHE");if(cache.isEmpty())QSKIP("Set P1_REAL_MAP_CACHE for real Hubei acceptance");
@@ -378,6 +426,46 @@ private slots:
             QVERIFY(QDir().mkpath(captures));QVERIFY(window.grab().save(QDir(captures).filePath("hubei-route-match-light.png")));
             theme.setDark(true);QTest::qWait(500);QVERIFY(window.grab().save(QDir(captures).filePath("hubei-route-match-dark.png")));
             window.resize(1024,720);QTest::qWait(500);QVERIFY(window.grab().save(QDir(captures).filePath("hubei-compact.png")));
+        }
+    }
+    // Real acceptance (opt-in): track points along a real Hubei A* route with a
+    // fixed +-8 m jitter, matched by the real FMM backend (P1_FMM_EXECUTABLE /
+    // P1_UBODT_EXECUTABLE). Prints CSV lines "track,..." for the report.
+    void realTrackMatching(){const auto cache=qEnvironmentVariable("P1_REAL_MAP_CACHE");if(cache.isEmpty())QSKIP("Set P1_REAL_MAP_CACHE and P1_FMM_* for real track matching");
+        const auto imported=data::ImportedDataset(cache).summary();const int repeats=qEnvironmentVariableIntValue("P1_TRACK_REPEATS")>0?qEnvironmentVariableIntValue("P1_TRACK_REPEATS"):3;
+        const QPointF origin(114.3200,30.5530);
+        auto metric=[](QPointF a,QPointF o){return QPointF((a.x()-o.x())*111195.08*std::cos(o.y()*M_PI/180),(a.y()-o.y())*111195.08);};
+        auto distanceToLine=[&](QPointF p,const QVector<QPointF>& line){double best=1e18;const auto o=line.front();const auto q=metric(p,o);
+            for(int i=1;i<line.size();++i){const auto a=metric(line[i-1],o),b=metric(line[i],o);const QLineF ab(a,b);const double L2=ab.dx()*ab.dx()+ab.dy()*ab.dy();
+                double t=L2>0?((q.x()-a.x())*ab.dx()+(q.y()-a.y())*ab.dy())/L2:0;t=std::clamp(t,0.,1.);best=std::min(best,QLineF(q,a+t*(b-a)).length());}return best;};
+        auto lengthOf=[&](const QVector<QPointF>& line){double m=0;for(int i=1;i<line.size();++i)m+=QLineF(metric(line[i-1],line[0]),metric(line[i],line[0])).length();return m;};
+        // Points every `spacing` metres along `line`, jittered with a fixed seed.
+        auto sample=[&](const QVector<QPointF>& line,double spacing,int maxPoints,quint32 seed){QVector<QPointF> out;std::mt19937 rng(seed);std::uniform_real_distribution<double> j(-8,8);
+            double next=0,walked=0;const auto o=line.front();
+            for(int i=1;i<line.size()&&out.size()<maxPoints;++i){const auto a=metric(line[i-1],o),b=metric(line[i],o);const double seg=QLineF(a,b).length();
+                while(next<=walked+seg&&out.size()<maxPoints){const auto p=a+(seg>0?(next-walked)/seg:0)*(b-a)+QPointF(j(rng),j(rng));
+                    out.append({o.x()+p.x()/(111195.08*std::cos(o.y()*M_PI/180)),o.y()+p.y()/111195.08});next+=spacing;}
+                walked+=seg;}
+            return out;};
+        std::printf("track,case,repeat,points,ok,request_ms,algorithm_ms,route_km,matched_km,dev_median_m,dev_p95_m,dev_max_m,status\n");
+        struct Case{const char* name;QPointF to;bool outside;};
+        for(const Case& tc:{Case{"inside-1km",QPointF(114.3290,30.5590),false},Case{"outside-reload",QPointF(114.3700,30.5800),true}}){
+            for(int r=0;r<repeats;++r){
+                app::NavigationWorkflow flow;QSignalSpy done(&flow,&app::NavigationWorkflow::completed);
+                flow.load(imported,origin.y(),origin.x(),tc.outside?1:2);QTRY_COMPARE_WITH_TIMEOUT(done.count(),1,180000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+                flow.plan(origin,tc.to);QTRY_COMPARE_WITH_TIMEOUT(done.count(),2,60000);QVERIFY2(done.last()[1].toBool(),qPrintable(flow.status()));
+                auto route=flow.state().route;
+                if(tc.outside){ // keep the far part of the route, then reload only 1 km around the start
+                    route=route.mid(route.size()/2);flow.load(imported,origin.y(),origin.x(),1);QTRY_COMPARE_WITH_TIMEOUT(done.count(),3,180000);}
+                for(const auto& p:sample(route,120,60,20261126+r))flow.addTrackPoint(p);
+                const int before=done.count();QElapsedTimer t;t.start();flow.matchTrackPoints();
+                QTRY_COMPARE_WITH_TIMEOUT(done.count(),before+1,300000);const double ms=t.nsecsElapsed()/1e6;const bool ok=done.last()[1].toBool();
+                QVector<double> dev;for(const auto& p:flow.state().matched)dev.append(distanceToLine(p,route));std::sort(dev.begin(),dev.end());
+                auto q=[&](double f){return dev.isEmpty()?0.:dev[std::min<qsizetype>(dev.size()-1,qsizetype(std::ceil(f*dev.size()))-1)];};
+                std::printf("track,%s,%d,%d,%d,%.1f,%.1f,%.3f,%.3f,%.2f,%.2f,%.2f,%s\n",tc.name,r,int(flow.trackPoints().size()),int(ok),ms,ok?flow.lastResult().algorithmMs:0.,
+                    lengthOf(route)/1000,ok?lengthOf(flow.state().matched)/1000:0.,q(.5),q(.95),dev.isEmpty()?0.:dev.last(),qPrintable(flow.status().replace(',',';').left(90)));std::fflush(stdout);
+                QVERIFY2(ok,qPrintable(flow.status()));QVERIFY(flow.state().matched.size()>=2);
+            }
         }
     }
     void pairedScenario(){const auto cache=qEnvironmentVariable("P1_REAL_MAP_CACHE");if(cache.isEmpty())QSKIP("real map cache required");
@@ -420,8 +508,8 @@ private slots:
             if(i>=0)redraws.append(QJsonObject{{"request_to_frame_ms",clock.nsecsElapsed()/1e6},
                 {"worker_ms",canvas->property("renderElapsedMs").toDouble()},{"base_cache_hit",canvas->property("cacheHit").toBool()}});}
         const auto network=flow.state().network;const auto bounds=network->roads->bounds();
-        double width=(bounds.maxLon-bounds.minLon)*network->metresLon*1.1;
-        double height=(bounds.maxLat-bounds.minLat)*network->metresLat*1.1;
+        double width=(network->project({bounds.maxLon,bounds.centerLat()}).x()-network->project({bounds.minLon,bounds.centerLat()}).x())*1.1;
+        double height=(network->project({bounds.centerLon(),bounds.maxLat}).y()-network->project({bounds.centerLon(),bounds.minLat}).y())*1.1;
         const double aspect=double(canvas->width())/canvas->height();width=std::max(width,height*aspect);height=width/aspect;
         const QJsonObject viewport{{"width_px",canvas->width()},{"height_px",canvas->height()},
             {"width_m",width},{"height_m",height},{"center_lon",bounds.centerLon()},{"center_lat",bounds.centerLat()}};

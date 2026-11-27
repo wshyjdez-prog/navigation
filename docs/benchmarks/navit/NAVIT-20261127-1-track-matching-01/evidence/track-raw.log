@@ -1,0 +1,15 @@
+********* Start testing of BusinessTests *********
+Config: Using QtTest library 6.4.2, Qt 6.4.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 13.2.0), ubuntu 24.04
+PASS   : BusinessTests::initTestCase()
+track,case,repeat,points,ok,request_ms,algorithm_ms,route_km,matched_km,dev_median_m,dev_p95_m,dev_max_m,status
+track,inside-1km,0,22,1,46845.2,9785.7,2.579,2.499,0.00,0.00,13.47,真实 FMM/HMM 匹配成功 · 22 点 / 85 条路径边；UBODT 阈值 2000 m，断点间距须在阈值内
+track,inside-1km,1,22,1,47569.1,9832.8,2.579,2.477,0.00,0.00,0.00,真实 FMM/HMM 匹配成功 · 22 点 / 86 条路径边；UBODT 阈值 2000 m，断点间距须在阈值内
+track,inside-1km,2,22,1,47275.9,9834.8,2.579,2.482,0.00,0.00,10.60,真实 FMM/HMM 匹配成功 · 22 点 / 85 条路径边；UBODT 阈值 2000 m，断点间距须在阈值内
+track,outside-reload,0,38,1,46453.9,9387.6,4.532,4.430,0.00,0.00,0.00,真实 FMM/HMM 匹配成功 · 38 点 / 84 条路径边；UBODT 阈值 2000 m，断点间距须在阈值内
+track,outside-reload,1,38,1,46012.3,9202.9,4.532,4.443,0.00,0.00,6.57,真实 FMM/HMM 匹配成功 · 38 点 / 86 条路径边；UBODT 阈值 2000 m，断点间距须在阈值内
+track,outside-reload,2,38,1,46680.2,9458.1,4.532,4.443,0.00,0.00,0.00,真实 FMM/HMM 匹配成功 · 38 点 / 84 条路径边；UBODT 阈值 2000 m，断点间距须在阈值内
+PASS   : BusinessTests::realTrackMatching()
+PASS   : BusinessTests::cleanupTestCase()
+Totals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 282033ms
+********* Finished testing of BusinessTests *********
+exit=0

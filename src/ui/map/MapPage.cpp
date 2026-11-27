@@ -45,7 +45,7 @@ public:
         auto* format=label("CSV 首行：latitude,longitude\n后续每行一对 WGS84 纬度、经度。支持 2–256 点；相邻点沿路距离不超过 2000 m。","secondary");format->setWordWrap(true);ml->addWidget(format);
         match_=button("选择轨迹并运行 FMM",true);match_->setObjectName("matchTrajectory");ml->addWidget(match_);
         auto* exportRoute=button("导出路线为测试轨迹");exportRoute->setObjectName("exportRouteTrajectory");ml->addWidget(exportRoute);
-        auto* legend=label("灰线：原始轨迹\n橙线：FMM/HMM 匹配路径\n蓝线：A* 规划路线\n\n后台生成本区域 UBODT；取消会终止子进程，任务结束清理临时文件。","caption");legend->setWordWrap(true);ml->addWidget(legend);ml->addStretch();tabs->addTab(matchPage,"轨迹");
+        auto* legend=label("绿线：原始轨迹\n橙线：FMM/HMM 匹配路径\n蓝线：A* 规划路线\n\n后台生成本区域 UBODT；取消会终止子进程，任务结束清理临时文件。","caption");legend->setWordWrap(true);ml->addWidget(legend);ml->addStretch();tabs->addTab(matchPage,"轨迹");
         auto* cancel=button("取消当前任务");cancel->setObjectName("cancelNavigationTask");l->addWidget(cancel);
         status_=label(flow_->status(),"secondary");status_->setObjectName("navigationStatus");status_->setWordWrap(true);l->addWidget(status_);
         metrics_=label({},"caption");metrics_->setObjectName("algorithmMetrics");metrics_->setWordWrap(true);l->addWidget(metrics_);
