@@ -696,3 +696,14 @@ Windows Qt 6.12 Release 预检中 A 相对 B 的中位耗时低约 3.0%，P95 �
 - 验证：根 CTest 19/19。湖北 8 个终点（53–406 km）× 两种模式 16/16 成功，0.33–0.74 s，峰值 RSS 280.7 MiB；质量对照见 `NAVIT-20261111-1-long-route-01`（与全量相比，长度比中位 1.0004，最大 2.33）。
 - 状态：本次忽略，单方案已实现；Navit 同起终点对比受阻；需 2、3、4 号评审。
 
+### DEC-20261128-5-geodesic-strategy-01：模拟导航地理计算改用开源 Boost.Geometry
+
+- 负责人/日期：5 / 2026-11-28。范围：`NavigationSimulation` 中的 WGS84 距离、沿线插值和航向；不改 A*、HMM、导航快照契约或其他组代码。
+- 用户原文：`第二次第三次用了开源算法吗，没用要重新写了，换上开源算法`。
+- 原因：原实现使用 `111195.08 m/度` 等距圆柱近似和经纬度线性插值，属于 AI 手写地理计算，不适合继续作为第三次作业算法依据。
+- 候选：A Boost.Geometry geographic Vincenty；B Boost.Geometry Andoyer；C Boost.Geometry Thomas。三者均为 BSL-1.0 开源实现，接口相同。
+- 本次选择：A Vincenty。依据是使用 WGS84 椭球、精度高于手写近似；B/Andoyer 和 C/Thomas 尚未在统一 Ubuntu 环境形成项目内实测，不伪造性能结论。
+- 实现：`src/ui/map/NavigationSimulation.*` 使用 Boost.Geometry `distance`、`line_interpolate`、`azimuth` 和 `srs::spheroid`；路线本身仍来自 3 号 Boost.Graph A*，匹配仍来自 3 号 FMM/HMM。
+- 验证状态：已基于队友最新 `main/3d2b513` 适配；仍需统一 Ubuntu / Boost 1.83 环境编译、运行导航模拟测试和桌面演示。Andoyer/Thomas 的速度对比与 Navit 渲染对比未测。
+- 关联：`docs/open-source-usage.md`、`docs/reports/member-5-assignment-2-3-report.md`、AI 日志 29。
+

@@ -6,6 +6,8 @@
 
 5 号本次负责地图上的导航展示，不重复实现 4 号导航状态机。演示输入直接使用 `NavigationWorkflow` 中真实 A* 计算得到的路线，按固定速度沿路线生成来源为 `mock` 的 `NavigationSnapshot`，再把快照交给 LinuxRenderer。
 
+沿路线的球面距离、位置插值和航向计算使用 **Boost.Geometry 1.83 的 geographic Vincenty 策略**（Boost Software License 1.0）。代码不再使用手写的“每度米数 + 经纬度线性插值”公式；A* 路线本身仍来自 3 号接入的 Boost.Graph，5 号没有重复实现路径规划。
+
 实现内容：
 
 - 当前位置沿当前 A* 路线移动，并显示带航向的方向标记；
@@ -31,7 +33,7 @@
 
 | 输入/输出 | 约定 |
 | --- | --- |
-| 路线 | `NavigationWorkflow::state().route`，元素为 WGS84 `{经度, 纬度}` |
+| 路线 | `NavigationWorkflow::state().route`，元素为 WGS84 `{经度, 纬度}`；距离和插值由 Boost.Geometry 计算 |
 | 导航快照 | `contracts::NavigationSnapshot` |
 | 地图场景 | `renderer::MapScene` |
 | 当前位置 | `MarkerKind::CurrentPosition`，航向单位为度，正北为 0、顺时针增加 |
@@ -46,7 +48,7 @@
 Windows Qt 6.12 / MinGW 13.1 独立检查完成：
 
 - `NavigationSimulation.cpp`、`MapView.cpp`、`LinuxRenderer.cpp` 编译通过；
-- 新增的导航模拟测试 4/4 通过（推进、暂停/继续、倍速、到达、非法路线）；
+- 新增的导航模拟测试覆盖推进、暂停/继续、倍速、Boost.Geometry 球面路线长度、到达和非法路线；
 - 原有 LinuxRenderer 测试通过；
 - 生成离屏预览图，确认路线、起点、终点、当前位置方向标记和转向卡进入同一帧。
 

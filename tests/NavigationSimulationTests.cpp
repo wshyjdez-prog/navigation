@@ -56,6 +56,15 @@ private slots:
         QCOMPARE(fast.speedMultiplier(), 4.0);
     }
 
+    void geodesicRouteLengthUsesBoostGeometry() {
+        ui::NavigationSimulation simulation;
+        QVERIFY(simulation.setRoute(route(), 10.0));
+        const double total = simulation.remainingM();
+        // Vincenty on the WGS84 spheroid: about 95.8 m east + 111.1 m north.
+        QVERIFY2(total > 205.0 && total < 209.0,
+                 qPrintable(QString::number(total, 'f', 3)));
+    }
+
     void arrivalProducesTerminalGuidance() {
         ui::NavigationSimulation simulation;
         QVERIFY(simulation.setRoute(route(), 10.0));

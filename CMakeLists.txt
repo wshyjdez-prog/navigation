@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_AUTOMOC ON)
 find_package(Qt6 6.4.2 EXACT REQUIRED COMPONENTS Widgets Concurrent)
+find_package(Boost 1.74 REQUIRED)
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 6.4.2 EXACT REQUIRED COMPONENTS Test)
@@ -109,7 +110,11 @@ add_subdirectory(src/navigation)
 if(NOT P1_NAVIGATION_REAL_PLANNER OR NOT P1_ALGORITHMS_BUILD_FMM_ADAPTER)
     message(FATAL_ERROR "The business workflow requires the selected A* and FMM adapters")
 endif()
-target_link_libraries(p1_ui PUBLIC p1_algorithms_astar p1_algorithms_roadmodel p1_algorithms_fmm)
+target_link_libraries(p1_ui PUBLIC
+    p1_algorithms_astar
+    p1_algorithms_roadmodel
+    p1_algorithms_fmm
+    Boost::headers)
 if(BUILD_TESTING)
     qt_add_executable(p1-pyramid-tests tests/TilePyramidTests.cpp)
     target_link_libraries(p1-pyramid-tests PRIVATE p1_ui Qt6::Test)

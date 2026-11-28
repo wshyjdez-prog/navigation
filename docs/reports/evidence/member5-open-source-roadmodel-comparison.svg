@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1240" height="700" viewBox="0 0 1240 700" role="img" aria-labelledby="chart-title chart-desc">
+  <title id="chart-title">开源路网模型查询和建网性能对比</title>
+  <desc id="chart-desc">湖北 10 公里路网，Boost.Graph CSR 方案查询中位 1.451 毫秒、建网 68.44 毫秒；Boost 加 GeographicLib 方案查询 4.744 毫秒、建网 171.22 毫秒；旧实现查询 43.304 毫秒、建网 14.32 毫秒。</desc>
+  <style>
+    text { font-family: "Noto Sans CJK SC", "Microsoft YaHei", sans-serif; fill: #202335; }
+    .title { font-size: 23px; font-weight: 700; }
+    .subtitle { font-size: 13px; fill: #625c73; }
+    .panel { font-size: 16px; font-weight: 600; }
+    .tick { font-size: 12px; fill: #625c73; }
+    .label { font-size: 12px; }
+    .note { font-size: 12px; fill: #625c73; }
+    .grid { stroke: #dcd4e6; stroke-width: 1; }
+    .axis { stroke: #81778f; stroke-width: 1.2; }
+    .series-a { fill: none; stroke: #2f6fed; stroke-width: 3; }
+    .series-b { fill: none; stroke: #d97706; stroke-width: 3; }
+    .series-old { fill: none; stroke: #7b8494; stroke-width: 3; }
+  </style>
+  <rect width="1240" height="700" fill="#ffffff"/>
+  <text class="title" x="48" y="38">开源路网模型性能对比</text>
+  <text class="subtitle" x="48" y="63">湖北 10 km 路网 · 155,223 节点 · 200 对随机点 · Ubuntu 24.04 / Boost 1.83 / Release</text>
+
+  <circle cx="710" cy="39" r="6" fill="#2f6fed"/>
+  <text class="label" x="724" y="44">A：Boost.Graph CSR + R*-tree</text>
+  <circle cx="930" cy="39" r="6" fill="#d97706"/>
+  <text class="label" x="944" y="44">B：Boost + GeographicLib</text>
+  <circle cx="1138" cy="39" r="6" fill="#7b8494"/>
+  <text class="label" x="1152" y="44">旧实现</text>
+
+  <text class="panel" x="70" y="96">一般模式查询耗时、中位（越低越好）</text>
+  <line class="grid" x1="90" y1="110" x2="565" y2="110"/>
+  <line class="grid" x1="90" y1="200" x2="565" y2="200"/>
+  <line class="grid" x1="90" y1="290" x2="565" y2="290"/>
+  <line class="grid" x1="90" y1="380" x2="565" y2="380"/>
+  <line class="grid" x1="90" y1="470" x2="565" y2="470"/>
+  <line class="axis" x1="90" y1="110" x2="90" y2="470"/>
+  <line class="axis" x1="90" y1="470" x2="565" y2="470"/>
+  <text class="tick" x="48" y="114">100</text>
+  <text class="tick" x="60" y="204">10</text>
+  <text class="tick" x="66" y="294">1</text>
+  <text class="tick" x="52" y="384">0.1</text>
+  <text class="tick" x="44" y="474">0.01</text>
+  <text class="tick" x="128" y="493">1 km</text>
+  <text class="tick" x="255" y="493">3 km</text>
+  <text class="tick" x="382" y="493">5 km</text>
+  <text class="tick" x="507" y="493">10 km</text>
+  <text class="tick" x="24" y="295" transform="rotate(-90 24 295)">毫秒（对数坐标）</text>
+
+  <polyline class="series-a" points="140,402.7 270,409.6 400,452.7 540,275.5"/>
+  <polyline class="series-b" points="140,409.0 270,300.6 400,256.2 540,229.2"/>
+  <polyline class="series-old" points="140,285.4 270,218.7 400,179.7 540,142.7"/>
+  <circle cx="540" cy="275.5" r="5" fill="#2f6fed"/>
+  <circle cx="540" cy="229.2" r="5" fill="#d97706"/>
+  <circle cx="540" cy="142.7" r="5" fill="#7b8494"/>
+  <text class="label" x="488" y="264" fill="#2f6fed">1.451</text>
+  <text class="label" x="486" y="218" fill="#d97706">4.744</text>
+  <text class="label" x="480" y="132" fill="#667085">43.304</text>
+
+  <text class="panel" x="660" y="96">建网耗时、中位（越低越好）</text>
+  <line class="grid" x1="680" y1="110" x2="1170" y2="110"/>
+  <line class="grid" x1="680" y1="200" x2="1170" y2="200"/>
+  <line class="grid" x1="680" y1="290" x2="1170" y2="290"/>
+  <line class="grid" x1="680" y1="380" x2="1170" y2="380"/>
+  <line class="grid" x1="680" y1="470" x2="1170" y2="470"/>
+  <line class="axis" x1="680" y1="110" x2="680" y2="470"/>
+  <line class="axis" x1="680" y1="470" x2="1170" y2="470"/>
+  <text class="tick" x="652" y="114">180</text>
+  <text class="tick" x="652" y="204">135</text>
+  <text class="tick" x="658" y="294">90</text>
+  <text class="tick" x="658" y="384">45</text>
+  <text class="tick" x="664" y="474">0</text>
+  <text class="tick" x="720" y="493">1 km</text>
+  <text class="tick" x="840" y="493">3 km</text>
+  <text class="tick" x="960" y="493">5 km</text>
+  <text class="tick" x="1100" y="493">10 km</text>
+  <text class="tick" x="620" y="295" transform="rotate(-90 620 295)">毫秒</text>
+
+  <polyline class="series-a" points="750,467.0 860,449.6 970,418.6 1110,333.1"/>
+  <polyline class="series-b" points="750,461.5 860,418.9 970,338.1 1110,127.6"/>
+  <polyline class="series-old" points="750,469.6 860,465.0 970,461.3 1110,441.4"/>
+  <circle cx="1110" cy="333.1" r="5" fill="#2f6fed"/>
+  <circle cx="1110" cy="127.6" r="5" fill="#d97706"/>
+  <circle cx="1110" cy="441.4" r="5" fill="#7b8494"/>
+  <text class="label" x="1052" y="322" fill="#2f6fed">68.44</text>
+  <text class="label" x="1038" y="117" fill="#d97706">171.22</text>
+  <text class="label" x="1052" y="430" fill="#667085">14.32</text>
+
+  <line x1="48" y1="545" x2="1192" y2="545" stroke="#dcd4e6"/>
+  <text class="note" x="48" y="574">选择 A 的原因：查询比 B 快约 3.27 倍、比旧实现快约 29.8 倍；建网比 B 快约 2.5 倍，且不新增依赖。</text>
+  <text class="note" x="48" y="600">代价：A 建网比旧实现慢约 4.8 倍，因此端到端优势取决于是否复用已建路网，不能宣称所有场景均更快。</text>
+  <text class="note" x="48" y="626">数据来源：docs/benchmarks/navit/NAVIT-20261126-1-road-model-01/evidence/component-A.csv、component-B.csv、component-legacy.csv。</text>
+  <text class="note" x="48" y="652">归属：3 号算法/1 号装配成果；5 号仅消费路线，不把该基准冒充为自己的算法性能。</text>
+  <text class="note" x="48" y="678">Navit 同口径建图和规划耗时因本机未安装而受阻，本图不包含虚构的 Navit 数值。</text>
+</svg>

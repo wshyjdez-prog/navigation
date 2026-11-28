@@ -6,11 +6,33 @@
 
 #include <algorithm>
 #include <limits>
+#include <utility>
 
 namespace p1::ui {
 namespace {
 
-constexpr double kMetresPerDegree = 111195.08;
+namespace bg = boost::geometry;
+
+using GeoPoint = NavigationGeoPoint;
+using GeoLine = NavigationGeoLine;
+
+bg::srs::spheroid<double> earthSpheroid() {
+    return bg::srs::spheroid<double>(6378137.0, 6356752.3142451793);
+}
+
+bg::strategy::distance::geographic<bg::strategy::vincenty> distanceStrategy() {
+    return bg::strategy::distance::geographic<bg::strategy::vincenty>(earthSpheroid());
+}
+
+bg::strategy::line_interpolate::geographic<bg::strategy::vincenty>
+lineInterpolateStrategy() {
+    return bg::strategy::line_interpolate::geographic<bg::strategy::vincenty>(
+        earthSpheroid());
+}
+
+bg::strategies::azimuth::geographic<> azimuthStrategy() {
+    return bg::strategies::azimuth::geographic<>(earthSpheroid());
+}
 
 double normalizedDelta(double degrees) {
     while (degrees > 180.0) degrees -= 360.0;
@@ -18,18 +40,12 @@ double normalizedDelta(double degrees) {
     return degrees;
 }
 
-double segmentDistance(const QPointF& from, const QPointF& to) {
-    const double meanLat = qDegreesToRadians((from.y() + to.y()) * 0.5);
-    const double dx = (to.x() - from.x()) * kMetresPerDegree * qCos(meanLat);
-    const double dy = (to.y() - from.y()) * kMetresPerDegree;
-    return qSqrt(dx * dx + dy * dy);
-}
-
-double segmentBearing(const QPointF& from, const QPointF& to) {
-    const double meanLat = qDegreesToRadians((from.y() + to.y()) * 0.5);
-    const double east = (to.x() - from.x()) * qCos(meanLat);
-    const double north = to.y() - from.y();
-    return qRadiansToDegrees(qAtan2(east, north));
+double geographicBearing(const GeoPoint& from, const GeoPoint& to) {
+    double degrees = qRadiansToDegrees(
+        bg::azimuth(from, to, azimuthStrategy()));
+    if (degrees < 0.0) degrees += 360.0;
+    if (degrees >= 360.0) degrees -= 360.0;
+    return degrees;
 }
 
 QString distanceText(double metres) {
@@ -57,14 +73,20 @@ bool NavigationSimulation::setRoute(const QVector<QPointF>& geoRoute,
         }
     }
 
-    geoRoute_ = geoRoute;
+    GeoLine geographicRoute;
+    for (const auto& point : geoRoute) {
+        geographicRoute.push_back(GeoPoint(point.x(), point.y()));
+    }
+    geoRoute_ = std::move(geographicRoute);
     dataVersion_ = dataVersion;
     baseSpeedMps_ = speedMps;
     cumulativeM_.resize(geoRoute_.size());
     cumulativeM_[0] = 0.0;
-    for (int index = 1; index < geoRoute_.size(); ++index) {
+    const auto distance = distanceStrategy();
+    for (std::size_t index = 1; index < geoRoute_.size(); ++index) {
         cumulativeM_[index] =
-            cumulativeM_[index - 1] + segmentDistance(geoRoute_[index - 1], geoRoute_[index]);
+            cumulativeM_[index - 1] +
+            bg::distance(geoRoute_[index - 1], geoRoute_[index], distance);
     }
     totalM_ = cumulativeM_.back();
     travelledM_ = 0.0;
@@ -175,17 +197,14 @@ QPointF NavigationSimulation::pointAt(double distanceM, double* bearingDeg) cons
     const double clamped = qBound(0.0, distanceM, totalM_);
     auto upper = std::upper_bound(cumulativeM_.cbegin(), cumulativeM_.cend(), clamped);
     int index = int(upper - cumulativeM_.cbegin());
-    index = qBound(1, index, geoRoute_.size() - 1);
-    const double startDistance = cumulativeM_[index - 1];
-    const double segmentLength = cumulativeM_[index] - startDistance;
-    const double fraction = segmentLength > 0.0
-        ? (clamped - startDistance) / segmentLength
-        : 0.0;
+    index = qBound(1, index, int(geoRoute_.size()) - 1);
     if (bearingDeg) {
-        *bearingDeg = segmentBearing(geoRoute_[index - 1], geoRoute_[index]);
+        *bearingDeg = geographicBearing(geoRoute_[index - 1], geoRoute_[index]);
     }
-    return geoRoute_[index - 1] +
-        (geoRoute_[index] - geoRoute_[index - 1]) * fraction;
+    GeoPoint interpolated;
+    bg::line_interpolate(
+        geoRoute_, clamped, interpolated, lineInterpolateStrategy());
+    return {bg::get<0>(interpolated), bg::get<1>(interpolated)};
 }
 
 void NavigationSimulation::updateGuidance() {
@@ -200,13 +219,13 @@ void NavigationSimulation::updateGuidance() {
     } else {
         int turnIndex = -1;
         double turnDelta = 0.0;
-        for (int index = 1; index + 1 < geoRoute_.size(); ++index) {
+        for (std::size_t index = 1; index + 1 < geoRoute_.size(); ++index) {
             if (cumulativeM_[index] <= travelledM_ + 5.0) continue;
-            const double incoming = segmentBearing(geoRoute_[index - 1], geoRoute_[index]);
-            const double outgoing = segmentBearing(geoRoute_[index], geoRoute_[index + 1]);
+            const double incoming = geographicBearing(geoRoute_[index - 1], geoRoute_[index]);
+            const double outgoing = geographicBearing(geoRoute_[index], geoRoute_[index + 1]);
             const double delta = normalizedDelta(outgoing - incoming);
             if (std::abs(delta) >= 18.0) {
-                turnIndex = index;
+                turnIndex = int(index);
                 turnDelta = delta;
                 break;
             }

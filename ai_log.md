@@ -32,6 +32,7 @@
 | 26 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、下载并校验开源语音依赖、本机代码编辑、本机 Hyper-V Ubuntu 24.04.5 虚拟机内构建/CTest、三种语音组合实测与 Navit 0.5.7 对照 | 第三次作业 LinuxVoiceAdapter：C ABI/FFI、Piper+Vosk 本地中文 TTS/ASR、语音页与导航桥接、麦克风权限与离线资源分发 |
 | 27 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、统一基线 Ubuntu 24.04.5 虚拟机内构建/CTest、两种组合与旧实现在湖北数据上实测 | 路网建模改用开源算法：Boost.Graph CSR + Boost.Geometry R*-tree/投影，选 A 并清理 B |
 | 28 | 1 | Claude Code（Claude 桌面应用 Code 标签页） | Claude Opus 5.5（claude-opus-5-5）；应用版本未记录 | 桌面对话、本机代码编辑、编译外部 FMM 19ef34e、统一基线 Ubuntu 24.04.5 虚拟机内构建/CTest、湖北真实数据匹配实测 | 地图右键设为轨迹点、导出轨迹点、进行地图匹配 |
+| 29 | 5 | Codex 桌面应用 | 具体模型及应用版本未记录 | 桌面对话、基于最新 main 重新适配、开源算法替换、代码审阅 | 第二次/第三次开源算法审查；模拟导航改用 Boost.Geometry Vincenty，并保留 3 号 Boost.Graph A*/FMM |
 
 ## 1. AI使用详情
 
@@ -1609,3 +1610,29 @@ AI回答：
 是否采用，以及原因：已实现于本机工作区（分支 `codex/member-1/road-model-open-source`，未提交）；采用原因待用户自己填写。
 
 对本组的实际价值：地图上可以直接右键设轨迹点、导出 CSV，并用真实 FMM/HMM 做地图匹配；超出已加载区域的点会自动加载道路；`map.track` 与 design.md 一致。新增测试 `trackPointsExportAndMatch` 与可选真实验收 `realTrackMatching`，根 CTest 23/23；湖北 6/6 成功、偏离中位 0 m。限制：单次匹配约 47 s、峰值约 1.5 GiB（UBODT 预计算）；Navit 不适用 / 受阻（NAVIT-20261127-1-track-matching-01）；需 3 号评审性能改进。
+
+### 对话 29：第二次与第三次开源算法审查
+
+对话编号：29（组员 5；记录 ID：`20261128-member5-open-source-review-01`）
+
+日期：2026-11-28（Asia/Shanghai）。
+
+场景：基于队友最新 `main/3d2b513` 检查第二次、第三次作业是否真正使用开源实现，并把第三次模拟导航中由 AI 手写的经纬度距离与插值换成开源算法。保留队友新增的 Boost 路网、轨迹点和 FMM 匹配代码。
+
+工具：Codex 桌面应用；模型与应用版本未记录。
+
+提示词：
+
+```text
+第二次第三次用了开源算法吗，没用要重新写了，换上开源算法
+```
+
+AI回答（关键片段）：
+
+> 第二次作业已经使用 Qt QPainter（开源图形框架）和 3 号的 Boost.Graph A*；第三次的路线插值仍是我们自己写的。为了满足“不能用 AI 自写算法替代开源实现”的要求，我会把距离、沿路线定位和航向计算改为项目已依赖的开源 Boost.Geometry。
+
+我的理解：待用户自己填写。
+
+是否采用，以及原因：已采用并基于最新 `main` 重写；采用原因待用户自己填写。
+
+对本组的实际价值：`NavigationSimulation` 的球面距离、沿线位置和方位角改由 Boost.Geometry 1.83 的 geographic Vincenty 策略计算，删除手写 `111195.08 m/度` 近似与线性插值；路线仍来自 3 号 Boost.Graph A*，地图匹配仍来自 3 号 FMM/HMM。新增球面路线长度测试并保留暂停/倍速/到达测试。限制：需要统一 Ubuntu / Boost 1.83 环境重新编译确认；4 号真实导航状态机仍未完成。

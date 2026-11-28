@@ -2,6 +2,9 @@
 
 #include "contracts/NavigationTypes.h"
 
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
+
 #include <QPointF>
 #include <QVector>
 
@@ -9,9 +12,16 @@
 
 namespace p1::ui {
 
+using NavigationGeoPoint = boost::geometry::model::d2::point_xy<
+    double, boost::geometry::cs::geographic<boost::geometry::degree>>;
+using NavigationGeoLine =
+    boost::geometry::model::linestring<NavigationGeoPoint>;
+
 // UI-side deterministic playback used for the third-assignment demonstration.
 // It produces the same NavigationSnapshot consumed by production presentation
 // code; it is not a navigation state machine and never marks source=real.
+// Geodesic distance, line interpolation and azimuth use Boost.Geometry's
+// geographic Vincenty implementation (BSL-1.0), not a hand-written projection.
 class NavigationSimulation final {
 public:
     bool setRoute(const QVector<QPointF>& geoRoute,
@@ -38,7 +48,7 @@ private:
     QPointF pointAt(double distanceM, double* bearingDeg) const;
     void updateGuidance();
 
-    QVector<QPointF> geoRoute_;
+    NavigationGeoLine geoRoute_;
     QVector<double> cumulativeM_;
     QString dataVersion_;
     std::optional<contracts::NavigationSnapshot> snapshot_;
